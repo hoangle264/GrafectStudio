@@ -1,0 +1,578 @@
+"use strict";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  TEMPLATES BUNDLE — nhúng tất cả .hbs vào JS để chạy offline (file://)
+//
+//  File này được tạo tự động. Khi muốn thay đổi template:
+//    1. Sửa file .hbs tương ứng trong src/templates/
+//    2. Cập nhật chuỗi tương ứng trong file này
+//
+//  Được tải TRƯỚC unit-config.js trong index.html.
+//  Khi load xong, gọi ucInjectBundledTemplates() để nạp vào Handlebars.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const UC_TEMPLATE_BUNDLE = {
+
+  // ── src/templates/error.hbs ──────────────────────────────────────────────
+  error: `;<h1/>Error
+{{#if unit.eStop}}
+LD   {{pad unit.eStop}}; {{{unit.label}}}  estop
+ZRES {{{unit.flagOrigin}}} {{{unit.flagsResetEnd}}} ; Origin
+{{/if}}
+{{#if originBase}}
+LD   {{pad unit.flagManual}}; Manual
+ZRES {{{originBase}}} {{{unit.flagsResetEnd}}} ; CY1 Down
+{{/if}}
+{{#if unit.errorDMAddr}}
+LD   CR2002           ; Always ON
+{{#each cylinders}}
+{{#if ErrorA}}
+MOV  {{pad ErrorA}}{{{unit.errorDMAddr}}}         ; Error_{{{label}}}_{{{dirAName}}}  {{{unit.label}}}_Error
+{{/if}}
+{{/each}}
+LD>  {{pad unit.errorDMAddr}}#0             ; {{{unit.label}}}_Error
+{{else}}
+{{#each cylinders}}
+{{#if ErrorA}}
+{{#if @first}}LD   {{else}}OR   {{/if}}{{pad ErrorA}}; Error_{{{label}}}_{{{dirAName}}}
+{{/if}}
+{{#if ErrorB}}
+OR   {{pad ErrorB}}; Error_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{/each}}
+{{/if}}
+SET  {{pad unit.flagError}}; Error
+LD   {{pad unit.flagError}}; Error
+SET  {{pad unit.flagErrStop}}; Operation Error Stop
+LD   {{pad unit.flagErrStop}}; Operation Error Stop
+{{#if unit.btnReset}}
+AND  {{pad unit.btnReset}}; btnReset
+{{/if}}
+{{#if unit.flagResetPulse}}
+DIFU {{pad unit.flagResetPulse}}; Reset Error
+LDP  {{pad unit.flagResetPulse}}; Reset Error
+ZRES {{{unit.flagError}}} {{{unit.flagResetEnd}}} ; Error  Reset Error
+{{/if}}
+`,
+
+  // ── src/templates/manual.hbs ─────────────────────────────────────────────
+  manual: `;<h1/>Manual
+LDB  {{pad unit.flagAuto}}; Auto
+{{#if unit.hmiManual}}
+AND  {{pad unit.hmiManual}}; Hmi_{{{unit.label}}}_Manual
+{{/if}}
+OR   {{pad unit.flagManual}}; Manual
+{{#if unit.eStop}}
+ANB  {{pad unit.eStop}}; {{{unit.label}}}  estop
+{{/if}}
+ANB  {{pad unit.flagManPEnd}}; Manual P end
+OUT  {{pad unit.flagManual}}; Manual
+{{#if hasCysWithOut}}
+LD   {{pad unit.flagManual}}; Manual
+{{#if isSingleCylinder}}
+ANP  {{pad cylinders.[0].HmiManBtn}}; Hmi_man _{{{cylinders.[0].label}}}
+ALT  {{pad cylinders.[0].sysManFlag}}; sys_man_{{{cylinders.[0].label}}}
+{{else}}
+{{#each cylinders}}
+{{#if altStackInst}}
+{{{altStackInst}}}
+{{/if}}
+ANP  {{pad HmiManBtn}}; Hmi_man _{{{label}}}
+ALT  {{pad sysManFlag}}; sys_man_{{{label}}}
+{{/each}}
+{{/if}}
+{{/if}}
+{{#if hasCysWithOut}}
+LDB  {{pad unit.flagManual}}; Manual
+MPS
+{{#each cysWithOut}}
+ANP  {{pad CoilA}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirAName}}}
+SET  {{pad sysManFlag}}; sys_man_{{{label}}}
+{{{stackBeforeDirB}}}
+ANP  {{pad CoilB}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirBName}}}
+RES  {{pad sysManFlag}}; sys_man_{{{label}}}
+{{#if stackAfterDirB}}
+{{{stackAfterDirB}}}
+{{/if}}
+{{/each}}
+{{/if}}
+LDB  {{pad unit.flagManual}}; Manual
+{{#if showManBtnZres}}
+ZRES {{{unit.hmiManBtnBase}}} {{{unit.hmiManBtnEnd}}} ; Hmi_man _{{{firstCyLabel}}}
+{{/if}}
+LD   {{pad unit.flagAuto}}; Auto
+DIFU {{pad unit.flagManPEnd}}; Manual P end
+`,
+
+  // ── src/templates/origin.hbs ─────────────────────────────────────────────
+  origin: `;<h1/>Origin
+{{#if unit.btnStart}}
+LDP  {{pad unit.btnStart}}; btnStart
+{{/if}}
+{{#if unit.hmiStart}}
+ORP  {{pad unit.hmiStart}}; Hmi_{{{unit.label}}}_start
+{{/if}}
+ANB  {{pad unit.flagManual}}; Manual
+ANB  {{pad unit.flagHomed}}; Homed
+OR   {{pad unit.flagOrigin}}; Origin
+AND  {{pad unit.flagError}}; Error
+{{#if unit.eStop}}
+ANB  {{pad unit.eStop}}; {{{unit.label}}}  estop
+{{/if}}
+{{#if unit.hmiStop}}
+ANB  {{pad unit.hmiStop}}; Hmi {{{unit.label}}} _stop
+{{/if}}
+OUT  {{pad unit.flagOrigin}}; Origin
+{{#if hasOriginSteps}}
+{{#each originSteps}}
+;{{{actionLabel}}}
+{{#if isFirst}}
+LD   {{pad ../unit.flagOrigin}}; Origin
+ANB  {{pad ../unit.flagHomed}}; Homed
+ANB  {{pad ../unit.flagError}}; Error
+{{else}}
+LD   {{pad prevCmpAddr}}; {{{prevActionLabel}}} Cmp
+ANB  {{pad ../unit.flagError}}; Error
+{{/if}}
+{{#if extraCondition}}
+{{{extraCondition}}}
+{{/if}}
+SET  {{pad addr}}; {{{actionLabel}}}
+{{> step_body}}
+{{/each}}
+LD   {{pad lastOriginStep.cmpAddr}}; {{{lastOriginStep.actionLabel}}} Cmp
+SET  {{pad unit.flagHomed}}; Homed
+LD   {{pad unit.flagHomed}}; Homed
+{{#if unit.outHomed}}
+OUT  {{pad unit.outHomed}}; {{{unit.label}}}  homed
+{{/if}}
+{{/if}}
+`,
+
+  // ── src/templates/auto.hbs ───────────────────────────────────────────────
+  auto: `;<h1/>Auto
+{{#if unit.btnStart}}
+LDP  {{pad unit.btnStart}}; btnStart
+{{/if}}
+{{#if unit.hmiStart}}
+ORP  {{pad unit.hmiStart}}; Hmi_{{{unit.label}}}_start
+{{/if}}
+AND  {{pad unit.flagHomed}}; Homed
+OR   {{pad unit.flagAuto}}; Auto
+AND  {{pad unit.flagError}}; Error
+{{#if unit.eStop}}
+ANB  {{pad unit.eStop}}; {{{unit.label}}}  estop
+{{/if}}
+{{#if unit.hmiStop}}
+ANB  {{pad unit.hmiStop}}; Hmi infeed _stop
+{{/if}}
+OUT  {{pad unit.flagAuto}}; Auto
+{{#if unit.autoTriggerAddr}}
+LD   {{pad unit.flagHomed}}; Homed
+AND  {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagManual}}; Manual
+ANB  {{pad unit.flagError}}; Error
+SET  {{pad unit.autoTriggerAddr}}
+{{/if}}
+{{#each stationFlows}}
+;<h1/>{{{label}}}
+{{#each steps}}
+;{{{actionLabel}}}
+{{#if isFirst}}
+LD   {{pad ../../unit.flagAuto}}; Auto
+AND  {{pad ../../unit.flagHomed}}; Homed
+ANB  {{pad ../../unit.flagError}}; Error
+SET  {{pad addr}}; {{{actionLabel}}}
+{{else}}
+LD   {{pad prevCmpAddr}}; {{{prevActionLabel}}} Cmp
+ANB  {{pad ../../unit.flagError}}; Error
+{{#if extraCondition}}
+{{{extraCondition}}}
+{{/if}}
+SET  {{pad addr}}; {{{actionLabel}}}
+{{/if}}
+{{> step_body}}
+{{/each}}
+LD   {{pad lastStep.cmpAddr}}; {{{lastStep.actionLabel}}} Cmp
+DIFU {{pad endPulseAddr}}; Sequence 1 End
+LD   {{pad endPulseAddr}}; Sequence 1 End
+ZRES {{{steps.[0].addr}}} {{{resetEndAddr}}} ; {{{lastStep.actionLabel}}} Cmp
+{{/each}}
+`,
+
+  // ── src/templates/output.hbs ─────────────────────────────────────────────
+  output: `;<h1/>Output
+{{#each cylinders}}
+{{#if hasOutput}}
+;{{{label}}}
+{{#if hasDirAOutput}}
+LD   {{pad ../unit.flagAuto}}; Auto
+{{#if singleStepDirA}}
+LD   {{pad enrichedStepsDirA.[0].addr}}; {{{enrichedStepsDirA.[0].sLabel}}}
+ANB  {{pad enrichedStepsDirA.[0].cmpAddr}}; {{{enrichedStepsDirA.[0].sLabel}}} Cmp
+{{else}}
+{{#each enrichedStepsDirA}}
+LD   {{pad addr}}; {{{sLabel}}}
+ANB  {{pad cmpAddr}}; {{{sLabel}}} Cmp
+{{#if needsORL}}
+ORL
+{{/if}}
+{{/each}}
+{{/if}}
+ANL
+LD   {{pad ../unit.flagManual}}; Manual
+ANP  {{pad sysManFlag}}; sys_man_{{{label}}}
+ORL
+{{#if LockA}}
+ANB  {{pad LockA}}; {{{../unit.label}}}_{{{label}}}_Lock_{{{dirAName}}}
+{{/if}}
+SET  {{pad CoilA}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirAName}}}
+{{#if CoilB}}
+CON
+RES  {{pad CoilB}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{/if}}
+{{#if hasDirBOutput}}
+LD   {{pad ../unit.flagAuto}}; Auto
+{{#if singleStepDirB}}
+LD   {{pad enrichedStepsDirB.[0].addr}}; {{{enrichedStepsDirB.[0].sLabel}}}
+ANB  {{pad enrichedStepsDirB.[0].cmpAddr}}; {{{enrichedStepsDirB.[0].sLabel}}} Cmp
+{{else}}
+{{#each enrichedStepsDirB}}
+LD   {{pad addr}}; {{{sLabel}}}
+ANB  {{pad cmpAddr}}; {{{sLabel}}} Cmp
+{{#if needsORL}}
+ORL
+{{/if}}
+{{/each}}
+{{/if}}
+ANL
+LD   {{pad ../unit.flagManual}}; Manual
+ANF  {{pad sysManFlag}}; sys_man_{{{label}}}
+ORL
+{{#if LockB}}
+ANB  {{pad LockB}}; {{{../unit.label}}}_{{{label}}}_Lock {{{dirBName}}}
+{{/if}}
+{{#if CoilA}}
+RES  {{pad CoilA}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirAName}}}
+CON
+{{/if}}
+SET  {{pad CoilB}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{#if errTimerDirA}}
+LD   {{pad CoilA}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirAName}}}
+ANB  {{pad LSH}}; in_{{{../unit.label}}}_{{{label}}}_{{{dirAName}}}
+ANB  {{pad ../unit.flagManual}}; Manual
+ANB  {{pad ../unit.flagErrStop}}; Operation Error Stop
+ONDL #{{{errorTimeout}}} {{{ErrorA}}}   ; Error_{{{label}}}_{{{dirAName}}}
+{{/if}}
+{{#if errTimerDirB}}
+LD   {{pad CoilB}}; Out_{{{../unit.label}}}_{{{label}}}_{{{dirBName}}}
+ANB  {{pad LSL}}; in_{{{../unit.label}}}_{{{label}}}_{{{dirBName}}}
+ANB  {{pad ../unit.flagManual}}; Manual
+ANB  {{pad ../unit.flagErrStop}}; Operation Error Stop
+ONDL #{{{errorTimeout}}} {{{ErrorB}}}   ; Error_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{/if}}
+{{/each}}
+`,
+
+  // ── src/templates/main-output.hbs ────────────────────────────────────────
+  'main-output': `;<h1>OUTPUT SECTION (AUTO/MANUAL)
+{{#each outputDevices}}
+{{{renderDeviceOutput this ../unit}}}
+{{/each}}
+`,
+
+};
+
+// ── Partials bundle ───────────────────────────────────────────────────────────
+
+const UC_PARTIAL_BUNDLE = {
+
+  // ── src/templates/step-body.hbs ──────────────────────────────────────────
+  //  *** SỬA ĐÂY để thay đổi format completion của mỗi step ***
+  //  Mặc định: LD addr → AND complete → OUT cmpAddr
+  step_body: `LD   {{pad addr}}; {{{actionLabel}}}
+{{#if completeValue}}
+AND= {{pad complete}} {{completeValue}}; {{{completeLabel}}}
+{{else}}
+{{#if completeNegated}}
+ANB  {{pad complete}}; {{{completeLabel}}}
+{{else}}
+AND  {{pad complete}}; {{{completeLabel}}}
+{{/if}}
+{{/if}}
+OUT  {{pad cmpAddr}}; {{{actionLabel}}} Cmp
+`,
+
+  // ── src/templates/devices/cylinder.hbs ───────────────────────────────────
+  device_cylinder: `{{#if hasOutput}}
+;{{{label}}}
+{{#if hasDirAOutput}}
+LD   {{pad unit.flagAuto}}; Auto
+{{#if singleStepDirA}}
+LD   {{pad enrichedStepsDirA.[0].addr}}; {{{enrichedStepsDirA.[0].sLabel}}}
+ANB  {{pad enrichedStepsDirA.[0].cmpAddr}}; {{{enrichedStepsDirA.[0].sLabel}}} Cmp
+{{else}}
+{{#each enrichedStepsDirA}}
+LD   {{pad addr}}; {{{sLabel}}}
+ANB  {{pad cmpAddr}}; {{{sLabel}}} Cmp
+{{#if needsORL}}
+ORL
+{{/if}}
+{{/each}}
+{{/if}}
+ANL
+LD   {{pad unit.flagManual}}; Manual
+ANP  {{pad sysManFlag}}; sys_man_{{{label}}}
+ORL
+{{#if LockA}}
+ANB  {{pad LockA}}; {{{unit.label}}}_{{{label}}}_Lock_{{{dirAName}}}
+{{/if}}
+SET  {{pad CoilA}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirAName}}}
+{{#if CoilB}}
+CON
+RES  {{pad CoilB}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{/if}}
+{{#if hasDirBOutput}}
+LD   {{pad unit.flagAuto}}; Auto
+{{#if singleStepDirB}}
+LD   {{pad enrichedStepsDirB.[0].addr}}; {{{enrichedStepsDirB.[0].sLabel}}}
+ANB  {{pad enrichedStepsDirB.[0].cmpAddr}}; {{{enrichedStepsDirB.[0].sLabel}}} Cmp
+{{else}}
+{{#each enrichedStepsDirB}}
+LD   {{pad addr}}; {{{sLabel}}}
+ANB  {{pad cmpAddr}}; {{{sLabel}}} Cmp
+{{#if needsORL}}
+ORL
+{{/if}}
+{{/each}}
+{{/if}}
+ANL
+LD   {{pad unit.flagManual}}; Manual
+ANF  {{pad sysManFlag}}; sys_man_{{{label}}}
+ORL
+{{#if LockB}}
+ANB  {{pad LockB}}; {{{unit.label}}}_{{{label}}}_Lock {{{dirBName}}}
+{{/if}}
+{{#if CoilA}}
+RES  {{pad CoilA}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirAName}}}
+CON
+{{/if}}
+SET  {{pad CoilB}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirBName}}}
+{{/if}}
+{{#if errTimerDirA}}
+LD   {{pad CoilA}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirAName}}}
+ANB  {{pad LSH}}; FB_{{{unit.label}}}_{{{label}}}_{{{fbDirAName}}}
+{{#if DisSnsH}}
+ANB  {{pad DisSnsH}}; {{{label}}} DisSns_{{{dirAName}}} bypass
+{{/if}}
+ANB  {{pad unit.flagManual}}; Manual
+ANB  {{pad unit.flagErrStop}}; Operation Error Stop
+ONDL #{{{errorTimeout}}} {{{ErrorA}}}   ; Error_{{{label}}}_{{{dirAName}}}_to_{{{fbDirAName}}}
+{{/if}}
+{{#if errTimerDirB}}
+LD   {{pad CoilB}}; Out_{{{unit.label}}}_{{{label}}}_{{{dirBName}}}
+ANB  {{pad LSL}}; FB_{{{unit.label}}}_{{{label}}}_{{{fbDirBName}}}
+{{#if DisSnsL}}
+ANB  {{pad DisSnsL}}; {{{label}}} DisSns_{{{dirBName}}} bypass
+{{/if}}
+ANB  {{pad unit.flagManual}}; Manual
+ANB  {{pad unit.flagErrStop}}; Operation Error Stop
+ONDL #{{{errorTimeout}}} {{{ErrorB}}}   ; Error_{{{label}}}_{{{dirBName}}}_to_{{{fbDirBName}}}
+{{/if}}
+{{/if}}
+`,
+
+  // ── src/templates/devices/motor.hbs ──────────────────────────────────────
+  device_motor: `;{{{label}}}
+{{#if fwdAddr}}
+LD   {{pad unit.flagAuto}}; Auto
+{{#if fwdStepAddr}}
+AND  {{pad fwdStepAddr}}; {{{label}}} Fwd step active
+{{/if}}
+{{#if revAddr}}
+ANB  {{pad revAddr}}; {{{label}}} Rev (interlock)
+{{/if}}
+{{#if overloadAddr}}
+ANB  {{pad overloadAddr}}; {{{label}}} Overload/Fault
+{{/if}}
+LD   {{pad unit.flagManual}}; Manual
+{{#if fwdManFlag}}
+ANP  {{pad fwdManFlag}}; sys_man_{{{label}}}_Fwd
+{{/if}}
+ORL
+OUT  {{pad fwdAddr}}; {{{label}}}_Fwd
+{{/if}}
+{{#if revAddr}}
+LD   {{pad unit.flagAuto}}; Auto
+{{#if revStepAddr}}
+AND  {{pad revStepAddr}}; {{{label}}} Rev step active
+{{/if}}
+{{#if fwdAddr}}
+ANB  {{pad fwdAddr}}; {{{label}}} Fwd (interlock)
+{{/if}}
+{{#if overloadAddr}}
+ANB  {{pad overloadAddr}}; {{{label}}} Overload/Fault
+{{/if}}
+LD   {{pad unit.flagManual}}; Manual
+{{#if revManFlag}}
+ANP  {{pad revManFlag}}; sys_man_{{{label}}}_Rev
+{{/if}}
+ORL
+OUT  {{pad revAddr}}; {{{label}}}_Rev
+{{/if}}
+{{#if overloadAddr}}
+LD   {{pad overloadAddr}}; {{{label}}} Overload/Fault
+SET  {{pad unit.flagError}}; Error (motor fault)
+{{/if}}
+`,
+
+  // ── src/templates/devices/servo.hbs ──────────────────────────────────────
+  device_servo: `;{{{label}}}
+{{#if enableAddr}}
+LD   {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad enableAddr}}; {{{label}}}_Enable
+{{/if}}
+{{#if targetPos}}
+LD   {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagError}}; Error
+DMOV {{{targetPos}}} ; {{{label}}}_TargetPos
+{{/if}}
+{{#if velocityAddr}}
+LD   {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagError}}; Error
+MOV  #100   {{pad velocityAddr}}; {{{label}}}_Velocity
+{{/if}}
+{{#if resetErrAddr}}
+LD   {{pad unit.flagResetPulse}}; Reset Error pulse
+OUT  {{pad resetErrAddr}}; {{{label}}}_ResetErr
+{{/if}}
+{{#if inPositionAddr}}
+LD   {{pad enableAddr}}; {{{label}}}_Enable
+AND  {{pad inPositionAddr}}; {{{label}}}_InPosition
+{{/if}}
+`,
+
+  // ── src/templates/devices/device_robot.hbs ──────────────────────────────
+  device_robot: `;{{{label}}} - Robot {{{id}}}
+
+{{#each commandList}}
+{{#if driveSignal}}
+{{#with (lookup ../signalsByName driveSignal) as |driveAddr|}}
+{{#if driveAddr}}
+LD   {{pad ../../unit.flagAuto}}; Auto
+ANB  {{pad ../../unit.flagError}}; Error
+OUT  {{pad driveAddr}}; {{{../../label}}}_{{{../name}}}
+{{/if}}
+{{/with}}
+{{/if}}
+{{/each}}
+
+{{#if signalsByName.PowerON}}
+LD   {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad signalsByName.PowerON}}; {{{label}}}_PowerON
+{{/if}}
+
+{{#if signalsByName.AutoMode}}
+LD   {{pad unit.flagAuto}}; Auto
+OUT  {{pad signalsByName.AutoMode}}; {{{label}}}_AutoMode
+{{/if}}
+
+{{#if signalsByName.Run}}
+LD   {{pad unit.flagAuto}}; Auto
+OUT  {{pad signalsByName.Run}}; {{{label}}}_Run
+{{/if}}
+
+{{#if signalsByName.Point1}}
+LD   {{pad unit.flagAuto}}; Auto
+AND  {{pad signalsByName.Point1}}; Movement command Point1
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad signalsByName.Point1}}; {{{unit.label}}}_{{{label}}}_Point1_Cmd
+{{/if}}
+
+{{#if signalsByName.Point2}}
+LD   {{pad unit.flagAuto}}; Auto
+AND  {{pad signalsByName.Point2}}; Movement command Point2
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad signalsByName.Point2}}; {{{unit.label}}}_{{{label}}}_Point2_Cmd
+{{/if}}
+
+{{#if signalsByName.Point3}}
+LD   {{pad unit.flagAuto}}; Auto
+AND  {{pad signalsByName.Point3}}; Movement command Point3
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad signalsByName.Point3}}; {{{unit.label}}}_{{{label}}}_Point3_Cmd
+{{/if}}
+
+{{#if signalsByName.Point4}}
+LD   {{pad unit.flagAuto}}; Auto
+AND  {{pad signalsByName.Point4}}; Movement command Point4
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad signalsByName.Point4}}; {{{unit.label}}}_{{{label}}}_Point4_Cmd
+{{/if}}
+`,
+
+  // ── src/templates/devices/generic.hbs ────────────────────────────────────
+  device_generic: `; WARNING: Generic output renderer for {{{kind}}} device {{{label}}}
+{{#if renderWarning}}
+; {{{renderWarning}}}
+{{/if}}
+{{#if outputAddr}}
+LD   {{pad unit.flagAuto}}; Auto
+ANB  {{pad unit.flagError}}; Error
+OUT  {{pad outputAddr}}; {{{label}}}_Output
+{{else}}
+; WARNING: {{{label}}} has no outputAddr; no output emitted.
+{{/if}}
+`,
+
+};
+
+// ─── Inject bundle vào Handlebars + UC_TEMPLATE_CACHE ────────────────────────
+// Được gọi bởi unit-config.js SAU KHI UC_TEMPLATE_CACHE đã được khai báo.
+// KHÔNG tự chạy ở đây vì UC_TEMPLATE_CACHE chưa tồn tại lúc này.
+function ucInjectBundledTemplates() {
+  if (typeof Handlebars === 'undefined') return;
+  if (typeof UC_TEMPLATE_CACHE === 'undefined') return;
+  // Đăng ký helpers trước khi compile (pad, eq, padStart2)
+  if (!Handlebars.__ucHelpersRegistered) {
+    Handlebars.registerHelper('pad', function(addr) {
+      var s = addr != null ? String(addr) : '';
+      while (s.length < 12) s += ' ';
+      return new Handlebars.SafeString(s);
+    });
+    Handlebars.registerHelper('eq', function(a, b) { return a === b; });
+    Handlebars.registerHelper('padStart2', function(n) {
+      return String((n != null ? Number(n) : 0) + 1).padStart(2, '0');
+    });
+    Handlebars.registerHelper('resolveDevicePartial', function(device) {
+      var dev = device || this || {};
+      return dev.outputPartial || dev.partialName || ('device_' + String(dev.templateKey || dev.kind || 'generic').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''));
+    });
+    Handlebars.registerHelper('renderDeviceOutput', function(device, unit) {
+      var dev = device || this || {};
+      var key = String(dev.templateKey || dev.kind || 'generic').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+      var name = dev.outputPartial || dev.partialName || ('device_' + (key || 'generic'));
+      var partial = Handlebars.partials && (Handlebars.partials[name] || Handlebars.partials.device_generic);
+      if (!partial) return new Handlebars.SafeString('; WARNING: Missing device output partial for ' + (dev.label || 'device'));
+      var renderer = typeof partial === 'function' ? partial : Handlebars.compile(partial);
+      return new Handlebars.SafeString(renderer(Object.assign({}, dev, { unit: unit || dev.unit || {} })));
+    });
+    Handlebars.__ucHelpersRegistered = true;
+  }
+  // Compile và cache các template chính
+  Object.keys(UC_TEMPLATE_BUNDLE).forEach(function(name) {
+    if (!UC_TEMPLATE_CACHE[name]) {
+      UC_TEMPLATE_CACHE[name] = Handlebars.compile(UC_TEMPLATE_BUNDLE[name]);
+    }
+  });
+  // Đăng ký partials
+  Object.keys(UC_PARTIAL_BUNDLE).forEach(function(name) {
+    Handlebars.registerPartial(name, UC_PARTIAL_BUNDLE[name]);
+  });
+}
