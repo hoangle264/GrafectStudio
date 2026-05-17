@@ -1,0 +1,41 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# MSTest
+TestResults/
+*.trx
+
+# Publish output
+publish/
+PublishProfiles/
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Resharper
+_ReSharper*/
+*.resharper
+*.DotSettings.user
