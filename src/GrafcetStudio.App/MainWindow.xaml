@@ -7,6 +7,49 @@
         Width="1280"
         Height="720">
     <Grid>
-        <wv2:WebView2 x:Name="webView" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#1F1F1F" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="GrafcetStudio"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           FontWeight="SemiBold"
+                           DockPanel.Dock="Left" />
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="—"
+                            Width="36"
+                            Height="30"
+                            FontSize="14"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="MinimizeButton_Click" />
+                    <Button Content="□"
+                            Width="36"
+                            Height="30"
+                            FontSize="12"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="MaximizeButton_Click" />
+                    <Button Content="✕"
+                            Width="36"
+                            Height="30"
+                            FontSize="14"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="CloseButton_Click" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <wv2:WebView2 Grid.Row="1" x:Name="webView" />
     </Grid>
 </Window>

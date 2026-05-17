@@ -1,14 +1,23 @@
+using GrafcetStudio.App.Events;
+using GrafcetStudio.App.Services;
 using Microsoft.Web.WebView2.Core;
+using Prism.Events;
+using Prism.Ioc;
 using System;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
+using System.Windows.Input;
 
 namespace GrafcetStudio.App;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    private readonly IEventAggregator _eventAggregator;
+
+    public MainWindow(IEventAggregator eventAggregator)
     {
+        _eventAggregator = eventAggregator;
         InitializeComponent();
         Loaded += MainWindow_Loaded;
     }
@@ -16,8 +25,107 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         await webView.EnsureCoreWebView2Async();
+
+        var bridge = ((App)Application.Current).Container.Resolve<IWebViewBridgeService>();
+        bridge.Init(webView);
+        webView.CoreWebView2.OpenDevToolsWindow();//test
+        webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+
         var webPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web"));
+        if (webPath == null)
+        {
+            var tried = string.Join(Environment.NewLine, Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web")));
+            MessageBox.Show($"Required 'web' folder not found. Tried the following paths:\n{tried}", "Missing content", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
         webView.CoreWebView2.SetVirtualHostNameToFolderMapping("grafcet.local", webPath, CoreWebView2HostResourceAccessKind.Allow);
         webView.CoreWebView2.Navigate("https://grafcet.local/index.html");
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            return;
+        }
+
+        DragMove();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+        if (!doc.RootElement.TryGetProperty("type", out var typeElement))
+        {
+            return;
+        }
+
+        var type = typeElement.GetString();
+        var payload = doc.RootElement.TryGetProperty("payload", out var payloadElement) ? payloadElement : default;
+
+        switch (type)
+        {
+            case "GENERATE_CODE":
+            {
+                var message = new GenerateCodePayload
+                {
+                    Platform = payload.GetProperty("platform").GetString() ?? string.Empty,
+                    Steps = payload.GetProperty("steps").GetString() ?? string.Empty,
+                    Transitions = payload.GetProperty("transitions").GetString() ?? string.Empty,
+                    Actions = payload.GetProperty("actions").GetString() ?? string.Empty,
+                    Variables = payload.GetProperty("variables").GetString() ?? string.Empty,
+                    RawJson = payload.GetRawText()
+                };
+                _eventAggregator.GetEvent<GenerateCodeRequestedEvent>().Publish(message);
+                break;
+            }
+            case "AI_REQUEST":
+            {
+                var message = new AiRequestPayload
+                {
+                    Type = payload.GetProperty("type").GetString() ?? string.Empty,
+                    Prompt = payload.GetProperty("prompt").GetString() ?? string.Empty,
+                    DiagramContext = payload.GetProperty("diagramContext").GetString() ?? string.Empty
+                };
+                _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
+                break;
+            }
+            case "SAVE_FILE":
+            {
+                var projectJson = payload.GetProperty("projectJson").GetString() ?? string.Empty;
+                _eventAggregator.GetEvent<SaveFileRequestedEvent>().Publish(projectJson);
+                break;
+            }
+            case "OPEN_FILE":
+                _eventAggregator.GetEvent<OpenFileRequestedEvent>().Publish(new object());
+                break;
+            case "EXPORT_CODE":
+            {
+                var message = new ExportCodePayload
+                {
+                    Code = payload.GetProperty("code").GetString() ?? string.Empty,
+                    Platform = payload.GetProperty("platform").GetString() ?? string.Empty
+                };
+                _eventAggregator.GetEvent<ExportCodeRequestedEvent>().Publish(message);
+                break;
+            }
+        }
     }
 }

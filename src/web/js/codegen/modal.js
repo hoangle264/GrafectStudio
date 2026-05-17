@@ -635,6 +635,7 @@ function cgDownloadCode() {
       addressMode: addrMode,
       requireUnitBindings: true
     });
+    if (cgExportViaHost(result.code, 'kv-5500')) return;
     const label   = (effectiveConfig.unit?.label || 'unit').replace(/\s+/g, '_');
     const blob = new Blob([result.code], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
@@ -679,6 +680,8 @@ function cgDownloadCode() {
     ? generateKVAll(selected, { baseMR, profile })
     : generateSTDemo(selected, { baseMR });
 
+  if (cgExportViaHost(result.code, target)) return;
+
   const ext = profile ? (profile.fileExt || '.mnm') : '.st';
   const safe = (project.name || 'grafcet').replace(/\s+/g, '_');
   const blob = new Blob([result.code], { type: 'text/plain;charset=utf-8' });
@@ -687,6 +690,18 @@ function cgDownloadCode() {
   a.download = safe + '_code' + ext;
   a.click();
   toast('✓ Downloaded ' + safe + '_code' + ext);
+}
+
+function cgExportViaHost(code, platform) {
+  if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
+    return false;
+  }
+  window.chrome.webview.postMessage({
+    type: 'EXPORT_CODE',
+    payload: { code, platform }
+  });
+  toast('✓ Export dialog opened');
+  return true;
 }
 
 function cgCopyCode() {
