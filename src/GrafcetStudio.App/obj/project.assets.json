@@ -15,6 +15,19 @@
           }
         }
       },
+      "Handlebars.Net/2.1.6": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/Handlebars.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/Handlebars.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.1": {
         "type": "package",
         "compile": {
@@ -210,6 +223,29 @@
         "lib/netstandard2.0/DryIoc.xml",
         "lib/netstandard2.1/DryIoc.dll",
         "lib/netstandard2.1/DryIoc.xml"
+      ]
+    },
+    "Handlebars.Net/2.1.6": {
+      "sha512": "WsYWCEXsIM6hEOSOSRHtIYLjC8BnbT5MVmqhNKRqUI7qiv0t8x3nJiBTEv0ZZfvUAMAFnadGIzSsS/U2anVG1Q==",
+      "type": "package",
+      "path": "handlebars.net/2.1.6",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "handlebars.net.2.1.6.nupkg.sha512",
+        "handlebars.net.nuspec",
+        "hbnet-icon.png",
+        "lib/net451/Handlebars.dll",
+        "lib/net451/Handlebars.xml",
+        "lib/net6.0/Handlebars.dll",
+        "lib/net6.0/Handlebars.xml",
+        "lib/netstandard1.3/Handlebars.dll",
+        "lib/netstandard1.3/Handlebars.xml",
+        "lib/netstandard2.0/Handlebars.dll",
+        "lib/netstandard2.0/Handlebars.xml",
+        "lib/netstandard2.1/Handlebars.dll",
+        "lib/netstandard2.1/Handlebars.xml"
       ]
     },
     "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.1": {
@@ -525,6 +561,7 @@
   },
   "projectFileDependencyGroups": {
     "net10.0-windows7.0": [
+      "Handlebars.Net >= 2.1.6",
       "Microsoft.Web.WebView2 >= 1.0.3240.44",
       "Prism.DryIoc >= 9.0.537",
       "Prism.Wpf >= 9.0.537"
@@ -555,6 +592,7 @@
       },
       "frameworks": {
         "net10.0-windows7.0": {
+          "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "projectReferences": {}
         }
@@ -573,8 +611,13 @@
     },
     "frameworks": {
       "net10.0-windows7.0": {
+        "framework": "net10.0-windows7.0",
         "targetAlias": "net10.0-windows",
         "dependencies": {
+          "Handlebars.Net": {
+            "target": "Package",
+            "version": "[2.1.6, )"
+          },
           "Microsoft.Web.WebView2": {
             "target": "Package",
             "version": "[1.0.3240.44, )"

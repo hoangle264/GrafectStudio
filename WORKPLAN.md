@@ -39,6 +39,4 @@
   - [ ] Generate GRAFCET từ mô tả
 
 ## Phase 6 — Polish
-- [ ] App icon, window title, About dialog
-- [ ] Error handling & user-friendly messages
-- [ ] Installer / publish
+ 

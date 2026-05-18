@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3240.44" />
     <PackageReference Include="Prism.DryIoc" Version="9.0.537" />
     <PackageReference Include="Prism.Wpf" Version="9.0.537" />
+    <PackageReference Include="Handlebars.Net" Version="2.1.6" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\..\..\web\**\*">

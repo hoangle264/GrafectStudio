@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GrafcetStudio.App")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0c5c548bea33ca375f0bb7a767fc255092c5efdd")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fbcdca630e27720b2e9fdc0abd2430fcf89b09aa")]
 [assembly: System.Reflection.AssemblyProductAttribute("GrafcetStudio.App")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GrafcetStudio.App")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

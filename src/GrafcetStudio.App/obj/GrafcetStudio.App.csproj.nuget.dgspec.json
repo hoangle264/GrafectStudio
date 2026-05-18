@@ -48,6 +48,10 @@
           "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "dependencies": {
+            "Handlebars.Net": {
+              "target": "Package",
+              "version": "[2.1.6, )"
+            },
             "Microsoft.Web.WebView2": {
               "target": "Package",
               "version": "[1.0.3240.44, )"

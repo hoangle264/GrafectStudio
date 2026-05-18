@@ -1,32 +1,39 @@
-# GRAFCET Studio v2 — Copilot Instructions
+# Copilot Instructions — GrafcetStudio
 
-## Kiến trúc tổng quan
-- **WPF** chỉ là container host WebView2, không có UI logic
-- **HTML/JS** chịu trách nhiệm toàn bộ UI, canvas, drag & drop, localStorage
-- **C#** chỉ xử lý: Code Generation, AI Client, File I/O
+## Mục tiêu
+Sinh scaffold C# 12/.NET 10/WPF theo Prism 9 + DryIoc, kiến trúc tổng quát cho nhiều loại thiết bị/PLC.
 
-## Rules bắt buộc
+## Phạm vi sinh code
+- Chỉ tạo **class/property/method signature**.
+- **Không implement method body**.
+- Mỗi namespace một file `.cs`, dùng **file-scoped namespace**.
+- Mỗi class có **XML doc 1 dòng** mô tả vai trò.
+- Ưu tiên immutable: `property { get; init; }` khi phù hợp.
 
-### UI
-- Mọi logic UI nằm ở JS/HTML — không sinh code thao tác UI ở C#
-- C# không giữ diagram state, không render bất kỳ thứ gì liên quan đến canvas
+## Nguyên tắc thiết kế
+- Tuân thủ **SRP**: mỗi class 1 trách nhiệm.
+- Dependency phải rõ ràng, **constructor injection**; không global/static mutable state.
+- Không hardcode hãng PLC hay loại thiết bị.
+- Magic string phải đưa vào **constant/enum**.
+- Method signature đầy đủ; thêm generic constraint nếu cần.
 
-### Bridge (JS ↔ C#)
-- JS → C#: dùng `chrome.webview.postMessage(payload)`
-- C# → JS: dùng `webView.ExecuteScriptAsync("functionName(data)")`
-- Bridge chỉ fire khi user **hoàn thành hành động** (mouseup, button click) — không fire trong quá trình drag
-- Debounce chỉ áp dụng cho `AI_REQUEST`, không áp dụng cho `GENERATE_CODE`
+## Ràng buộc bắt buộc
+1. Khác biệt PLC chỉ nằm ở `PlcProfile.InstructionMap`/`TimerInstruction`.
+2. Hành vi thiết bị nằm ở `DeviceTypeConfig.Commands`.
+3. `RuntimeResolver.FindCommand()` tra cứu theo **driveSignal name**.
+4. `OutputBindingPlanner` chỉ gom LD/OR logic, không biết `PlcProfile`.
+5. `IlGenerator` và `StGenerator` nhận `IProjectRepository`, `ISequenceResolver` qua constructor.
+6. `TemplateManager` nhận `IHandlebars` qua constructor.
+7. `DeviceLibraryLoader` là static class thuần, không state/DI.
+8. Builtin helpers đăng ký trong `TemplateManager.RegisterBuiltinHelpers()`: `pad`, `eq`, `padStart2`.
 
-### C# Internal
-- Không gọi `ExecuteScriptAsync` trực tiếp từ ViewModel
-- Dùng `IWebViewBridgeService` (inject qua DryIoc) để gọi JS
-- Dùng `IEventAggregator` (Prism) để publish event nội bộ — decouple ViewModel khỏi WebView2
+## Domain/CodeGen/Test contract
+- Giữ đúng contract model/enum/interface/method signature theo đặc tả dự án hiện tại.
+- Các test class tạo skeleton theo pattern tên: `Should_[ExpectedBehavior]_When_[Condition]`.
 
-### AI / API
-- API key không bao giờ được truyền sang JS
-- Toàn bộ Anthropic API call thực hiện ở C#
-- Buffer AI stream chunks (flush mỗi 100ms) trước khi gọi `ExecuteScriptAsync`
-
-### State update từ AI
-- Dùng operation list `updateDiagramState(actions[])` — không truyền lại toàn bộ JSON diagram
-- Schema op: `addStep | addTransition | removeStep | updateAction`
+## Công nghệ chuẩn
+- C# 12, .NET 10, WPF
+- Prism 9 + DryIoc
+- Handlebars.Net
+- Newtonsoft.Json hoặc System.Text.Json
+- xUnit + Moq
