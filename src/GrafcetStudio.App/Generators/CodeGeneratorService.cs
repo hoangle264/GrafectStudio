@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Models;
+using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
 

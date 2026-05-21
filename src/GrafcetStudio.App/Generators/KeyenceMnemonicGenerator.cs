@@ -1,7 +1,8 @@
-using GrafcetStudio.App.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using GrafcetStudio.Domain.Enums;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
@@ -24,7 +25,7 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
             var exec = $"@MR{100 + i * 2}";
             var done = $"@MR{101 + i * 2}";
             map.Add($"; S{item.Step.Number:D2}: exec={exec}, done={done}");
-            var prevDone = item.Step.Initial || i == 0 ? "CR2002" : $"@MR{101 + (i - 1) * 2}";
+            var prevDone = item.Step.IsInitial || i == 0 ? "CR2002" : $"@MR{101 + (i - 1) * 2}";
 
             sb.AppendLine($"LD   {prevDone.PadRight(12)}; S{item.Step.Number:D2} prev done");
             EmitConditionAndSet(sb, item.InTransition?.Condition, payload.Variables, exec, $"S{item.Step.Number:D2} exec");
@@ -38,28 +39,29 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
         return sb.ToString();
     }
 
-    private static void EmitConditionAndSet(StringBuilder sb, string? condition, IReadOnlyList<Variable> vars, string target, string comment)
+    private static void EmitConditionAndSet(StringBuilder sb, string? condition, IReadOnlyList<DeviceVariable> vars, string target, string comment)
     {
         if (!SkipCondition(condition))
         {
             var resolved = AddressResolver.Resolve(condition!, vars);
             sb.AppendLine($"AND  {resolved}");
         }
+
         sb.AppendLine($"SET  {target.PadRight(12)}; {comment}");
     }
 
-    private static void EmitActions(StringBuilder sb, Step step, string exec, IReadOnlyList<Variable> vars)
+    private static void EmitActions(StringBuilder sb, Step step, string exec, IReadOnlyList<DeviceVariable> vars)
     {
         foreach (var action in step.Actions)
         {
             var addr = !string.IsNullOrWhiteSpace(action.Address) ? action.Address! : AddressResolver.Resolve(action.Variable, vars);
             sb.AppendLine($"LD   {exec.PadRight(12)}; S{step.Number:D2} exec");
-            switch ((action.Qualifier ?? "N").ToUpperInvariant())
+            switch (action.Qualifier)
             {
-                case "N": sb.AppendLine($"OUT  {addr}"); break;
-                case "S": sb.AppendLine($"SET  {addr}"); break;
-                case "R": sb.AppendLine($"RST  {addr}"); break;
-                default: sb.AppendLine($"; [{action.Qualifier}] {addr} — not implemented"); break;
+                case ActionQualifier.N: sb.AppendLine($"OUT  {addr}"); break;
+                case ActionQualifier.S: sb.AppendLine($"SET  {addr}"); break;
+                case ActionQualifier.R: sb.AppendLine($"RST  {addr}"); break;
+                default: sb.AppendLine($"; [{action.Qualifier}] {addr} - not implemented"); break;
             }
         }
     }

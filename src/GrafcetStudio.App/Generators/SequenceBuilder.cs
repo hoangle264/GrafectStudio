@@ -1,6 +1,6 @@
-using GrafcetStudio.App.Models;
 using System.Collections.Generic;
 using System.Linq;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
@@ -14,21 +14,26 @@ public class SequenceItem
 public static class SequenceBuilder
 {
     public static IReadOnlyList<SequenceItem> Build(CodegenPayload payload)
+        => Build(payload.ToDiagramState());
+
+    public static IReadOnlyList<SequenceItem> Build(DiagramState state)
     {
-        var steps = payload.Steps.OrderBy(s => s.Number).ToList();
+        var steps = state.Steps.OrderBy(s => s.Number).ToList();
         if (steps.Count == 0) return new List<SequenceItem>();
 
         var byId = steps.ToDictionary(s => s.Id, s => s);
-        var transitions = payload.Transitions;
-        var current = steps.FirstOrDefault(s => s.Initial) ?? steps[0];
+        var transitions = state.Transitions;
+        var current = steps.FirstOrDefault(s => s.IsInitial) ?? steps[0];
         var visited = new HashSet<string>();
         var ordered = new List<Step>();
 
         while (current is not null && visited.Add(current.Id))
         {
             ordered.Add(current);
-            var outT = transitions.FirstOrDefault(t => t.FromStepIds.Contains(current.Id));
-            var nextId = outT?.ToStepIds.FirstOrDefault();
+            var outTransitionId = state.Connections.FirstOrDefault(c => c.From == current.Id)?.To;
+            var nextId = outTransitionId is null
+                ? null
+                : state.Connections.FirstOrDefault(c => c.From == outTransitionId)?.To;
             current = nextId is not null && byId.TryGetValue(nextId, out var next) ? next : null;
         }
 
@@ -37,8 +42,11 @@ public static class SequenceBuilder
         return ordered.Select(s => new SequenceItem
         {
             Step = s,
-            InTransition = transitions.FirstOrDefault(t => t.ToStepIds.Contains(s.Id)),
-            OutTransition = transitions.FirstOrDefault(t => t.FromStepIds.Contains(s.Id))
+            InTransition = ResolveTransition(state.Connections.FirstOrDefault(c => c.To == s.Id)?.From, transitions),
+            OutTransition = ResolveTransition(state.Connections.FirstOrDefault(c => c.From == s.Id)?.To, transitions)
         }).ToList();
     }
+
+    private static Transition? ResolveTransition(string? transitionId, IList<Transition> transitions)
+        => transitionId is null ? null : transitions.FirstOrDefault(t => t.Id == transitionId);
 }

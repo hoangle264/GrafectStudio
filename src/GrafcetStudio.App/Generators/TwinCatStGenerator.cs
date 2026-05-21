@@ -1,6 +1,7 @@
-using GrafcetStudio.App.Models;
 using System;
 using System.Text;
+using GrafcetStudio.Domain.Enums;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
@@ -21,7 +22,7 @@ public class TwinCatStGenerator : ICodeGenerator
             var done = $"s{n:D2}_done";
             sb.AppendLine($"VAR {exec} : BOOL; {done} : BOOL; END_VAR");
 
-            var prev = item.Step.Initial ? "TRUE" : $"s{Math.Max(1, n - 1):D2}_done";
+            var prev = item.Step.IsInitial ? "TRUE" : $"s{Math.Max(1, n - 1):D2}_done";
             var inCond = NormalizeCondition(item.InTransition?.Condition, payload);
             sb.AppendLine($"IF {prev} AND {inCond} THEN {exec} := TRUE; END_IF;");
 
@@ -33,7 +34,7 @@ public class TwinCatStGenerator : ICodeGenerator
                 var addr = !string.IsNullOrWhiteSpace(action.Address)
                     ? action.Address!
                     : AddressResolver.Resolve(action.Variable, payload.Variables);
-                if (string.Equals(action.Qualifier, "N", StringComparison.OrdinalIgnoreCase))
+                if (action.Qualifier == ActionQualifier.N)
                     sb.AppendLine($"{addr} := {exec};");
             }
             sb.AppendLine();

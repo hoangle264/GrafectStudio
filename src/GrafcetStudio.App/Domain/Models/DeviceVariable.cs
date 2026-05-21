@@ -1,16 +1,21 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace GrafcetStudio.Domain.Models;
 
 /// <summary>Represents an instantiated device variable and its signal address map.</summary>
 public class DeviceVariable
 {
+    [JsonPropertyName("label")]
     public string Label { get; init; } = string.Empty;
 
+    [JsonPropertyName("format")]
     public string Format { get; init; } = string.Empty;
 
+    [JsonPropertyName("address")]
     public string? Address { get; init; }
 
+    [JsonPropertyName("signalAddresses")]
     public IDictionary<string, string> SignalAddresses { get; init; } = new Dictionary<string, string>();
 
     public string? GetSignalAddress(string signalId)

@@ -1,6 +1,6 @@
 using GrafcetStudio.App.Events;
 using GrafcetStudio.App.Generators;
-using GrafcetStudio.App.Models;
+using GrafcetStudio.Domain.Models;
 using Prism.Events;
 using System;
 using System.Text.Json;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using GrafcetStudio.Domain.Enums;
 using GrafcetStudio.Domain.Resolution;
 
@@ -7,12 +8,17 @@ namespace GrafcetStudio.Domain.Models;
 /// <summary>Represents an action bound to a step in a Grafcet diagram.</summary>
 public class StepAction
 {
+    [JsonPropertyName("variable")]
     public string Variable { get; init; } = string.Empty;
 
+    [JsonPropertyName("address")]
     public string? Address { get; init; }
 
+    [JsonPropertyName("qualifier")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public ActionQualifier Qualifier { get; init; }
 
+    [JsonPropertyName("timeMs")]
     public double TimeMs { get; init; }
 
     public string ToPhysicalAddress(IList<DeviceVariable> vars)

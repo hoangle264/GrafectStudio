@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Models;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
