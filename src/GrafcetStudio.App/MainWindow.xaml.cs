@@ -86,11 +86,11 @@ public partial class MainWindow : Window
             {
                 var message = new GenerateCodePayload
                 {
-                    Platform = payload.GetProperty("platform").GetString() ?? string.Empty,
-                    Steps = payload.GetProperty("steps").GetString() ?? string.Empty,
-                    Transitions = payload.GetProperty("transitions").GetString() ?? string.Empty,
-                    Actions = payload.GetProperty("actions").GetString() ?? string.Empty,
-                    Variables = payload.GetProperty("variables").GetString() ?? string.Empty,
+                    Platform = GetOptionalString(payload, "platform"),
+                    Steps = GetOptionalRawText(payload, "steps"),
+                    Transitions = GetOptionalRawText(payload, "transitions"),
+                    Actions = GetOptionalRawText(payload, "actions"),
+                    Variables = GetOptionalRawText(payload, "variables"),
                     RawJson = payload.GetRawText()
                 };
                 _eventAggregator.GetEvent<GenerateCodeRequestedEvent>().Publish(message);
@@ -128,4 +128,14 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    private static string GetOptionalString(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static string GetOptionalRawText(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property)
+            ? property.GetRawText()
+            : string.Empty;
 }

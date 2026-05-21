@@ -21,12 +21,10 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ICodeGeneratorService, CodeGeneratorService>();
         containerRegistry.RegisterSingleton<CodeGenerationOrchestrator>();
         containerRegistry.RegisterSingleton<FileIOOrchestrator>();
-        containerRegistry.RegisterSingleton<MockCodeGeneratorService>();
         containerRegistry.RegisterSingleton<MockAiService>();
 
         Container.Resolve<CodeGenerationOrchestrator>().Init();
         Container.Resolve<FileIOOrchestrator>().Init();
-        Container.Resolve<MockCodeGeneratorService>();
         Container.Resolve<MockAiService>();
     }
 }

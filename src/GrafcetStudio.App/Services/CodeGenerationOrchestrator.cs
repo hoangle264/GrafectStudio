@@ -9,6 +9,11 @@ namespace GrafcetStudio.App.Services;
 
 public class CodeGenerationOrchestrator
 {
+    private static readonly JsonSerializerOptions PayloadJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly IEventAggregator _events;
     private readonly ICodeGeneratorService _codegen;
     private readonly IWebViewBridgeService _bridge;
@@ -29,7 +34,7 @@ public class CodeGenerationOrchestrator
     {
         try
         {
-            var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson)
+            var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson, PayloadJsonOptions)
                           ?? throw new InvalidOperationException("Invalid codegen payload.");
             var platform = string.IsNullOrWhiteSpace(payload.Platform) ? message.Platform : payload.Platform;
             var code = _codegen.Generate(platform, payload);

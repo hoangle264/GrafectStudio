@@ -72,6 +72,8 @@ function showGenerateCodeModal() {
             border-radius:3px;outline:none;">
             <option value="unit-config">🟣 Unit Config JSON</option>
             <option value="runtime-plan">🟤 Runtime Plan [debug]</option>
+            <option value="csharp-kv-5500">C# Keyence KV demo</option>
+            <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
           </select>
         </div>
 
@@ -420,6 +422,7 @@ function cgUpdatePreview() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
   const isUC = (target === 'unit-config');
   const usesUC = (target === 'unit-config' || target === 'runtime-plan');
+  const usesCSharp = target === 'csharp-kv-5500' || target === 'csharp-twincat-st';
 
   // Show/hide panels
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
@@ -442,6 +445,20 @@ function cgUpdatePreview() {
   const pre  = document.getElementById('cg-preview');
   const stat = document.getElementById('cg-stat');
   if (!pre) return;
+
+  if (usesCSharp) {
+    const selected = cgGetSelectedDiagramIds();
+    if (!selected.length) {
+      pre.textContent = '; No diagrams selected.';
+      if (stat) stat.textContent = '';
+      return;
+    }
+
+    pre.textContent = '; Waiting for C# generator...';
+    if (stat) stat.textContent = 'C# generator request queued';
+    cgGenerateViaHost(target === 'csharp-kv-5500' ? 'kv-5500' : 'twincat-st', selected[0]);
+    return;
+  }
 
   // ── Unit Config JSON engine ───────────────────────────────────────────────
   if (isUC) {
@@ -550,6 +567,119 @@ function cgUpdatePreview() {
 }
 
 // ─── Syntax highlight cho Unit Config output ──────────────────────────────────
+function cgGetSelectedDiagramIds() {
+  return Array.from(
+    document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
+  ).map(c => c.value);
+}
+
+function cgBuildCSharpPayload(platform, diagId) {
+  if (activeDiagramId && typeof flushState === 'function') flushState();
+
+  const diag = (project.diagrams || []).find(d => d.id === diagId) || {};
+  const data = loadDiagramData(diagId);
+  const s = (data && data.state) || { steps: [], transitions: [], connections: [], vars: [] };
+  const steps = (s.steps || []).map(step => ({
+    id: step.id || '',
+    number: Number(step.number || 0),
+    label: step.label || '',
+    initial: !!step.initial,
+    actions: (step.actions || []).map(action => ({
+      variable: action.variable || '',
+      address: action.address || null,
+      qualifier: action.qualifier || 'N',
+      timeMs: Number(action.timeMs || action.time || 0)
+    }))
+  }));
+  const stepIds = new Set(steps.map(step => step.id));
+  const transitions = (s.transitions || []).map(trans => ({
+    id: trans.id || '',
+    label: trans.label || '',
+    condition: trans.condition || '',
+    fromStepIds: (s.connections || [])
+      .filter(conn => conn.to === trans.id && stepIds.has(conn.from))
+      .map(conn => conn.from),
+    toStepIds: (s.connections || [])
+      .filter(conn => conn.from === trans.id && stepIds.has(conn.to))
+      .map(conn => conn.to)
+  }));
+
+  return {
+    platform,
+    project: {
+      id: project.id || '',
+      name: project.name || '',
+      machineName: project.machineName || ''
+    },
+    diagram: {
+      id: diag.id || diagId,
+      name: diag.name || diagId,
+      mode: diag.mode || '',
+      unitId: diag.unitId || '',
+      unit: diag.unit || ''
+    },
+    steps,
+    transitions,
+    variables: cgGetCSharpVariables(s)
+  };
+}
+
+function cgGetCSharpVariables(diagramState) {
+  const vars = [];
+  const seen = new Set();
+  const add = function(v) {
+    if (!v || !v.label || seen.has(v.label)) return;
+    seen.add(v.label);
+    vars.push({
+      label: v.label,
+      format: v.format || v.dataType || '',
+      address: v.address || null,
+      signalAddresses: v.signalAddresses || {}
+    });
+  };
+
+  (diagramState.vars || []).forEach(add);
+  if (typeof ensureProjectVariables === 'function') {
+    const grouped = ensureProjectVariables();
+    (grouped.imported || []).forEach(add);
+    (grouped.user || []).forEach(add);
+  }
+  (project.excelVars || []).forEach(add);
+  return vars;
+}
+
+function cgGenerateViaHost(platform, diagId) {
+  if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
+    const pre = document.getElementById('cg-preview');
+    const stat = document.getElementById('cg-stat');
+    if (pre) pre.textContent = '; C# generator is available only inside the WPF host.';
+    if (stat) stat.textContent = 'Host bridge unavailable';
+    return false;
+  }
+
+  window.chrome.webview.postMessage({
+    type: 'GENERATE_CODE',
+    payload: cgBuildCSharpPayload(platform, diagId)
+  });
+  return true;
+}
+
+function receiveGeneratedCode(code) {
+  const pre = document.getElementById('cg-preview');
+  const stat = document.getElementById('cg-stat');
+  if (pre) pre.textContent = code || '';
+  if (stat) stat.textContent = 'Generated by C# host';
+}
+
+function receiveError(payload) {
+  const pre = document.getElementById('cg-preview');
+  const stat = document.getElementById('cg-stat');
+  const source = payload && payload.source ? payload.source : 'host';
+  const message = payload && payload.message ? payload.message : String(payload || 'Unknown error');
+  if (pre) pre.textContent = '; ' + source + ' error: ' + message;
+  if (stat) stat.textContent = 'C# host error';
+}
+
 function cgUCHighlight(pre, profile) {
   const commentPfx = profile ? profile.comment : ';';
   const commentRe = commentPfx === '//' ? /^(\/\/.*)$/gm : /^(;.*)$/gm;
@@ -620,6 +750,22 @@ function cgDownloadCode() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
 
   // ── Unit Config engine ────────────────────────────────────────────────────
+  if (target === 'csharp-kv-5500' || target === 'csharp-twincat-st') {
+    const code = document.getElementById('cg-preview')?.textContent || '';
+    const platform = target === 'csharp-kv-5500' ? 'kv-5500' : 'twincat-st';
+    if (cgExportViaHost(code, platform)) return;
+
+    const ext = platform === 'kv-5500' ? '.mnm' : '.st';
+    const safe = (project.name || 'grafcet').replace(/\s+/g, '_');
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = safe + '_csharp_code' + ext;
+    a.click();
+    toast('Downloaded ' + safe + '_csharp_code' + ext);
+    return;
+  }
+
   if (target === 'unit-config') {
     const selectedUnitId = cgUCGetSelectedUnitId();
     const effectiveConfig = cgUCGetEffectiveConfig(selectedUnitId);
