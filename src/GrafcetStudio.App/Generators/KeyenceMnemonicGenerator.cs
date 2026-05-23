@@ -22,7 +22,7 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
         for (var i = 0; i < seq.Count; i++)
         {
             var item = seq[i];
-            var exec = $"@MR{100 + i * 2}";
+            var exec = $"@MD{100 + i * 2}";
             var done = $"@MR{101 + i * 2}";
             map.Add($"; S{item.Step.Number:D2}: exec={exec}, done={done}");
             var prevDone = item.Step.IsInitial || i == 0 ? "CR2002" : $"@MR{101 + (i - 1) * 2}";

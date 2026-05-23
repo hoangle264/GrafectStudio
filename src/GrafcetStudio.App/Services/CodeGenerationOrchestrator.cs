@@ -11,7 +11,8 @@ public class CodeGenerationOrchestrator
 {
     private static readonly JsonSerializerOptions PayloadJsonOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
     private readonly IEventAggregator _events;

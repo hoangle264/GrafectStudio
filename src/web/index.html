@@ -626,17 +626,12 @@
 <script src="js/editor/tables.js"></script>
 <script src="js/editor/vars.js"></script>
 <script src="js/editor/excel-import.js"></script>
+<!-- Force generation via C# host in the WPF app; disable in-browser JS generators -->
+<script>window.__ONLY_CSHARP_CODEGEN__ = true;</script>
 <script src="js/codegen/kv-generator.js"></script>
-<script src="js/codegen/sequence.js"></script>
-<script src="js/codegen/st-generator.js"></script>
-<script src="js/codegen/templates-bundle.js"></script>
+<!-- Keep Unit Config UI, Template Manager and modal; JS generators removed. -->
 <script src="js/codegen/unit-config.js"></script>
 <script src="js/codegen/template-manager.js"></script>
-<script src="js/codegen/runtime-metadata.js"></script>
-<script src="js/codegen/runtime-resolver.js"></script>
-<script src="js/codegen/runtime-planner.js"></script>
-<script src="js/codegen/output-binding-planner.js"></script>
-<script src="js/codegen/runtime-debug.js"></script>
 <script src="js/codegen/modal.js"></script>
 </body>
 </html>

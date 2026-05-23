@@ -477,22 +477,11 @@ function cgUpdatePreview() {
     }
     const profile  = PLC_PROFILES['kv-5500'];
     const addrMode = document.getElementById('uc-addr-mode')?.value || 'block';
-    try {
-      const result  = cgGenerateFromUnitConfig(effectiveConfig, null, profile, selectedUnitId, {
-        strictTemplates: true,
-        addressMode: addrMode,
-        requireUnitBindings: true
-      });
-      pre.textContent = result.code;
-      if (stat) stat.textContent = result.stats;
-      // Syntax highlight
-      cgUCHighlight(pre, profile);
-    } catch (e) {
-      const msg = e && e.message ? e.message : String(e);
-      pre.textContent = '; ⚠ Lỗi khi sinh mã: ' + msg + '\n; Kiểm tra template hoặc dữ liệu unit config.';
-      if (stat) stat.textContent = 'Lỗi sinh mã';
-      console.error('[modal] cgGenerateFromUnitConfig error:', e);
-    }
+    // Route Unit Config generation to C# host (disable in-browser JS generation)
+    pre.textContent = '; Waiting for C# generator...';
+    if (stat) stat.textContent = 'C# generator request queued';
+    const selectedUnit = cgUCGetSelectedUnitId() || selectedUnitId;
+    cgGenerateViaHost('unit-config', selectedUnit || '');
     return;
   }
 
@@ -509,21 +498,10 @@ function cgUpdatePreview() {
       return;
     }
 
-    try {
-      const result = cgBuildRuntimeDebugPreview(selected, {
-        baseMR,
-        unitConfig: UC_UNIT_CONFIG,
-        runtimeTypeConfig: UC_RUNTIME_DEVICE_META || UC_CYLINDER_TYPES
-      });
-      pre.textContent = result.code;
-      if (stat) stat.textContent = result.stats;
-    } catch (e) {
-      pre.textContent = JSON.stringify({
-        error: e && e.message ? e.message : String(e)
-      }, null, 2);
-      if (stat) stat.textContent = 'Runtime plan debug failed';
-      console.error('[modal] cgBuildRuntimeDebugPreview error:', e);
-    }
+    // Route Runtime Plan debug preview to C# host
+    pre.textContent = '; Waiting for C# generator...';
+    if (stat) stat.textContent = 'C# generator request queued';
+    cgGenerateViaHost('runtime-plan', selected[0] || '');
     return;
   }
 
@@ -539,31 +517,10 @@ function cgUpdatePreview() {
     return;
   }
 
-  const profile = PLC_PROFILES[target];
-  const result = profile
-    ? generateKVAll(selected, { baseMR, profile })
-    : generateSTDemo(selected, { baseMR });
-
-  pre.textContent = result.code;
-  if (stat) stat.textContent = result.stats;
-
-  // Syntax highlight pass (minimal — colorize comments and instructions)
-  const commentPfx = profile ? profile.comment : ';';
-  const commentRe = commentPfx === '//'
-    ? /^(\/\/.*)$/gm
-    : /^(;.*)$/gm;
-  // HTML-escape raw text before injecting into innerHTML so that ;<h1> bookmark
-  // markers (which contain < and >) are not parsed as HTML tags.
-  const escaped = pre.textContent.replace(/[&<>]/g, c =>
-    c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
-  pre.innerHTML = escaped
-    // ;<h1> bookmarks — highlight as section headings (match the escaped form)
-    .replace(/^(;&lt;h1&gt;.*)$/gm, '<span style="color:var(--amber);font-weight:bold">$1</span>')
-    .replace(commentRe, '<span style="color:var(--text3)">$1</span>')
-    .replace(/\b(LD|LDI|LD NOT|AND|ANI|AND NOT|AND LD|OR|ORI|OR NOT|OR LD|SET|RST|RSET|OUT|ANB|ORB|LDNOT|ANDNOT|ORNOT|MPS|MRD|MPP|ULD|OLD|TMRON|ONDL|TIM|TMRA|S\b|R\b|U\b|UN\b|O\b|ON\b|=\b)\b/g,
-      '<span style="color:var(--cyan)">$1</span>')
-    .replace(/@MR\d+/g, '<span style="color:var(--amber)">$&</span>')
-    .replace(/\bMR\d+\b/g, '<span style="color:#4ade80">$&</span>');
+  // Route Canvas generation to C# host for all non-C# targets
+  pre.textContent = '; Waiting for C# generator...';
+  if (stat) stat.textContent = 'C# generator request queued';
+  cgGenerateViaHost(target, selected[0] || '');
 }
 
 // ─── Syntax highlight cho Unit Config output ──────────────────────────────────
@@ -768,28 +725,10 @@ function cgDownloadCode() {
   }
 
   if (target === 'unit-config') {
+    // Request Unit Config export via C# host
     const selectedUnitId = cgUCGetSelectedUnitId();
-    const effectiveConfig = cgUCGetEffectiveConfig(selectedUnitId);
-    if (!effectiveConfig) {
-      toast('⚠ Load Unit Config JSON hoặc import Struct Data Unit Station trước');
-      return;
-    }
-    if (!cgUCEnsureTemplateHealth('download code')) return;
-    const profile  = PLC_PROFILES['kv-5500'];
-    const addrMode = document.getElementById('uc-addr-mode')?.value || 'block';
-    const result  = cgGenerateFromUnitConfig(effectiveConfig, null, profile, selectedUnitId, {
-      strictTemplates: true,
-      addressMode: addrMode,
-      requireUnitBindings: true
-    });
-    if (cgExportViaHost(result.code, 'kv-5500')) return;
-    const label   = (effectiveConfig.unit?.label || 'unit').replace(/\s+/g, '_');
-    const blob = new Blob([result.code], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = label + '_code.mnm';
-    a.click();
-    toast('✓ Downloaded ' + label + '_code.mnm');
+    if (!selectedUnitId) { toast('⚠ Chưa chọn Unit để export'); return; }
+    cgGenerateViaHost('unit-config', selectedUnitId);
     return;
   }
 
@@ -800,18 +739,8 @@ function cgDownloadCode() {
     ).map(c => c.value);
     if (!selected.length) { toast('⚠ No diagrams selected'); return; }
 
-    const result = cgBuildRuntimeDebugPreview(selected, {
-      baseMR,
-      unitConfig: UC_UNIT_CONFIG,
-      runtimeTypeConfig: UC_RUNTIME_DEVICE_META || UC_CYLINDER_TYPES
-    });
-    const safe = (project.name || 'grafcet').replace(/\s+/g, '_');
-    const blob = new Blob([result.code], { type: 'application/json;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = safe + '_runtime_plan.json';
-    a.click();
-    toast('✓ Downloaded ' + safe + '_runtime_plan.json');
+    // Request Runtime Plan export via C# host
+    cgGenerateViaHost('runtime-plan', selected[0] || '');
     return;
   }
 
@@ -822,21 +751,8 @@ function cgDownloadCode() {
   ).map(c => c.value);
   if (!selected.length) { toast('⚠ No diagrams selected'); return; }
 
-  const profile = PLC_PROFILES[target];
-  const result = profile
-    ? generateKVAll(selected, { baseMR, profile })
-    : generateSTDemo(selected, { baseMR });
-
-  if (cgExportViaHost(result.code, target)) return;
-
-  const ext = profile ? (profile.fileExt || '.mnm') : '.st';
-  const safe = (project.name || 'grafcet').replace(/\s+/g, '_');
-  const blob = new Blob([result.code], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = safe + '_code' + ext;
-  a.click();
-  toast('✓ Downloaded ' + safe + '_code' + ext);
+  // Request code export via C# host for canvas targets
+  cgGenerateViaHost(target, selected[0] || '');
 }
 
 function cgExportViaHost(code, platform) {
