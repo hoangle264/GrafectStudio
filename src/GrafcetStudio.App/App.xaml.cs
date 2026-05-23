@@ -19,6 +19,7 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ICodeGenerator, KeyenceMnemonicGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
         containerRegistry.RegisterSingleton<ICodeGeneratorService, CodeGeneratorService>();
+        containerRegistry.RegisterSingleton<ConfigService>();
         containerRegistry.RegisterSingleton<CodeGenerationOrchestrator>();
         containerRegistry.RegisterSingleton<FileIOOrchestrator>();
         containerRegistry.RegisterSingleton<MockAiService>();

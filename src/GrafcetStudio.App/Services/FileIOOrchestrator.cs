@@ -22,6 +22,7 @@ public class FileIOOrchestrator
         _events.GetEvent<SaveFileRequestedEvent>().Subscribe(OnSaveRequested);
         _events.GetEvent<OpenFileRequestedEvent>().Subscribe(OnOpenRequested);
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
+        _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
     }
 
     private async void OnSaveRequested(string projectJson)
@@ -54,6 +55,33 @@ public class FileIOOrchestrator
         try
         {
             await _files.ExportCodeAsync(payload.Code, payload.Platform);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendErrorAsync("fileIO", ex.Message);
+        }
+    }
+
+    private async void OnBrowseCodegenPathRequested(BrowseCodegenPathPayload payload)
+    {
+        try
+        {
+            var target = string.Equals(payload.Target, "deviceLibrary", StringComparison.OrdinalIgnoreCase)
+                ? "deviceLibrary"
+                : string.Equals(payload.Target, "outputRoot", StringComparison.OrdinalIgnoreCase)
+                    ? "outputRoot"
+                : "templateRoot";
+            var path = target switch
+            {
+                "deviceLibrary" => await _files.BrowseDeviceLibraryPathAsync(),
+                "outputRoot" => await _files.BrowseOutputRootPathAsync(),
+                _ => await _files.BrowseTemplateRootPathAsync()
+            };
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                await _bridge.SendCodegenPathAsync(target, path);
+            }
         }
         catch (Exception ex)
         {

@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Events;
+﻿using GrafcetStudio.App.Events;
 using GrafcetStudio.App.Services;
 using Microsoft.Web.WebView2.Core;
 using Prism.Events;
@@ -26,7 +26,7 @@ public partial class MainWindow : Window
     {
         await webView.EnsureCoreWebView2Async();
 
-        var bridge = ((App)Application.Current).Container.Resolve<IWebViewBridgeService>();
+        var bridge = ((App)System.Windows.Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
         //webView.CoreWebView2.OpenDevToolsWindow();//test
         webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
@@ -35,11 +35,16 @@ public partial class MainWindow : Window
         if (webPath == null)
         {
             var tried = string.Join(Environment.NewLine, Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web")));
-            MessageBox.Show($"Required 'web' folder not found. Tried the following paths:\n{tried}", "Missing content", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show($"Required 'web' folder not found. Tried the following paths:\n{tried}", "Missing content", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
 
         webView.CoreWebView2.SetVirtualHostNameToFolderMapping("grafcet.local", webPath, CoreWebView2HostResourceAccessKind.Allow);
+        webView.CoreWebView2.NavigationCompleted += async (_, _) =>
+        {
+            var config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
+            await bridge.SendSavedPathsAsync(config.DeviceLibraryPath, config.TemplatePath, config.OutputPath);
+        };
         webView.CoreWebView2.Navigate("https://grafcet.local/index.html");
     }
 
@@ -87,6 +92,9 @@ public partial class MainWindow : Window
                 var message = new GenerateCodePayload
                 {
                     Platform = GetOptionalString(payload, "platform"),
+                    DeviceLibraryPath = GetOptionalString(payload, "deviceLibraryPath"),
+                    TemplatePath = GetOptionalString(payload, "templatePath"),
+                    OutputPath = GetOptionalString(payload, "outputPath"),
                     Steps = GetOptionalRawText(payload, "steps"),
                     Transitions = GetOptionalRawText(payload, "transitions"),
                     Actions = GetOptionalRawText(payload, "actions"),
@@ -126,6 +134,15 @@ public partial class MainWindow : Window
                 _eventAggregator.GetEvent<ExportCodeRequestedEvent>().Publish(message);
                 break;
             }
+            case "BROWSE_CODEGEN_PATH":
+            {
+                var message = new BrowseCodegenPathPayload
+                {
+                    Target = GetOptionalString(payload, "target")
+                };
+                _eventAggregator.GetEvent<BrowseCodegenPathRequestedEvent>().Publish(message);
+                break;
+            }
         }
     }
 
@@ -139,3 +156,5 @@ public partial class MainWindow : Window
             ? property.GetRawText()
             : string.Empty;
 }
+
+

@@ -1,4 +1,4 @@
-using Microsoft.Web.WebView2.Wpf;
+﻿using Microsoft.Web.WebView2.Wpf;
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -40,6 +40,18 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"updateDiagramState({JsonSerializer.Serialize(actionsJson)});");
     }
 
+    public async Task SendCodegenPathAsync(string target, string path)
+    {
+        var payload = JsonSerializer.Serialize(new { target, path });
+        await ExecuteAsync($"receiveCodegenPath({payload});");
+    }
+
+    public async Task SendSavedPathsAsync(string deviceLibraryPath, string templatePath, string outputPath)
+    {
+        var payload = JsonSerializer.Serialize(new { deviceLibraryPath, templatePath, outputPath });
+        await ExecuteAsync($"receiveSavedPaths({payload});");
+    }
+
     private async Task ExecuteAsync(string script)
     {
         if (_webView?.CoreWebView2 is null)
@@ -50,3 +62,4 @@ public class WebViewBridgeService : IWebViewBridgeService
         await _webView.ExecuteScriptAsync(script);
     }
 }
+

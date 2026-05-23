@@ -21,3 +21,7 @@ public class OpenFileRequestedEvent : PubSubEvent<object>
 public class ExportCodeRequestedEvent : PubSubEvent<ExportCodePayload>
 {
 }
+
+public class BrowseCodegenPathRequestedEvent : PubSubEvent<BrowseCodegenPathPayload>
+{
+}

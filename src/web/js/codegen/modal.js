@@ -1,45 +1,16 @@
-"use strict";
+﻿"use strict";
 
-// ═══════════════════════════════════════════════════════════
-//  GRAFCET Code Generator — grafcet-codegen.js
+let cgSavedPaths = { deviceLibraryPath: '', templatePath: '', outputPath: '' };
+
+//  GRAFCET Code Generator - grafcet-codegen.js
 //  Target: Keyence KV Mnemonic IL (.mnm)
-//  Planned: IEC 61131-3 ST (.st) — demo/stub only
+//  Planned: IEC 61131-3 ST (.st) â€” demo/stub only
 //
 //  Reads from global: project, loadDiagramData(), flushState(),
 //  resolveStepsThrough(), toast(), esc2()
-// ═══════════════════════════════════════════════════════════
-
-let CG_DEFAULT_DEVLIB_LOADED = false;
-let CG_DEFAULT_DEVLIB_LOADING = null;
-
-function cgEnsureBundledDeviceLibrary() {
-  if (CG_DEFAULT_DEVLIB_LOADED) return;
-  if (CG_DEFAULT_DEVLIB_LOADING) return;
-  CG_DEFAULT_DEVLIB_LOADING = fetch('config/Devices.json')
-    .then(function(res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    })
-    .then(function(data) {
-      if (typeof cgLoadDeviceLibrary === 'function') cgLoadDeviceLibrary(data);
-      if (typeof ucLoadDeviceCommandLibrary === 'function') ucLoadDeviceCommandLibrary(data);
-      CG_DEFAULT_DEVLIB_LOADED = true;
-      if (typeof cgUpdatePreview === 'function') cgUpdatePreview();
-    })
-    .catch(function(err) {
-      console.warn('[modal] không load được config/Devices.json:', err);
-    })
-    .finally(function() {
-      CG_DEFAULT_DEVLIB_LOADING = null;
-    });
-}
-
-// ─── Entry Point ─────────────────────────────────────────────────────────────
+//  Show Generate Code Modal 
 function showGenerateCodeModal() {
-  // Cho phép mở modal ngay cả khi không có diagram — unit-config mode không cần diagram
   if (activeDiagramId && typeof flushState === 'function') flushState();
-  cgEnsureBundledDeviceLibrary();
-
   let el = document.getElementById('modal-codegen');
   if (el) el.remove();
   el = document.createElement('div');
@@ -53,10 +24,9 @@ function showGenerateCodeModal() {
       <!-- Header -->
       <div style="padding:12px 20px;background:var(--s3);border-bottom:1px solid var(--border);
         display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="font-size:14px;">⟨/⟩</span>
         <span style="font-size:12px;letter-spacing:2px;font-family:'Orbitron',monospace;">GENERATE CODE</span>
         <span style="flex:1;"></span>
-        <button class="btn" onclick="closeModal('modal-codegen')" style="padding:2px 10px;">✕</button>
+        <button class="btn" onclick="closeModal('modal-codegen')" style="padding:2px 10px;">X</button>
       </div>
 
       <!-- Options row -->
@@ -70,8 +40,8 @@ function showGenerateCodeModal() {
             style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);
             font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;
             border-radius:3px;outline:none;">
-            <option value="unit-config">🟣 Unit Config JSON</option>
-            <option value="runtime-plan">🟤 Runtime Plan [debug]</option>
+            <option value="unit-config">Unit Config JSON</option>
+            <option value="runtime-plan"> Runtime Plan [debug]</option>
             <option value="csharp-kv-5500">C# Keyence KV demo</option>
             <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
           </select>
@@ -108,190 +78,64 @@ function showGenerateCodeModal() {
         </div>
       </div>
 
-      <!-- Unit Config JSON Files (collapsible, hiện khi usesUC) -->
-      <div id="cg-uc-files-bar" style="display:none;border-top:1px solid var(--border);background:var(--s2);flex-shrink:0;">
-        <div style="padding:6px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;"
-          onclick="cgToggleUCFiles()">
-          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">📁 JSON FILES</span>
-          <span id="uc-files-chevron" style="font-size:9px;color:var(--text3);">▶</span>
-          <span id="uc-files-summary" style="font-size:9px;color:var(--text3);margin-left:4px;"></span>
-          <span style="flex:1;"></span>
-          <label style="font-size:9px;color:var(--text3);display:flex;align-items:center;gap:4px;"
-            onclick="event.stopPropagation()">
-            Address Mode:
-            <select id="uc-addr-mode" onchange="cgUpdatePreview()"
-              style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);
-              font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;
-              border-radius:3px;outline:none;">
-              <option value="linear">Linear — MR100, MR102, MR104…</option>
-              <option value="block" selected>Block — MR100…MR115, MR200…MR215…</option>
-            </select>
-          </label>
-        </div>
-        <div id="cg-uc-files-body" style="display:none;padding:8px 20px 10px 20px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <label style="font-size:9px;color:var(--text3);width:110px;flex-shrink:0;">Unit Config: <span style="color:var(--cyan)">*</span></label>
-              <input type="file" id="uc-unit-file" accept=".json"
-                style="font-size:10px;color:var(--cyan);background:var(--bg);
-                border:1px solid var(--border);border-radius:3px;padding:2px 6px;flex:1;min-width:0;"
-                onchange="cgUCLoadFile('uc-unit-file', function(d){ UC_UNIT_CONFIG=d; cgUCUpdateStatus(); cgUCBuildUnitSelector(); cgUpdatePreview(); })">
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <label style="font-size:9px;color:var(--text3);width:110px;flex-shrink:0;">Cylinder Types: <span style="font-size:8px;">(optional)</span></label>
-              <input type="file" id="uc-cyl-file" accept=".json"
-                style="font-size:10px;color:var(--cyan);background:var(--bg);
-                border:1px solid var(--border);border-radius:3px;padding:2px 6px;flex:1;min-width:0;"
-                onchange="cgUCLoadFile('uc-cyl-file', function(d){ UC_CYLINDER_TYPES=d; cgUCUpdateStatus(); cgUpdatePreview(); })">
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <label style="font-size:9px;color:var(--text3);width:110px;flex-shrink:0;">Device Library: <span style="font-size:8px;">(optional)</span></label>
-              <input type="file" id="uc-devlib-file" accept=".json"
-                style="font-size:10px;color:var(--cyan);background:var(--bg);
-                border:1px solid var(--border);border-radius:3px;padding:2px 6px;flex:1;min-width:0;"
-                onchange="cgUCLoadFile('uc-devlib-file', function(d){ cgLoadDeviceLibrary(d); if (typeof ucLoadDeviceCommandLibrary === 'function') ucLoadDeviceCommandLibrary(d); cgUCUpdateStatus(); cgUpdatePreview(); })">
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <label style="font-size:9px;color:var(--text3);width:110px;flex-shrink:0;">Runtime Metadata: <span style="font-size:8px;">(optional)</span></label>
-              <input type="file" id="uc-runtime-meta-file" accept=".json"
-                style="font-size:10px;color:var(--cyan);background:var(--bg);
-                border:1px solid var(--border);border-radius:3px;padding:2px 6px;flex:1;min-width:0;"
-                onchange="cgUCLoadFile('uc-runtime-meta-file', function(d){ UC_RUNTIME_DEVICE_META=d; cgUCUpdateStatus(); cgUpdatePreview(); })">
-            </div>
+        <!-- Codegen asset paths (C# reads these files) -->
+        <div style="border-top:1px solid var(--border);background:var(--s2);flex-shrink:0;">
+          <div style="padding:6px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;"
+            onclick="cgToggleAssetPaths()">
+            <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">CODEGEN PATHS</span>
+            <span id="asset-paths-chevron" style="font-size:9px;color:var(--text3);">▶</span>
+            <span id="asset-paths-summary" style="font-size:9px;color:var(--text3);margin-left:4px;"></span>
           </div>
-          <!-- Unit selector từ project canvas -->
-          <div id="uc-unit-selector" style="display:none;margin-top:8px;">
-            <div style="font-size:9px;color:var(--text3);margin-bottom:4px;">CHỌN UNIT TRONG PROJECT</div>
-            <div id="uc-unit-radio-list" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
-          </div>
-          <div id="uc-status" style="font-size:9px;color:var(--text3);margin-top:6px;"></div>
-        </div>
-      </div>
-
-      <!-- Template Manager (collapsible) -->
-      <div style="border-top:1px solid var(--border);background:var(--s2);flex-shrink:0;">
-        <div style="padding:6px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;"
-          onclick="cgToggleTemplateManager()">
-          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">⚙ TEMPLATE MANAGER</span>
-          <span id="tpl-manager-chevron" style="font-size:9px;color:var(--text3);">▶</span>
-          <span style="flex:1;"></span>
-          <label style="font-size:9px;color:var(--cyan);cursor:pointer;"
-            onclick="event.stopPropagation()">
-            + Nạp .hbs
-            <input type="file" multiple accept=".hbs" style="display:none"
-              onchange="tmHandleFileUpload(this.files); this.value=''">
-          </label>
-        </div>
-        <div id="tpl-manager-body" style="display:none;padding:0 20px 10px 20px;">
-          <div id="tpl-manager-list" style="margin-top:4px;"></div>
-          <div style="margin-top:6px;font-size:9px;color:var(--text3);">
-            Hỗ trợ Unit Config: <code style="color:var(--cyan)">error.hbs</code>,
-            <code style="color:var(--cyan)">manual.hbs</code>,
-            <code style="color:var(--cyan)">origin.hbs</code>,
-            <code style="color:var(--cyan)">auto.hbs</code>,
-            <code style="color:var(--cyan)">main-output.hbs</code>,
-            <code style="color:var(--cyan)">output.hbs</code>,
-            <code style="color:var(--cyan)">step-body.hbs</code>,
-            <code style="color:var(--cyan)">cylinder.hbs</code>,
-            <code style="color:var(--cyan)">servo.hbs</code>,
-            <code style="color:var(--cyan)">motor.hbs</code>.
-            <br>Legacy vẫn hỗ trợ: <code style="color:var(--cyan)">kv_main.hbs</code>,
-            <code style="color:var(--cyan)">kv_step.hbs</code>,
-            <code style="color:var(--cyan)">st_main.hbs</code>.
-            <br>Ghi chú: upload theo đúng tên file, không cần giữ path thư mục như <code style="color:var(--cyan)">devices/...</code>.
-            <br>Ghi chú: <code style="color:var(--cyan)">kv_step.hbs</code> dùng cú pháp
-            <code>${"$"}{prevStepDone}</code>/<code>${"$"}{stepExe}</code>/<code>${"$"}{stepDone}</code>.
-            Phân tách block activation và feedback bằng dòng <code>;;;</code> (3 dấu chấm phẩy).
+          <div id="asset-paths-body" style="display:none;padding:8px 20px 10px 20px;">
+            <div style="display:grid;grid-template-columns:120px 1fr auto;gap:6px 10px;align-items:center;">
+              <label style="font-size:9px;color:var(--text3);">Device Library</label>
+              <input id="cg-device-library-path" value="config/Devices.json" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
+              <button class="btn" onclick="cgBrowseCodegenPath('deviceLibrary')" style="padding:3px 8px;font-size:9px;">Browse...</button>
+              <label style="font-size:9px;color:var(--text3);">Template Root</label>
+              <input id="cg-template-root-path" value="templates" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
+              <button class="btn" onclick="cgBrowseCodegenPath('templateRoot')" style="padding:3px 8px;font-size:9px;">Browse...</button>
+              <label style="font-size:9px;color:var(--text3);">Output Folder</label>
+              <input id="cg-output-root-path" value="" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
+              <button class="btn" onclick="cgBrowseCodegenPath('outputRoot')" style="padding:3px 8px;font-size:9px;">Browse...</button>
+            </div>
+            <div id="asset-paths-status" style="font-size:9px;color:var(--text3);margin-top:6px;"></div>
           </div>
         </div>
-      </div>
 
-      <!-- Code preview -->
-      <div style="flex:1;overflow:auto;padding:0;">
-        <pre id="cg-preview"
-          style="margin:0;padding:14px 18px;font-family:'JetBrains Mono',monospace;
-          font-size:11px;line-height:1.7;color:var(--text2);background:var(--bg);
-          min-height:300px;white-space:pre;tab-size:4;"></pre>
-      </div>
+        <!-- Code preview -->
+        <div style="flex:1;overflow:auto;padding:0;">
+          <pre id="cg-preview"
+            style="margin:0;padding:14px 18px;font-family:'JetBrains Mono',monospace;
+            font-size:11px;line-height:1.7;color:var(--text2);background:var(--bg);
+            min-height:300px;white-space:pre;tab-size:4;"></pre>
+        </div>
 
-      <!-- Footer actions -->
-      <div style="padding:10px 20px;border-top:1px solid var(--border);
-        display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
-        <span id="cg-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
-        <button class="btn" onclick="cgCopyCode()">⎘ Copy</button>
-        <button class="btn a" onclick="cgDownloadCode()">↓ Download</button>
-      </div>
-    </div>`;
+        <!-- Footer actions -->
+        <div style="padding:10px 20px;border-top:1px solid var(--border);
+          display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
+          <span id="cg-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
+          <button class="btn" onclick="cgCopyCode()">⎘ Copy</button>
+          <button class="btn a" onclick="cgDownloadCode()">↓ Download</button>
+        </div>
+      </div>`;
 
   document.body.appendChild(el);
+  cgApplySavedPaths();
   cgBuildUnitList();
-  cgUCBuildUnitSelector();
-  tmRenderManagerList();
+  cgUpdateAssetPathStatus();
   cgUpdatePreview();
 }
 
-// ─── Build unit selector cho Unit Config mode ─────────────────────────────────
-function cgUCBuildUnitSelector() {
-  const wrap    = document.getElementById('uc-unit-radio-list');
-  const section = document.getElementById('uc-unit-selector');
-  if (!wrap) return;
-  wrap.innerHTML = '';
 
-  const units    = (project && project.units) || [];
-  const allDiags = (project && project.diagrams) || [];
-  const hasOrphans = allDiags.some(d => !d.unitId);
 
-  const items = [];
-  units.forEach(u => {
-    const count = allDiags.filter(d => d.unitId === u.id).length;
-    items.push({ id: u.id, label: u.name || u.id, count });
-  });
-  if (hasOrphans) {
-    items.push({ id: '__none__', label: '(No unit)', count: allDiags.filter(d => !d.unitId).length });
-  }
+// â”€â”€â”€ Build unit selector cho Unit Config mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  if (!items.length) {
-    const unitVars = (typeof ucGetUnitStationVars === 'function') ? ucGetUnitStationVars() : [];
-    unitVars.forEach(function(v) {
-      if (v && v.label) items.push({ id: v.label, label: v.label, count: 0 });
-    });
-  }
+// â”€â”€â”€ Láº¥y unitId Ä‘ang chá»n trong UC unit selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  if (!items.length) {
-    // Legacy fallback: lấy từ project.unitConfig khi project.units chưa có
-    const unitCfg = (typeof project !== 'undefined' && project.unitConfig) || {};
-    Object.keys(unitCfg).forEach(function(key) {
-      items.push({ id: key, label: key, count: 0 });
-    });
-  }
-
-  if (!items.length) {
-    if (section) section.style.display = 'none';
-    return;
-  }
-
-  items.forEach((item, i) => {
-    const lbl = document.createElement('label');
-    lbl.className = 'cg-radio-lbl';
-    lbl.innerHTML = `<input type="radio" name="uc-unit-radio" value="${item.id}"
-      onchange="cgUpdatePreview()">${esc2(item.label)}
-      <span style="color:var(--text3);font-size:8px;margin-left:2px;">(${item.count})</span>`;
-    wrap.appendChild(lbl);
-    if (i === 0) {
-      lbl.querySelector('input').checked = true;
-    }
-  });
-
-  if (section) section.style.display = '';
-}
-
-// ─── Lấy unitId đang chọn trong UC unit selector ─────────────────────────────
-function cgUCGetSelectedUnitId() {
-  const radio = document.querySelector('#uc-unit-radio-list input[name="uc-unit-radio"]:checked');
-  return radio ? radio.value : null;
-}
-
-// ─── Build unit radio list ────────────────────────────────────────────────────
+// â”€â”€â”€ Build unit radio list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function cgBuildUnitList() {
   const wrap = document.getElementById('cg-unit-list');
   if (!wrap) return;
@@ -338,13 +182,13 @@ function cgBuildUnitList() {
   }
 }
 
-// ─── Called when user selects a unit radio button ────────────────────────────
+//  Called when user selects a unit radio button 
 function cgOnUnitSelect(unitId) {
   cgBuildDiagForUnit(unitId);
   cgUpdatePreview();
 }
 
-// ─── Build diagram checkboxes for the selected unit ──────────────────────────
+// Build diagram checkboxes for the selected unit
 function cgBuildDiagForUnit(unitId) {
   const listWrap = document.getElementById('cg-diag-list');
   const section  = document.getElementById('cg-unit-diag-section');
@@ -376,48 +220,8 @@ function cgSelectAll(val) {
   cgUpdatePreview();
 }
 
-function cgUCGetTemplateHealth() {
-  if (typeof tmGetUnitConfigTemplateHealth !== 'function') {
-    return { valid: true, errors: [], entries: [] };
-  }
-  return tmGetUnitConfigTemplateHealth(cgUCGetSelectedUnitId());
-}
 
-function cgUCFormatTemplateHealth(health) {
-  const lines = ['; ⚠ Template library is blocking generation.'];
-  (health.errors || []).forEach(function(message) {
-    lines.push('; - ' + message);
-  });
-  if (!health.errors || !health.errors.length) {
-    lines.push('; - Unknown template validation error.');
-  }
-  lines.push('; Kiểm tra Template Manager để sửa hoặc reset template lỗi.');
-  return lines.join('\n');
-}
-
-function cgUCBlockInvalidTemplates(pre, stat, health) {
-  if (pre) pre.textContent = cgUCFormatTemplateHealth(health);
-  if (stat) stat.textContent = 'Template Manager blocked generation';
-  if (typeof tmRenderManagerList === 'function') tmRenderManagerList();
-}
-
-function cgUCEnsureTemplateHealth(actionLabel) {
-  const health = cgUCGetTemplateHealth();
-  if (health.valid) return health;
-  toast('⚠ Không thể ' + actionLabel + ': template library đang lỗi.');
-  if (typeof tmRenderManagerList === 'function') tmRenderManagerList();
-  return null;
-}
-
-function cgUCGetEffectiveConfig(selectedUnitId) {
-  if (UC_UNIT_CONFIG) return UC_UNIT_CONFIG;
-  const hasUnitConfig = (typeof project !== 'undefined' && project.unitConfig && Object.keys(project.unitConfig).length > 0);
-  const hasUnitStationVars = (typeof ucGetUnitStationVars === 'function' && ucGetUnitStationVars().length > 0);
-  if ((!hasUnitConfig && !hasUnitStationVars) || typeof ucBuildSyntheticConfig !== 'function') return null;
-  return ucBuildSyntheticConfig(selectedUnitId);
-}
-
-// ─── Live preview ─────────────────────────────────────────────────────────────
+//  Live preview 
 function cgUpdatePreview() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
   const isUC = (target === 'unit-config');
@@ -426,20 +230,8 @@ function cgUpdatePreview() {
 
   // Show/hide panels
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
-  const ucFilesBar  = document.getElementById('cg-uc-files-bar');
   const unitWrap    = document.getElementById('cg-unit-wrap');
   if (baseMRWrap) baseMRWrap.style.display = isUC ? 'none' : '';
-  if (ucFilesBar) {
-    const wasHidden = ucFilesBar.style.display === 'none';
-    ucFilesBar.style.display = usesUC ? '' : 'none';
-    // Auto-mở khi lần đầu hiện và chưa có file nào được load
-    if (wasHidden && usesUC && !UC_UNIT_CONFIG) {
-      const body    = document.getElementById('cg-uc-files-body');
-      const chevron = document.getElementById('uc-files-chevron');
-      if (body)    body.style.display    = '';
-      if (chevron) chevron.textContent   = '▼';
-    }
-  }
   if (unitWrap)   unitWrap.style.display   = isUC ? 'none' : '';
 
   const pre  = document.getElementById('cg-preview');
@@ -460,32 +252,17 @@ function cgUpdatePreview() {
     return;
   }
 
-  // ── Unit Config JSON engine ───────────────────────────────────────────────
+  // Unit Config JSON engine
   if (isUC) {
-    const selectedUnitId = cgUCGetSelectedUnitId();
-    const effectiveConfig = cgUCGetEffectiveConfig(selectedUnitId);
-
-    if (!effectiveConfig) {
-      pre.textContent = '; Vui lòng load Unit Config JSON (infeed-unit.json)\n; hoặc import Struct Data Unit Station + thiết bị để tạo config.';
-      if (stat) stat.textContent = 'Unit Config mode — thiếu cấu hình Unit';
-      return;
-    }
-    const health = cgUCGetTemplateHealth();
-    if (!health.valid) {
-      cgUCBlockInvalidTemplates(pre, stat, health);
-      return;
-    }
-    const profile  = PLC_PROFILES['kv-5500'];
-    const addrMode = document.getElementById('uc-addr-mode')?.value || 'block';
-    // Route Unit Config generation to C# host (disable in-browser JS generation)
+    // Route Unit Config generation to C# host; JSON file inputs were removed from the modal.
     pre.textContent = '; Waiting for C# generator...';
     if (stat) stat.textContent = 'C# generator request queued';
-    const selectedUnit = cgUCGetSelectedUnitId() || selectedUnitId;
+    const selectedUnit = cgGetDefaultUnitId();
     cgGenerateViaHost('unit-config', selectedUnit || '');
     return;
   }
 
-  // ── Runtime Plan debug preview ───────────────────────────────────────────
+  // Runtime Plan debug preview 
   if (target === 'runtime-plan') {
     const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
     const selected = Array.from(
@@ -505,7 +282,7 @@ function cgUpdatePreview() {
     return;
   }
 
-  // ── Canvas engine (gốc) ──────────────────────────────────────────────────
+  //  Canvas engine (góc)  
   const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
   const selected = Array.from(
     document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
@@ -523,7 +300,15 @@ function cgUpdatePreview() {
   cgGenerateViaHost(target, selected[0] || '');
 }
 
-// ─── Syntax highlight cho Unit Config output ──────────────────────────────────
+// Syntax highlight cho Unit Config output 
+function cgGetDefaultUnitId() {
+  const unitRadio = document.querySelector('#cg-unit-list input[name="cg-unit-radio"]:checked');
+  if (unitRadio) return unitRadio.value;
+  const firstUnit = (project.units || [])[0];
+  if (firstUnit) return firstUnit.id || '';
+  return (project.diagrams || []).some(d => !d.unitId) ? '__none__' : '';
+}
+
 function cgGetSelectedDiagramIds() {
   return Array.from(
     document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
@@ -563,6 +348,11 @@ function cgBuildCSharpPayload(platform, diagId) {
 
   return {
     platform,
+    codegenAssets: cgGetCodegenAssets(),
+    deviceLibraryPath: cgGetCodegenAssets().deviceLibraryPath,
+    templateRootPath: cgGetCodegenAssets().templateRootPath,
+    templatePath: cgGetCodegenAssets().templateRootPath,
+    outputPath: cgGetCodegenAssets().outputPath,
     project: {
       id: project.id || '',
       name: project.name || '',
@@ -653,61 +443,13 @@ function cgUCHighlight(pre, profile) {
     .replace(/\bLR\d+\b/g, '<span style="color:#f472b6">$&</span>');
 }
 
-// ─── Status badge cho file load ───────────────────────────────────────────────
-function cgUCUpdateStatus() {
-  const el = document.getElementById('uc-status');
-  if (!el) return;
-  const parts = [];
-  const selectedUnitId = typeof cgUCGetSelectedUnitId === 'function' ? cgUCGetSelectedUnitId() : null;
-  const effectiveConfig = cgUCGetEffectiveConfig(selectedUnitId);
-  if (effectiveConfig) {
-    const cfg = effectiveConfig;
-    const label = cfg.unit?.label || 'loaded';
-    // v3: devices[] / v2: cylinders[]
-    const devCount = Array.isArray(cfg.devices)
-      ? cfg.devices.length
-      : (cfg.cylinders?.length || 0);
-    const schemaVer = (cfg.unit?.overrides != null || cfg.devices != null) ? 'v3' : 'v2';
-    const idxStr = cfg.unit?.unitIndex != null ? ' idx=' + cfg.unit.unitIndex : '';
-    const sourceLabel = UC_UNIT_CONFIG ? 'Unit Config' : 'Unit Struct';
-    parts.push(`✓ ${sourceLabel} [${schemaVer}]: ${label}${idxStr}  (${devCount} device(s))`);
-  }
-  if (UC_CYLINDER_TYPES) {
-    parts.push('Cylinder Types: ' + Object.keys(UC_CYLINDER_TYPES).filter(k => !k.startsWith('_')).length + ' types (optional)');
-  }
-  if (UC_RUNTIME_DEVICE_META) {
-    parts.push('Runtime Metadata: ' + Object.keys(UC_RUNTIME_DEVICE_META).filter(k => !k.startsWith('_')).length + ' type(s) loaded');
-  }
-  // v3: hiển thị trạng thái Device Library
-  const libKeys = Object.keys(DEVICE_LIBRARY || {}).filter(k => !k.startsWith('_'));
-  if (libKeys.length) {
-    parts.push(`Device Library: ${libKeys.length} type(s) loaded`);
-  }
-  el.textContent = parts.length ? parts.join('  |  ') : 'Load Unit Config JSON hoặc import Struct Data Unit Station để bắt đầu';
-  el.style.color = effectiveConfig ? 'var(--cyan)' : 'var(--text3)';
+// Status badge cho file load 
 
-  // Cập nhật summary trên header của collapsible bar
-  const summary = document.getElementById('uc-files-summary');
-  if (summary) {
-    if (effectiveConfig) {
-      const label = effectiveConfig.unit?.label || 'loaded';
-      const extras = [UC_CYLINDER_TYPES ? 'Cyl' : null,
-                      Object.keys(DEVICE_LIBRARY || {}).filter(k => !k.startsWith('_')).length ? 'DevLib' : null,
-                      UC_RUNTIME_DEVICE_META ? 'Meta' : null].filter(Boolean);
-      summary.textContent = '✓ ' + label + (UC_UNIT_CONFIG ? '' : ' (Struct)') + (extras.length ? '  +' + extras.join(', ') : '');
-      summary.style.color = 'var(--cyan)';
-    } else {
-      summary.textContent = 'Chưa load file';
-      summary.style.color = 'var(--text3)';
-    }
-  }
-}
-
-// ─── Download / Copy ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Download / Copy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function cgDownloadCode() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
 
-  // ── Unit Config engine ────────────────────────────────────────────────────
+  //Unit Config engine 
   if (target === 'csharp-kv-5500' || target === 'csharp-twincat-st') {
     const code = document.getElementById('cg-preview')?.textContent || '';
     const platform = target === 'csharp-kv-5500' ? 'kv-5500' : 'twincat-st';
@@ -725,10 +467,8 @@ function cgDownloadCode() {
   }
 
   if (target === 'unit-config') {
-    // Request Unit Config export via C# host
-    const selectedUnitId = cgUCGetSelectedUnitId();
-    if (!selectedUnitId) { toast('⚠ Chưa chọn Unit để export'); return; }
-    cgGenerateViaHost('unit-config', selectedUnitId);
+    // Request Unit Config export via C# host.
+    cgGenerateViaHost('unit-config', cgGetDefaultUnitId() || '');
     return;
   }
 
@@ -737,14 +477,14 @@ function cgDownloadCode() {
     const selected = Array.from(
       document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
     ).map(c => c.value);
-    if (!selected.length) { toast('⚠ No diagrams selected'); return; }
+    if (!selected.length) { toast('⚠  No diagrams selected'); return; }
 
     // Request Runtime Plan export via C# host
     cgGenerateViaHost('runtime-plan', selected[0] || '');
     return;
   }
 
-  // ── Canvas engine ─────────────────────────────────────────────────────────
+  //  Canvas engine 
   const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
   const selected = Array.from(
     document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
@@ -768,32 +508,96 @@ function cgExportViaHost(code, platform) {
 }
 
 function cgCopyCode() {
-  const target = document.getElementById('cg-target')?.value || 'kv-5500';
-  if (target === 'unit-config' && !cgUCEnsureTemplateHealth('copy code')) {
-    return;
-  }
   const pre = document.getElementById('cg-preview');
   if (!pre) return;
-  navigator.clipboard.writeText(pre.textContent).then(() => toast('✓ Copied to clipboard'));
+  navigator.clipboard.writeText(pre.textContent).then(() => toast('âœ“ Copied to clipboard'));
 }
 
-// ─── JSON Files panel toggle ─────────────────────────────────────────────────
-function cgToggleUCFiles() {
-  const body    = document.getElementById('cg-uc-files-body');
-  const chevron = document.getElementById('uc-files-chevron');
-  if (!body) return;
-  const open = body.style.display !== 'none';
-  body.style.display    = open ? 'none' : '';
-  if (chevron) chevron.textContent = open ? '▶' : '▼';
+// JSON Files panel toggle 
+
+// --- Codegen asset paths ----------------------------------------------------
+function cgGetCodegenAssets() {
+  const devPath = document.getElementById('cg-device-library-path')?.value || 'config/Devices.json';
+  const tplRoot = document.getElementById('cg-template-root-path')?.value || 'templates';
+  const outRoot = document.getElementById('cg-output-root-path')?.value || '';
+  return {
+    deviceLibraryPath: devPath.trim(),
+    templateRootPath: tplRoot.trim(),
+    outputPath: outRoot.trim()
+  };
 }
 
-// ─── Template Manager toggle ──────────────────────────────────────────────────
-function cgToggleTemplateManager() {
-  const body = document.getElementById('tpl-manager-body');
-  const chevron = document.getElementById('tpl-manager-chevron');
+function cgUpdateAssetPathStatus() {
+  const assets = cgGetCodegenAssets();
+  const status = document.getElementById('asset-paths-status');
+  const summary = document.getElementById('asset-paths-summary');
+  const ok = !!assets.deviceLibraryPath && !!assets.templateRootPath && !!assets.outputPath;
+  const text = ok
+    ? 'C# host will resolve: ' + assets.deviceLibraryPath + ' | ' + assets.templateRootPath + ' | ' + assets.outputPath
+    : 'Missing device library, template root, or output path';
+  if (status) {
+    status.textContent = text;
+    status.style.color = ok ? 'var(--cyan)' : 'var(--amber)';
+  }
+  if (summary) {
+    summary.textContent = ok ? '? paths ready' : 'missing path';
+    summary.style.color = ok ? 'var(--cyan)' : 'var(--amber)';
+  }
+}
+
+function cgBrowseCodegenPath(target) {
+  if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
+    toast('Browse is available only inside the WPF host');
+    return false;
+  }
+
+  window.chrome.webview.postMessage({
+    type: 'BROWSE_CODEGEN_PATH',
+    payload: { target }
+  });
+  return true;
+}
+
+function receiveCodegenPath(payload) {
+  const data = typeof payload === 'string' ? { target: 'templateRoot', path: payload } : (payload || {});
+  const inputId = data.target === 'deviceLibrary'
+    ? 'cg-device-library-path'
+    : data.target === 'outputRoot'
+      ? 'cg-output-root-path'
+      : 'cg-template-root-path';
+  const input = document.getElementById(inputId);
+  if (!input || !data.path) return;
+  input.value = data.path;
+  cgUpdateAssetPathStatus();
+  cgUpdatePreview();
+}
+
+function receiveSavedPaths(payload) {
+  cgSavedPaths = payload || {};
+  cgApplySavedPaths();
+}
+
+function cgApplySavedPaths() {
+  const data = cgSavedPaths || {};
+  const deviceInput = document.getElementById('cg-device-library-path');
+  const templateInput = document.getElementById('cg-template-root-path');
+  const outputInput = document.getElementById('cg-output-root-path');
+  if (deviceInput && data.deviceLibraryPath) deviceInput.value = data.deviceLibraryPath;
+  if (templateInput && data.templatePath) templateInput.value = data.templatePath;
+  if (outputInput && data.outputPath) outputInput.value = data.outputPath;
+  cgUpdateAssetPathStatus();
+  cgUpdatePreview();
+}
+
+function cgToggleAssetPaths() {
+  const body = document.getElementById('asset-paths-body');
+  const chevron = document.getElementById('asset-paths-chevron');
   if (!body) return;
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
   if (chevron) chevron.textContent = open ? '▶' : '▼';
-  if (!open) tmRenderManagerList();
+  if (!open) cgUpdateAssetPathStatus();
 }
+
+
+

@@ -628,10 +628,8 @@
 <script src="js/editor/excel-import.js"></script>
 <!-- Force generation via C# host in the WPF app; disable in-browser JS generators -->
 <script>window.__ONLY_CSHARP_CODEGEN__ = true;</script>
-<script src="js/codegen/kv-generator.js"></script>
-<!-- Keep Unit Config UI, Template Manager and modal; JS generators removed. -->
+<!-- Keep Unit Config UI and modal; code generation runs in the C# host. -->
 <script src="js/codegen/unit-config.js"></script>
-<script src="js/codegen/template-manager.js"></script>
 <script src="js/codegen/modal.js"></script>
 </body>
 </html>

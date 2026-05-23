@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace GrafcetStudio.App.Services;
 
@@ -10,4 +10,7 @@ public interface IWebViewBridgeService
     Task SendErrorAsync(string source, string message);
     Task LoadProjectDataAsync(string json);
     Task UpdateDiagramStateAsync(string actionsJson);
+    Task SendCodegenPathAsync(string target, string path);
+    Task SendSavedPathsAsync(string deviceLibraryPath, string templatePath, string outputPath);
 }
+

@@ -1,8 +1,11 @@
-namespace GrafcetStudio.App.Events;
+﻿namespace GrafcetStudio.App.Events;
 
 public class GenerateCodePayload
 {
     public string Platform { get; set; } = string.Empty;
+    public string DeviceLibraryPath { get; set; } = string.Empty;
+    public string TemplatePath { get; set; } = string.Empty;
+    public string OutputPath { get; set; } = string.Empty;
     public string Steps { get; set; } = string.Empty;
     public string Transitions { get; set; } = string.Empty;
     public string Actions { get; set; } = string.Empty;
@@ -22,3 +25,10 @@ public class ExportCodePayload
     public string Code { get; set; } = string.Empty;
     public string Platform { get; set; } = string.Empty;
 }
+
+public class BrowseCodegenPathPayload
+{
+    public string Target { get; set; } = string.Empty;
+}
+
+

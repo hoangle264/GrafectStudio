@@ -39,3 +39,6 @@ Thumbs.db
 _ReSharper*/
 *.resharper
 *.DotSettings.user
+
+# Node.js
+node_modules/
