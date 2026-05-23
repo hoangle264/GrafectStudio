@@ -620,7 +620,8 @@ function cgBuildCSharpPayload(platform, diagId) {
     },
     steps,
     transitions,
-    variables: cgGetCSharpVariables(s)
+    variables: cgGetCSharpVariables(s),
+    deviceTypes: (project && project.devices) || []
   };
 }
 

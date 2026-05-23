@@ -28,7 +28,7 @@ public partial class MainWindow : Window
 
         var bridge = ((App)Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
-        webView.CoreWebView2.OpenDevToolsWindow();//test
+        //webView.CoreWebView2.OpenDevToolsWindow();//test
         webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
 
         var webPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web"));

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using System.Linq;
 
 namespace GrafcetStudio.Domain.Models;
 
@@ -23,29 +24,42 @@ public class CodegenPayload
     [JsonPropertyName("Variables")]
     public List<DeviceVariable> Variables { get; set; } = new();
 
-    public DiagramState ToDiagramState()
+    [JsonPropertyName("DeviceTypes")]
+    public List<DeviceType> DeviceTypes { get; set; } = new();
+
+    public void EnrichVariables()
     {
-        var connections = new List<Connection>();
-        foreach (var transition in Transitions)
+        // Replace internal signal IDs with friendly names for each variable
+        foreach (var variable in Variables)
         {
-            foreach (var fromStepId in transition.FromStepIds)
-            {
-                connections.Add(new Connection { From = fromStepId, To = transition.Id });
-            }
+            // Find matching device type based on variable.Format (e.g., "Cylinder")
+            var deviceType = DeviceTypes?.FirstOrDefault(dt =>
+                string.Equals(dt.Name, variable.Format, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dt.Name, variable.Format, StringComparison.OrdinalIgnoreCase));
+            if (deviceType == null) continue;
 
-            foreach (var toStepId in transition.ToStepIds)
+            var newMap = new Dictionary<string, string>();
+            foreach (var kv in variable.SignalAddresses)
             {
-                connections.Add(new Connection { From = transition.Id, To = toStepId });
+                // kv.Key is internal ID like "cyl_lsh"
+                // Find signal with that ID in the device type
+                var signal = deviceType.Signals.FirstOrDefault(s =>
+                    string.Equals(s.Id, kv.Key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(s.Name, kv.Key, StringComparison.OrdinalIgnoreCase));
+                if (signal != null)
+                {
+                    // Use friendly name as key, value remains the address
+                    newMap[signal.Name] = kv.Value;
+                }
+                else
+                {
+                    // Keep original entry if not found (fallback)
+                    newMap[kv.Key] = kv.Value;
+                }
             }
+            // Replace with the new map containing only friendly names (replace IDs)
+            variable.SignalAddresses = newMap;
         }
-
-        return new DiagramState
-        {
-            Steps = Steps,
-            Transitions = Transitions,
-            Connections = connections,
-            Variables = Variables
-        };
     }
 }
 

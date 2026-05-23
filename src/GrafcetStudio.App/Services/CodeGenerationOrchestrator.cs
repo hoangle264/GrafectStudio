@@ -36,6 +36,7 @@ public class CodeGenerationOrchestrator
         {
             var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson, PayloadJsonOptions)
                           ?? throw new InvalidOperationException("Invalid codegen payload.");
+            payload.EnrichVariables();
             var platform = string.IsNullOrWhiteSpace(payload.Platform) ? message.Platform : payload.Platform;
             var code = _codegen.Generate(platform, payload);
             await _bridge.SendGeneratedCodeAsync(code);
