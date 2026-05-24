@@ -3,13 +3,8 @@
 public class GenerateCodePayload
 {
     public string Platform { get; set; } = string.Empty;
-    public string DeviceLibraryPath { get; set; } = string.Empty;
     public string TemplatePath { get; set; } = string.Empty;
     public string OutputPath { get; set; } = string.Empty;
-    public string Steps { get; set; } = string.Empty;
-    public string Transitions { get; set; } = string.Empty;
-    public string Actions { get; set; } = string.Empty;
-    public string Variables { get; set; } = string.Empty;
     public string RawJson { get; set; } = string.Empty;
 }
 

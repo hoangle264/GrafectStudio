@@ -90,20 +90,15 @@ public partial class MainWindow : Window
         {
             case "GENERATE_CODE":
             {
-                var stepCount = GetOptionalArrayLength(payload, "steps");
-                var transitionCount = GetOptionalArrayLength(payload, "transitions");
-                Debug.WriteLine($"[Codegen] C# received payload counts: steps={stepCount}, transitions={transitionCount}");
+                var flowCount = GetOptionalArrayLength(payload, "flows");
+                var variableCount = GetOptionalArrayLength(payload, "variables");
+                Debug.WriteLine($"[Codegen] C# received payload counts: flows={flowCount}, variables={variableCount}");
 
                 var message = new GenerateCodePayload
                 {
                     Platform = GetOptionalString(payload, "platform"),
-                    DeviceLibraryPath = GetOptionalString(payload, "deviceLibraryPath"),
-                    TemplatePath = GetOptionalString(payload, "templateRootPath", "templatePath"),
+                    TemplatePath = GetOptionalString(payload, "templateRootPath"),
                     OutputPath = GetOptionalString(payload, "outputPath"),
-                    Steps = GetOptionalRawText(payload, "steps"),
-                    Transitions = GetOptionalRawText(payload, "transitions"),
-                    Actions = GetOptionalRawText(payload, "actions"),
-                    Variables = GetOptionalRawText(payload, "variables"),
                     RawJson = payload.GetRawText()
                 };
                 _eventAggregator.GetEvent<GenerateCodeRequestedEvent>().Publish(message);
@@ -166,11 +161,6 @@ public partial class MainWindow : Window
 
         return string.Empty;
     }
-
-    private static string GetOptionalRawText(JsonElement element, string propertyName)
-        => element.TryGetProperty(propertyName, out var property)
-            ? property.GetRawText()
-            : string.Empty;
 
     private static int GetOptionalArrayLength(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array

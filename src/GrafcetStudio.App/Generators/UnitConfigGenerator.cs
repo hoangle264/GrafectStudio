@@ -36,12 +36,15 @@ public class UnitConfigGenerator : ICodeGenerator
 
     private static object BuildContext(CodegenPayload payload)
     {
-        var unitId = payload.Diagram?.UnitId ?? string.Empty;
-        var unitLabel = !string.IsNullOrWhiteSpace(payload.Diagram?.Unit)
-            ? payload.Diagram!.Unit
-            : !string.IsNullOrWhiteSpace(payload.Diagram?.UnitId)
-                ? payload.Diagram!.UnitId
+        var unitId = payload.Unit?.Id ?? string.Empty;
+        var unitLabel = !string.IsNullOrWhiteSpace(payload.Unit?.Label)
+            ? payload.Unit!.Label!
+            : !string.IsNullOrWhiteSpace(payload.Unit?.Name)
+                ? payload.Unit!.Name!
                 : payload.Project?.Name ?? "Unit";
+        var flows = payload.Flows ?? new();
+        var autoFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "auto", StringComparison.OrdinalIgnoreCase)).ToList();
+        var originFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
         var deviceTypesByName = payload.DeviceTypes.ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
         var devices = payload.Variables.Select(variable =>
@@ -73,7 +76,6 @@ public class UnitConfigGenerator : ICodeGenerator
         return new
         {
             project = payload.Project,
-            diagram = payload.Diagram,
             unit = new
             {
                 id = unitId,
@@ -82,14 +84,21 @@ public class UnitConfigGenerator : ICodeGenerator
             },
             devices,
             cylinders = devices.Where(d => string.Equals(d.kind, "cylinder", StringComparison.OrdinalIgnoreCase)).ToList(),
-            steps = payload.Steps,
-            transitions = payload.Transitions,
             variables = payload.Variables,
             deviceTypes = payload.DeviceTypes,
-            stationFlows = Array.Empty<object>(),
-            originSteps = payload.Steps.Where(s => s.IsInitial).ToList(),
+            stationFlows = autoFlows,
+            autoFlows,
+            originFlows,
+            flows,
+            originSteps = originFlows.SelectMany(f => f.Steps).Where(s => s.IsInitial).ToList(),
             warnings = Array.Empty<string>()
         };
+    }
+
+    private static string NormalizeFlowType(FlowInfo flow)
+    {
+        var value = flow.Type ?? flow.Mode ?? string.Empty;
+        return string.Equals(value, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
     }
 
     private static string NormalizeDeviceKind(string? format)

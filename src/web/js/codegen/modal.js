@@ -227,44 +227,22 @@ function cgSelectAll(val) {
 
 //  Live preview 
 function cgUpdatePreview() {
-  const target = document.getElementById('cg-target')?.value || 'kv-5500';
+  const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
-  const isUC = (platform === 'unit-config');
 
-  // Show/hide panels
+  // All codegen targets now use the Unit Config payload shape.
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
   const unitWrap    = document.getElementById('cg-unit-wrap');
-  if (baseMRWrap) baseMRWrap.style.display = isUC ? 'none' : '';
-  if (unitWrap)   unitWrap.style.display   = isUC ? 'none' : '';
+  if (baseMRWrap) baseMRWrap.style.display = 'none';
+  if (unitWrap)   unitWrap.style.display   = 'none';
 
   const pre  = document.getElementById('cg-preview');
   const stat = document.getElementById('cg-stat');
   if (!pre) return;
 
-  if (!isUC) {
-    const selected = cgGetSelectedDiagramIds();
-    if (!selected.length) {
-      pre.textContent = '; No diagrams selected.';
-      if (stat) stat.textContent = '';
-      return;
-    }
-
-    pre.textContent = '; Waiting for C# generator...';
-    if (stat) stat.textContent = 'C# generator request queued';
-    cgGenerateViaHost(platform, selected[0]);
-    return;
-  }
-
-  // Unit Config JSON engine
-  if (isUC) {
-    // Route Unit Config generation to C# host; JSON file inputs were removed from the modal.
-    pre.textContent = '; Waiting for C# generator...';
-    if (stat) stat.textContent = 'C# generator request queued';
-    const selectedUnit = cgGetDefaultUnitId();
-    cgGenerateViaHost('unit-config', selectedUnit || '');
-    return;
-  }
-
+  pre.textContent = '; Waiting for C# generator...';
+  if (stat) stat.textContent = 'C# generator request queued';
+  cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
 }
 
 // Syntax highlight cho Unit Config output 
@@ -288,9 +266,12 @@ function cgGetSelectedDiagramIds() {
   ).map(c => c.value);
 }
 
-function cgBuildCSharpPayload(platform, diagId) {
+function cgBuildCSharpPayload(platform, unitId) {
   if (activeDiagramId && typeof flushState === 'function') flushState();
-  console.debug('gen')
+  return cgBuildCSharpUnitPayload(platform, unitId || cgGetDefaultUnitId() || '');
+}
+
+function cgBuildCSharpFlow(diagId) {
   const diag = (project.diagrams || []).find(d => d.id === diagId) || {};
   const data = loadDiagramData(diagId);
   const s = (data && data.state) || { steps: [], transitions: [], connections: [], vars: [] };
@@ -319,24 +300,7 @@ function cgBuildCSharpPayload(platform, diagId) {
       .map(conn => conn.to)
   }));
 
-  console.log('[Codegen] Diagram payload counts', {
-    diagramId: diag.id || diagId,
-    steps: steps.length,
-    transitions: transitions.length
-  });
-
   return {
-    platform,
-    codegenAssets: cgGetCodegenAssets(),
-    deviceLibraryPath: cgGetCodegenAssets().deviceLibraryPath,
-    templateRootPath: cgGetCodegenAssets().templateRootPath,
-    templatePath: cgGetCodegenAssets().templateRootPath,
-    outputPath: cgGetCodegenAssets().outputPath,
-    project: {
-      id: project.id || '',
-      name: project.name || '',
-      machineName: project.machineName || ''
-    },
     diagram: {
       id: diag.id || diagId,
       name: diag.name || diagId,
@@ -346,9 +310,72 @@ function cgBuildCSharpPayload(platform, diagId) {
     },
     steps,
     transitions,
-    variables: cgGetCSharpVariables(s),
+    variables: cgGetCSharpVariables(s)
+  };
+}
+
+function cgBuildCSharpUnitPayload(platform, unitId) {
+  const units = project.units || [];
+  const selectedUnit = unitId && unitId !== '__none__'
+    ? units.find(u => u.id === unitId)
+    : null;
+  const unitDiagrams = (project.diagrams || []).filter(d =>
+    unitId === '__none__' ? !d.unitId : d.unitId === unitId
+  );
+  const allVars = [];
+  const seenVars = new Set();
+  const addVar = v => {
+    if (!v || !v.label || seenVars.has(v.label)) return;
+    seenVars.add(v.label);
+    allVars.push(v);
+  };
+
+  const flows = unitDiagrams.map(d => {
+    const flow = cgBuildCSharpFlow(d.id);
+    (flow.variables || []).forEach(addVar);
+    return {
+      id: flow.diagram.id,
+      name: flow.diagram.name,
+      type: cgNormalizeFlowType(flow.diagram.mode),
+      mode: flow.diagram.mode,
+      diagram: flow.diagram,
+      steps: flow.steps,
+      transitions: flow.transitions
+    };
+  });
+
+  console.log('[Codegen] Unit payload counts', {
+    unitId,
+    flows: flows.length,
+    auto: flows.filter(f => f.type === 'auto').length,
+    origin: flows.filter(f => f.type === 'origin').length,
+    variables: allVars.length
+  });
+
+  return {
+    platform,
+    codegenAssets: cgGetCodegenAssets(),
+    templateRootPath: cgGetCodegenAssets().templateRootPath,
+    outputPath: cgGetCodegenAssets().outputPath,
+    project: {
+      id: project.id || '',
+      name: project.name || '',
+      machineName: project.machineName || ''
+    },
+    unit: {
+      id: selectedUnit ? selectedUnit.id : (unitId || ''),
+      name: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : ''),
+      label: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : '')
+    },
+    flows,
+    variables: allVars,
     deviceTypes: (project && project.devices) || []
   };
+}
+
+function cgNormalizeFlowType(mode) {
+  const value = String(mode || '').trim().toLowerCase();
+  return value === 'origin' ? 'origin' : 'auto';
 }
 
 function cgGetCSharpVariables(diagramState) {
@@ -429,18 +456,9 @@ function cgUCHighlight(pre, profile) {
 
 // â”€â”€â”€ Download / Copy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function cgDownloadCode() {
-  const target = document.getElementById('cg-target')?.value || 'kv-5500';
+  const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
-
-  if (platform === 'unit-config') {
-    cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
-    return;
-  }
-
-  const selected = cgGetSelectedDiagramIds();
-  if (!selected.length) { toast('No diagrams selected'); return; }
-
-  cgGenerateViaHost(platform, selected[0] || '');
+  cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
 }
 function cgExportViaHost(code, platform) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {

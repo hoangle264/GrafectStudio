@@ -6,28 +6,25 @@ namespace GrafcetStudio.Domain.Models;
 
 public class CodegenPayload
 {
-    [JsonPropertyName("Platform")]
+    [JsonPropertyName("platform")]
     public string Platform { get; set; } = string.Empty;
 
     [JsonPropertyName("templateRootPath")]
     public string TemplateRootPath { get; set; } = string.Empty;
 
-    [JsonPropertyName("Project")]
+    [JsonPropertyName("project")]
     public ProjectInfo? Project { get; set; }
 
-    [JsonPropertyName("Diagram")]
-    public DiagramInfo? Diagram { get; set; }
+    [JsonPropertyName("unit")]
+    public UnitInfo? Unit { get; set; }
 
-    [JsonPropertyName("Steps")]
-    public List<Step> Steps { get; set; } = new();
+    [JsonPropertyName("flows")]
+    public List<FlowInfo> Flows { get; set; } = new();
 
-    [JsonPropertyName("Transitions")]
-    public List<Transition> Transitions { get; set; } = new();
-
-    [JsonPropertyName("Variables")]
+    [JsonPropertyName("variables")]
     public List<DeviceVariable> Variables { get; set; } = new();
 
-    [JsonPropertyName("DeviceTypes")]
+    [JsonPropertyName("deviceTypes")]
     public List<DeviceType> DeviceTypes { get; set; } = new();
 
     public void EnrichVariables()
@@ -80,4 +77,22 @@ public class DiagramInfo
     [JsonPropertyName("mode")] public string? Mode { get; set; }
     [JsonPropertyName("unitId")] public string? UnitId { get; set; }
     [JsonPropertyName("unit")] public string? Unit { get; set; }
+}
+
+public class UnitInfo
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    [JsonPropertyName("label")] public string? Label { get; set; }
+}
+
+public class FlowInfo
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    [JsonPropertyName("type")] public string? Type { get; set; }
+    [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("diagram")] public DiagramInfo? Diagram { get; set; }
+    [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
+    [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
 }

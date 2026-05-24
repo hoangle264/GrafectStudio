@@ -24,15 +24,17 @@ public class RuntimePlanGenerator : ICodeGenerator
         return JsonSerializer.Serialize(new
         {
             project = payload.Project,
-            diagram = payload.Diagram,
+            unit = payload.Unit,
             platform = payload.Platform,
             counts = new
             {
-                steps = payload.Steps.Count,
-                transitions = payload.Transitions.Count,
+                flows = payload.Flows.Count,
+                steps = payload.Flows.Sum(flow => flow.Steps.Count),
+                transitions = payload.Flows.Sum(flow => flow.Transitions.Count),
                 variables = payload.Variables.Count,
                 sequence = sequence.Count()
             },
+            flows = payload.Flows,
             sequence,
             variables = payload.Variables
         }, JsonOptions);
