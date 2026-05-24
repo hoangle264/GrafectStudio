@@ -23,5 +23,11 @@ public class TemplateEntry
 
     public string Content { get; init; } = string.Empty;
 
+    public string FilePath { get; init; } = string.Empty;
+
+    public bool IsCustom { get; init; }
+
+    public bool IsPartial { get; init; }
+
     public string Source => Content;
 }

@@ -9,6 +9,9 @@ public class CodegenPayload
     [JsonPropertyName("Platform")]
     public string Platform { get; set; } = string.Empty;
 
+    [JsonPropertyName("templateRootPath")]
+    public string TemplateRootPath { get; set; } = string.Empty;
+
     [JsonPropertyName("Project")]
     public ProjectInfo? Project { get; set; }
 

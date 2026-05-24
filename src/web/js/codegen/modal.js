@@ -41,13 +41,19 @@ function showGenerateCodeModal() {
             font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;
             border-radius:3px;outline:none;">
             <option value="unit-config">Unit Config JSON</option>
-            <option value="runtime-plan"> Runtime Plan [debug]</option>
+            <option value="runtime-plan">Runtime Plan [debug]</option>
+            <option value="kv-5500">Keyence KV-5500</option>
+            <option value="kv-8000">Keyence KV-8000</option>
+            <option value="melsec">Mitsubishi MELSEC</option>
+            <option value="omron">OMRON</option>
+            <option value="siemens">Siemens</option>
+            <option value="twincat-st">TwinCAT ST</option>
             <option value="csharp-kv-5500">C# Keyence KV demo</option>
             <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
           </select>
         </div>
 
-        <!-- Base MR address (ẩn khi dùng unit-config) -->
+        <!-- Base MR address hidden for unit-config -->
         <div id="cg-base-mr-wrap">
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">
             BASE ADDRESS <span style="color:var(--cyan);">@MR</span>
@@ -59,7 +65,7 @@ function showGenerateCodeModal() {
             oninput="cgUpdatePreview()">
         </div>
 
-        <!-- Unit + Diagram selector (ẩn khi dùng unit-config) -->
+        <!-- Unit + Diagram selector hidden for unit-config -->
         <div id="cg-unit-wrap" style="flex:1;min-width:220px;">
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">UNIT</div>
           <div id="cg-unit-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
@@ -83,7 +89,7 @@ function showGenerateCodeModal() {
           <div style="padding:6px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;"
             onclick="cgToggleAssetPaths()">
             <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">CODEGEN PATHS</span>
-            <span id="asset-paths-chevron" style="font-size:9px;color:var(--text3);">▶</span>
+            <span id="asset-paths-chevron" style="font-size:9px;color:var(--text3);">&gt;</span>
             <span id="asset-paths-summary" style="font-size:9px;color:var(--text3);margin-left:4px;"></span>
           </div>
           <div id="asset-paths-body" style="display:none;padding:8px 20px 10px 20px;">
@@ -117,8 +123,8 @@ function showGenerateCodeModal() {
         <div style="padding:10px 20px;border-top:1px solid var(--border);
           display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
           <span id="cg-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
-          <button class="btn" onclick="cgCopyCode()">⎘ Copy</button>
-          <button class="btn a" onclick="cgDownloadCode()">↓ Download</button>
+          <button class="btn" onclick="cgCopyCode()">Copy</button>
+          <button class="btn a" onclick="cgDownloadCode()">Download</button>
         </div>
       </div>`;
 
@@ -131,11 +137,9 @@ function showGenerateCodeModal() {
 
 
 
-// â”€â”€â”€ Build unit selector cho Unit Config mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Build unit selector cho Unit Config mode
 
-// â”€â”€â”€ Láº¥y unitId Ä‘ang chá»n trong UC unit selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// â”€â”€â”€ Build unit radio list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Build unit radio list 
 function cgBuildUnitList() {
   const wrap = document.getElementById('cg-unit-list');
   if (!wrap) return;
@@ -224,9 +228,8 @@ function cgSelectAll(val) {
 //  Live preview 
 function cgUpdatePreview() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
-  const isUC = (target === 'unit-config');
-  const usesUC = (target === 'unit-config' || target === 'runtime-plan');
-  const usesCSharp = target === 'csharp-kv-5500' || target === 'csharp-twincat-st';
+  const platform = cgResolveHostPlatform(target);
+  const isUC = (platform === 'unit-config');
 
   // Show/hide panels
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
@@ -238,7 +241,7 @@ function cgUpdatePreview() {
   const stat = document.getElementById('cg-stat');
   if (!pre) return;
 
-  if (usesCSharp) {
+  if (!isUC) {
     const selected = cgGetSelectedDiagramIds();
     if (!selected.length) {
       pre.textContent = '; No diagrams selected.';
@@ -248,7 +251,7 @@ function cgUpdatePreview() {
 
     pre.textContent = '; Waiting for C# generator...';
     if (stat) stat.textContent = 'C# generator request queued';
-    cgGenerateViaHost(target === 'csharp-kv-5500' ? 'kv-5500' : 'twincat-st', selected[0]);
+    cgGenerateViaHost(platform, selected[0]);
     return;
   }
 
@@ -262,45 +265,15 @@ function cgUpdatePreview() {
     return;
   }
 
-  // Runtime Plan debug preview 
-  if (target === 'runtime-plan') {
-    const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
-    const selected = Array.from(
-      document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
-    ).map(c => c.value);
-
-    if (!selected.length) {
-      pre.textContent = '{\n  "error": "No diagrams selected."\n}';
-      if (stat) stat.textContent = '';
-      return;
-    }
-
-    // Route Runtime Plan debug preview to C# host
-    pre.textContent = '; Waiting for C# generator...';
-    if (stat) stat.textContent = 'C# generator request queued';
-    cgGenerateViaHost('runtime-plan', selected[0] || '');
-    return;
-  }
-
-  //  Canvas engine (góc)  
-  const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
-  const selected = Array.from(
-    document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
-  ).map(c => c.value);
-
-  if (!selected.length) {
-    pre.textContent = '; No diagrams selected.';
-    if (stat) stat.textContent = '';
-    return;
-  }
-
-  // Route Canvas generation to C# host for all non-C# targets
-  pre.textContent = '; Waiting for C# generator...';
-  if (stat) stat.textContent = 'C# generator request queued';
-  cgGenerateViaHost(target, selected[0] || '');
 }
 
 // Syntax highlight cho Unit Config output 
+function cgResolveHostPlatform(target) {
+  return {
+    'csharp-kv-5500': 'kv-5500',
+    'csharp-twincat-st': 'twincat-st'
+  }[target] || target || 'kv-5500';
+}
 function cgGetDefaultUnitId() {
   const unitRadio = document.querySelector('#cg-unit-list input[name="cg-unit-radio"]:checked');
   if (unitRadio) return unitRadio.value;
@@ -317,7 +290,7 @@ function cgGetSelectedDiagramIds() {
 
 function cgBuildCSharpPayload(platform, diagId) {
   if (activeDiagramId && typeof flushState === 'function') flushState();
-
+  console.debug('gen')
   const diag = (project.diagrams || []).find(d => d.id === diagId) || {};
   const data = loadDiagramData(diagId);
   const s = (data && data.state) || { steps: [], transitions: [], connections: [], vars: [] };
@@ -345,6 +318,12 @@ function cgBuildCSharpPayload(platform, diagId) {
       .filter(conn => conn.from === trans.id && stepIds.has(conn.to))
       .map(conn => conn.to)
   }));
+
+  console.log('[Codegen] Diagram payload counts', {
+    diagramId: diag.id || diagId,
+    steps: steps.length,
+    transitions: transitions.length
+  });
 
   return {
     platform,
@@ -424,6 +403,9 @@ function receiveError(payload) {
   const stat = document.getElementById('cg-stat');
   const source = payload && payload.source ? payload.source : 'host';
   const message = payload && payload.message ? payload.message : String(payload || 'Unknown error');
+  if (typeof toast === 'function' && (source === 'template-loader' || source === 'template-validation')) {
+    toast('? ' + source + ': ' + message);
+  }
   if (pre) pre.textContent = '; ' + source + ' error: ' + message;
   if (stat) stat.textContent = 'C# host error';
 }
@@ -448,53 +430,18 @@ function cgUCHighlight(pre, profile) {
 // â”€â”€â”€ Download / Copy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function cgDownloadCode() {
   const target = document.getElementById('cg-target')?.value || 'kv-5500';
+  const platform = cgResolveHostPlatform(target);
 
-  //Unit Config engine 
-  if (target === 'csharp-kv-5500' || target === 'csharp-twincat-st') {
-    const code = document.getElementById('cg-preview')?.textContent || '';
-    const platform = target === 'csharp-kv-5500' ? 'kv-5500' : 'twincat-st';
-    if (cgExportViaHost(code, platform)) return;
-
-    const ext = platform === 'kv-5500' ? '.mnm' : '.st';
-    const safe = (project.name || 'grafcet').replace(/\s+/g, '_');
-    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = safe + '_csharp_code' + ext;
-    a.click();
-    toast('Downloaded ' + safe + '_csharp_code' + ext);
+  if (platform === 'unit-config') {
+    cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
     return;
   }
 
-  if (target === 'unit-config') {
-    // Request Unit Config export via C# host.
-    cgGenerateViaHost('unit-config', cgGetDefaultUnitId() || '');
-    return;
-  }
+  const selected = cgGetSelectedDiagramIds();
+  if (!selected.length) { toast('No diagrams selected'); return; }
 
-  if (target === 'runtime-plan') {
-    const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
-    const selected = Array.from(
-      document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
-    ).map(c => c.value);
-    if (!selected.length) { toast('⚠  No diagrams selected'); return; }
-
-    // Request Runtime Plan export via C# host
-    cgGenerateViaHost('runtime-plan', selected[0] || '');
-    return;
-  }
-
-  //  Canvas engine 
-  const baseMR = parseInt(document.getElementById('cg-base-mr')?.value || '100', 10);
-  const selected = Array.from(
-    document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
-  ).map(c => c.value);
-  if (!selected.length) { toast('⚠ No diagrams selected'); return; }
-
-  // Request code export via C# host for canvas targets
-  cgGenerateViaHost(target, selected[0] || '');
+  cgGenerateViaHost(platform, selected[0] || '');
 }
-
 function cgExportViaHost(code, platform) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
     return false;
@@ -503,7 +450,7 @@ function cgExportViaHost(code, platform) {
     type: 'EXPORT_CODE',
     payload: { code, platform }
   });
-  toast('✓ Export dialog opened');
+  toast('Export dialog opened');
   return true;
 }
 
@@ -583,7 +530,7 @@ function cgApplySavedPaths() {
   const templateInput = document.getElementById('cg-template-root-path');
   const outputInput = document.getElementById('cg-output-root-path');
   if (deviceInput && data.deviceLibraryPath) deviceInput.value = data.deviceLibraryPath;
-  if (templateInput && data.templatePath) templateInput.value = data.templatePath;
+  if (templateInput && (data.templateRootPath || data.templatePath)) templateInput.value = data.templateRootPath || data.templatePath;
   if (outputInput && data.outputPath) outputInput.value = data.outputPath;
   cgUpdateAssetPathStatus();
   cgUpdatePreview();
@@ -595,7 +542,7 @@ function cgToggleAssetPaths() {
   if (!body) return;
   const open = body.style.display !== 'none';
   body.style.display = open ? 'none' : '';
-  if (chevron) chevron.textContent = open ? '▶' : '▼';
+  if (chevron) chevron.textContent = open ? '>' : 'v';
   if (!open) cgUpdateAssetPathStatus();
 }
 

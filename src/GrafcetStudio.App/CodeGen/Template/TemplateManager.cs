@@ -54,7 +54,17 @@ public class TemplateManager
     }
 
     public void RegisterTemplate(TemplateEntry entry)
-        => LoadTemplate(string.IsNullOrWhiteSpace(entry.CacheKey) ? entry.Name : entry.CacheKey!, entry.Content);
+    {
+        var key = ResolveTemplateKey(entry);
+        if (entry.IsPartial)
+        {
+            RegisterPartial(string.IsNullOrWhiteSpace(entry.PartialName) ? key : entry.PartialName!, entry.Content);
+            _sources[key] = entry.Content;
+            return;
+        }
+
+        LoadTemplate(key, entry.Content);
+    }
 
     public void RegisterTemplates(IList<TemplateEntry> entries)
     {
@@ -82,6 +92,13 @@ public class TemplateManager
 
     public void RegisterHelper(string name, HandlebarsHelper helper)
         => _handlebars.RegisterHelper(name, helper);
+
+    private static string ResolveTemplateKey(TemplateEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.CacheKey)) return entry.CacheKey!;
+        if (!string.IsNullOrWhiteSpace(entry.Id)) return entry.Id;
+        return entry.Name;
+    }
 
     public void ApplyCustomTemplatesToCache()
     {

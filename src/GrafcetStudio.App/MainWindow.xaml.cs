@@ -4,6 +4,7 @@ using Microsoft.Web.WebView2.Core;
 using Prism.Events;
 using Prism.Ioc;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -89,11 +90,15 @@ public partial class MainWindow : Window
         {
             case "GENERATE_CODE":
             {
+                var stepCount = GetOptionalArrayLength(payload, "steps");
+                var transitionCount = GetOptionalArrayLength(payload, "transitions");
+                Debug.WriteLine($"[Codegen] C# received payload counts: steps={stepCount}, transitions={transitionCount}");
+
                 var message = new GenerateCodePayload
                 {
                     Platform = GetOptionalString(payload, "platform"),
                     DeviceLibraryPath = GetOptionalString(payload, "deviceLibraryPath"),
-                    TemplatePath = GetOptionalString(payload, "templatePath"),
+                    TemplatePath = GetOptionalString(payload, "templateRootPath", "templatePath"),
                     OutputPath = GetOptionalString(payload, "outputPath"),
                     Steps = GetOptionalRawText(payload, "steps"),
                     Transitions = GetOptionalRawText(payload, "transitions"),
@@ -151,10 +156,26 @@ public partial class MainWindow : Window
             ? property.GetString() ?? string.Empty
             : string.Empty;
 
+    private static string GetOptionalString(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            var value = GetOptionalString(element, propertyName);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+
+        return string.Empty;
+    }
+
     private static string GetOptionalRawText(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property)
             ? property.GetRawText()
             : string.Empty;
+
+    private static int GetOptionalArrayLength(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array
+            ? property.GetArrayLength()
+            : 0;
 }
 
 

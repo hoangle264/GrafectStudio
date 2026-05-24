@@ -1,14 +1,17 @@
+﻿using GrafcetStudio.Domain.Enums;
+using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
-using GrafcetStudio.Domain.Enums;
-using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
 public class KeyenceMnemonicGenerator : ICodeGenerator
 {
-    public string Platform => "kv-5500";
+    public const string DefaultPlatform = "kv-5500";
+
+    public string Platform => DefaultPlatform;
 
     public string Generate(CodegenPayload payload)
     {
@@ -18,6 +21,7 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
         sb.AppendLine($"; Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
         var map = new List<string>();
+        Debug.WriteLine($"[Codegen] C# received payload counts: steps={seq.Count}, transitions={seq.Sum(item => item.Step.Number)}");
 
         for (var i = 0; i < seq.Count; i++)
         {
@@ -71,3 +75,5 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
            || condition == "1"
            || condition.Equals("true", StringComparison.OrdinalIgnoreCase);
 }
+
+

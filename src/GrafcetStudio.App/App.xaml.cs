@@ -1,5 +1,8 @@
-using GrafcetStudio.App.Generators;
+﻿using GrafcetStudio.App.Generators;
 using GrafcetStudio.App.Services;
+using GrafcetStudio.CodeGen.Profile;
+using GrafcetStudio.CodeGen.Template;
+using HandlebarsDotNet;
 using Prism.DryIoc;
 using Prism.Ioc;
 using System.Windows;
@@ -17,8 +20,16 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IWebViewBridgeService, WebViewBridgeService>();
         containerRegistry.RegisterSingleton<IFileService, FileService>();
         containerRegistry.RegisterSingleton<ICodeGenerator, KeyenceMnemonicGenerator>();
+        containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Kv8000.Id));
+        containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Melsec.Id));
+        containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Omron.Id));
+        containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Siemens.Id));
+        containerRegistry.RegisterSingleton<ICodeGenerator, RuntimePlanGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
+        containerRegistry.RegisterSingleton<ICodeGenerator, UnitConfigGenerator>();
         containerRegistry.RegisterSingleton<ICodeGeneratorService, CodeGeneratorService>();
+        containerRegistry.RegisterInstance<IHandlebars>(Handlebars.Create());
+        containerRegistry.RegisterSingleton<TemplateManager>();
         containerRegistry.RegisterSingleton<ConfigService>();
         containerRegistry.RegisterSingleton<CodeGenerationOrchestrator>();
         containerRegistry.RegisterSingleton<FileIOOrchestrator>();
@@ -29,3 +40,5 @@ public partial class App : PrismApplication
         Container.Resolve<MockAiService>();
     }
 }
+
+
