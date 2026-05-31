@@ -766,10 +766,18 @@ function openDiagPropsPanel(id) {
   document.getElementById('dp-desc').value = d.description||'';
   document.getElementById('dp-machine').value = d.machine||project.machineName||'';
 
+  if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(d, true);
+
   // Mode chips — only Auto and Origin
   dpSetMode(d.mode||'Auto');
   // Type chips
   dpSetType(d.diagramType||'Main');
+  dpSetAddressMode(d.addressMode||'bool');
+  dpSetBoolAddressMode(d.boolAddressMode||'linear');
+  document.getElementById('dp-base-mr').value = d.baseMr ?? 100;
+  document.getElementById('dp-active-word').value = d.activeWord || 'DM0';
+  document.getElementById('dp-complete-word').value = d.completeWord || 'DM100';
+  dpUpdateAddressFields();
   // Header badge
   dpUpdateBadge(d.mode||'Auto');
   document.getElementById('dp-title').textContent = d.name;
@@ -801,6 +809,68 @@ function dpSetType(type) {
   sBtn.className = 'dp-type-chip' + (type==='SubRoutine'?' active-sub':'');
   dpLiveUpdate();
 }
+
+function dpSetAddressMode(mode) {
+  const normalized = String(mode || 'bool').toLowerCase() === 'word' ? 'word' : 'bool';
+  document.querySelectorAll('#dp-address-mode-chips .dp-chip').forEach(c=>{
+    c.classList.toggle('active', c.dataset.addressMode===normalized);
+  });
+  dpUpdateAddressFields();
+  dpLiveUpdate();
+}
+function dpSetBoolAddressMode(mode) {
+  const normalized = typeof normalizeBoolAddressMode === 'function' ? normalizeBoolAddressMode(mode) : (String(mode).toLowerCase()==='block'?'block':'linear');
+  document.querySelectorAll('#dp-bool-mode-chips .dp-chip').forEach(c=>{
+    c.classList.toggle('active', c.dataset.boolMode===normalized);
+  });
+  dpLiveUpdate();
+}
+function dpGetCurrentAddressMode() {
+  const active = document.querySelector('#dp-address-mode-chips .dp-chip.active');
+  return active ? active.dataset.addressMode : 'bool';
+}
+function dpGetCurrentBoolAddressMode() {
+  const active = document.querySelector('#dp-bool-mode-chips .dp-chip.active');
+  return active ? active.dataset.boolMode : 'linear';
+}
+function dpUpdateAddressFields() {
+  const isWord = dpGetCurrentAddressMode() === 'word';
+  const boolFields = document.getElementById('dp-bool-address-fields');
+  const wordFields = document.getElementById('dp-word-address-fields');
+  if (boolFields) boolFields.style.display = isWord ? 'none' : 'block';
+  if (wordFields) wordFields.style.display = isWord ? 'block' : 'none';
+}
+function dpReadAddressConfig() {
+  const mode = dpGetCurrentAddressMode();
+  const baseMrRaw = document.getElementById('dp-base-mr')?.value || '0';
+  const baseMr = Number(baseMrRaw);
+  return {
+    addressMode: mode,
+    boolAddressMode: dpGetCurrentBoolAddressMode(),
+    baseMr: Number.isInteger(baseMr) && baseMr >= 0 ? baseMr : 0,
+    activeWord: (document.getElementById('dp-active-word')?.value || 'DM0').trim() || 'DM0',
+    completeWord: (document.getElementById('dp-complete-word')?.value || 'DM100').trim() || 'DM100'
+  };
+}
+function dpValidateAddressConfig(config) {
+  if (config.addressMode === 'bool') {
+    const baseText = document.getElementById('dp-base-mr')?.value || '';
+    const base = Number(baseText);
+    if (!Number.isInteger(base) || base < 0) {
+      toast('⚠ Base MR must be a non-negative integer');
+      return false;
+    }
+  }
+  if (config.addressMode === 'word') {
+    const wordRe = /^[A-Za-z]+\d+$/;
+    if (!wordRe.test(config.activeWord) || !wordRe.test(config.completeWord)) {
+      toast('⚠ Word addresses must look like DM0 or DM100');
+      return false;
+    }
+  }
+  return true;
+}
+
 function dpUpdateBadge(mode) {
   const cfg = MODE_CFG[mode]||{color:'var(--text2)',bg:'var(--s3)'};
   const badge = document.getElementById('dp-mode-badge');
@@ -827,7 +897,8 @@ function dpLiveUpdate() {
   const type = dpGetCurrentType();
   const name = document.getElementById('dp-name').value||'GRAFCET';
   const desc = document.getElementById('dp-desc').value;
-  const fake = {machine, unit:unitName, mode, diagramType:type, name, description:desc};
+  const address = dpReadAddressConfig();
+  const fake = {machine, unit:unitName, mode, diagramType:type, name, description:desc, ...address};
   dpUpdateCodePreview(fake);
 }
 function dpUpdateCodePreview(d) {
@@ -839,6 +910,9 @@ function dpUpdateCodePreview(d) {
     ['unit',    unit],
     ['mode',    d.mode||'Auto'],
     ['type',    d.diagramType||'Main'],
+    ['address', d.addressMode === 'word'
+      ? `@${d.activeWord||'DM0'} / @${d.completeWord||'DM100'}`
+      : `@MR${d.baseMr ?? 100} (${d.boolAddressMode||'linear'})`],
     ['name',    d.name||'GRAFCET'],
   ].map(([k,v])=>`<span class="k">${k}</span>: <span class="v">${esc(v)}</span>`).join('\n');
 }
@@ -855,6 +929,13 @@ function saveDiagPropsPanel() {
   d.unit = unitSel.value ? (project.units.find(u=>u.id===unitSel.value)?.name||'') : '';
   d.mode = dpGetCurrentMode();
   d.diagramType = dpGetCurrentType();
+  const address = dpReadAddressConfig();
+  if (!dpValidateAddressConfig(address)) return;
+  d.addressMode = address.addressMode;
+  d.boolAddressMode = address.boolAddressMode;
+  d.baseMr = address.baseMr;
+  d.activeWord = address.activeWord;
+  d.completeWord = address.completeWord;
   saveProject(); renderTree(); renderTabs();
   document.getElementById('dp-title').textContent = d.name;
   dpUpdateCodePreview(d);
