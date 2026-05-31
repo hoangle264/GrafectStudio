@@ -1,4 +1,5 @@
 ﻿using GrafcetStudio.Domain.Models;
+using System;
 using System.Text.Json;
 
 namespace GrafcetStudio.App.Generators;
@@ -17,8 +18,8 @@ public class RuntimePlanGenerator : ICodeGenerator
             step = item.Step,
             inTransition = item.InTransition,
             outTransition = item.OutTransition,
-            execAddress = $"@MR{100 + index * 2}",
-            doneAddress = $"@MR{101 + index * 2}"
+            execAddress = RequireStepAddress(item.Step.ExecAddress, item.Step, "execAddress"),
+            doneAddress = RequireStepAddress(item.Step.DoneAddress, item.Step, "doneAddress")
         });
 
         return JsonSerializer.Serialize(new
@@ -39,4 +40,9 @@ public class RuntimePlanGenerator : ICodeGenerator
             variables = payload.Variables
         }, JsonOptions);
     }
+
+    private static string RequireStepAddress(string? address, Step step, string propertyName)
+        => string.IsNullOrWhiteSpace(address)
+            ? throw new InvalidOperationException($"Invalid codegen payload: step '{step.Id}' (S{step.Number:D2}) is missing {propertyName}.")
+            : address;
 }

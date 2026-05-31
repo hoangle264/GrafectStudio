@@ -26,10 +26,12 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
         for (var i = 0; i < seq.Count; i++)
         {
             var item = seq[i];
-            var exec = $"@MD{100 + i * 2}";
-            var done = $"@MR{101 + i * 2}";
+            var exec = RequireStepAddress(item.Step.ExecAddress, item.Step, "execAddress");
+            var done = RequireStepAddress(item.Step.DoneAddress, item.Step, "doneAddress");
             map.Add($"; S{item.Step.Number:D2}: exec={exec}, done={done}");
-            var prevDone = item.Step.IsInitial || i == 0 ? "CR2002" : $"@MR{101 + (i - 1) * 2}";
+            var prevDone = item.Step.IsInitial || i == 0
+                ? "CR2002"
+                : RequireStepAddress(seq[i - 1].Step.DoneAddress, seq[i - 1].Step, "doneAddress");
 
             sb.AppendLine($"LD   {prevDone.PadRight(12)}; S{item.Step.Number:D2} prev done");
             EmitConditionAndSet(sb, item.InTransition?.Condition, payload.Variables, exec, $"S{item.Step.Number:D2} exec");
@@ -69,6 +71,11 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
             }
         }
     }
+
+    private static string RequireStepAddress(string? address, Step step, string propertyName)
+        => string.IsNullOrWhiteSpace(address)
+            ? throw new InvalidOperationException($"Invalid codegen payload: step '{step.Id}' (S{step.Number:D2}) is missing {propertyName}.")
+            : address;
 
     private static bool SkipCondition(string? condition)
         => string.IsNullOrWhiteSpace(condition)

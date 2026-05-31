@@ -460,6 +460,33 @@
       </div>
     </div>
 
+
+    <!-- ADDRESS CONFIG -->
+    <div class="dp-section">
+      <div class="dp-section-title">ADDRESS CONFIG</div>
+      <div class="dp-label">Address mode</div>
+      <div class="dp-mode-chips dp-address-chips" id="dp-address-mode-chips">
+        <button class="dp-chip dp-chip-auto" data-address-mode="bool" onclick="dpSetAddressMode('bool')">Bool</button>
+        <button class="dp-chip dp-chip-origin" data-address-mode="word" onclick="dpSetAddressMode('word')">Word</button>
+      </div>
+
+      <div id="dp-bool-address-fields">
+        <div class="dp-label">Bool packing</div>
+        <div class="dp-mode-chips dp-address-chips" id="dp-bool-mode-chips">
+          <button class="dp-chip dp-chip-auto" data-bool-mode="linear" onclick="dpSetBoolAddressMode('linear')">Linear</button>
+          <button class="dp-chip dp-chip-origin" data-bool-mode="block" onclick="dpSetBoolAddressMode('block')">Block</button>
+        </div>
+        <div class="dp-label">Base MR</div>
+        <input class="dp-input" id="dp-base-mr" type="number" min="0" step="1" oninput="dpLiveUpdate()">
+      </div>
+
+      <div id="dp-word-address-fields">
+        <div class="dp-label">Active word</div>
+        <input class="dp-input" id="dp-active-word" type="text" placeholder="DM0" oninput="dpLiveUpdate()">
+        <div class="dp-label">Complete word</div>
+        <input class="dp-input" id="dp-complete-word" type="text" placeholder="DM100" oninput="dpLiveUpdate()">
+      </div>
+    </div>
     <!-- CODE PREVIEW -->
     <div class="dp-section">
       <div class="dp-section-title">CODE PREVIEW</div>

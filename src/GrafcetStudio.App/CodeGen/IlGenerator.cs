@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using GrafcetStudio.CodeGen.Profile;
@@ -53,14 +54,18 @@ public class IlGenerator : ICodeGenerator
     public DiagramResult GenerateDiagram(DiagramMeta meta, DiagramState state, GenerationOptions opts)
     {
         var sequence = _sequenceResolver.Resolve(state);
-        var mrMap = opts.MrMap ?? _sequenceResolver.AllocateMrMap(sequence, opts.BaseMr);
+        var mrMap = sequence.ToDictionary(entry => entry.Step.Id, entry => new MrPair(
+            RequireStepAddress(entry.Step.ExecAddress, entry.Step, "execAddress"),
+            RequireStepAddress(entry.Step.DoneAddress, entry.Step, "doneAddress")));
         var lines = new List<string> { $"{opts.Profile.CommentPrefix} Diagram: {meta.Name} ({meta.Mode})" };
 
-        foreach (var entry in sequence)
+        for (var i = 0; i < sequence.Count; i++)
         {
+            var entry = sequence[i];
             if (!mrMap.TryGetValue(entry.Step.Id, out var mr)) continue;
+            var prevDone = entry.Step.IsInitial || i == 0 ? "CR2002" : mrMap[sequence[i - 1].Step.Id].Done;
             lines.Add(BuildStepComment(entry.Step.Number, entry.Step.Label));
-            lines.AddRange(BuildStepActivation(entry, mr, opts));
+            lines.AddRange(BuildStepActivation(entry, mr, prevDone, opts));
             lines.AddRange(BuildStepFeedback(entry, mr, opts));
 
             if (!opts.SeparateOutputs)
@@ -93,10 +98,9 @@ public class IlGenerator : ICodeGenerator
         return template;
     }
 
-    private IList<string> BuildStepActivation(SequenceEntry entry, MrPair mr, GenerationOptions opts)
+    private IList<string> BuildStepActivation(SequenceEntry entry, MrPair mr, string prevDone, GenerationOptions opts)
     {
-        var prev = entry.Step.IsInitial ? "CR2002" : entry.InTransition is null ? "CR2002" : mr.Done;
-        var lines = new List<string> { $"LD   {PadAddress(prev)}{opts.Profile.CommentPrefix} previous done" };
+        var lines = new List<string> { $"LD   {PadAddress(prevDone)}{opts.Profile.CommentPrefix} previous done" };
         if (entry.InTransition is { Condition: not "1" } t && !string.IsNullOrWhiteSpace(t.Condition))
         {
             lines.Add($"{Map("AND"),-5}{t.Condition}");
@@ -117,6 +121,11 @@ public class IlGenerator : ICodeGenerator
         lines.Add($"{Map("SET"),-5}{mr.Done}");
         return lines;
     }
+
+    private static string RequireStepAddress(string? address, Step step, string propertyName)
+        => string.IsNullOrWhiteSpace(address)
+            ? throw new InvalidOperationException($"Invalid codegen payload: step '{step.Id}' (S{step.Number:D2}) is missing {propertyName}.")
+            : address;
 
     private string BuildStepComment(int stepNum, string stepLabel)
         => $"; S{stepNum:D2} {stepLabel}";

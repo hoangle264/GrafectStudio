@@ -77,6 +77,11 @@ public class DiagramInfo
     [JsonPropertyName("mode")] public string? Mode { get; set; }
     [JsonPropertyName("unitId")] public string? UnitId { get; set; }
     [JsonPropertyName("unit")] public string? Unit { get; set; }
+    [JsonPropertyName("addressMode")] public string? AddressMode { get; set; }
+    [JsonPropertyName("boolAddressMode")] public string? BoolAddressMode { get; set; }
+    [JsonPropertyName("baseMr")] public int? BaseMr { get; set; }
+    [JsonPropertyName("activeWord")] public string? ActiveWord { get; set; }
+    [JsonPropertyName("completeWord")] public string? CompleteWord { get; set; }
 }
 
 public class UnitInfo
