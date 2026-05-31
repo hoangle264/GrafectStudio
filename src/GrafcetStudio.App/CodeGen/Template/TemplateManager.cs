@@ -10,6 +10,7 @@ public class TemplateManager
     private readonly IHandlebars _handlebars;
     private readonly Dictionary<string, string> _sources = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HandlebarsTemplate<object, object>> _compiled = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _registeredPartials = new(StringComparer.OrdinalIgnoreCase);
 
     public TemplateManager(IHandlebars handlebars)
     {
@@ -32,6 +33,10 @@ public class TemplateManager
         => _sources.TryGetValue(name, out var source) ? source : null;
 
     public bool IsTemplateLoaded(string name) => _compiled.ContainsKey(name);
+
+    public bool IsPartialRegistered(string partialName) => _registeredPartials.Contains(partialName);
+
+    public IEnumerable<string> GetLoadedTemplateIds() => _sources.Keys.ToList();
 
     public void RegisterBuiltinHelpers()
     {
@@ -81,6 +86,18 @@ public class TemplateManager
         return template(model);
     }
 
+    public bool TryRender(string templateName, object model, out string result)
+    {
+        if (!_compiled.TryGetValue(templateName, out var template))
+        {
+            result = string.Empty;
+            return false;
+        }
+
+        result = template(model);
+        return true;
+    }
+
     public IList<string> RenderLines(string name, object context)
         => Render(name, context).Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList();
 
@@ -88,7 +105,10 @@ public class TemplateManager
         => CheckHealth();
 
     public void RegisterPartial(string name, string source)
-        => _handlebars.RegisterTemplate(name, source);
+    {
+        _handlebars.RegisterTemplate(name, source);
+        _registeredPartials.Add(name);
+    }
 
     public void RegisterHelper(string name, HandlebarsHelper helper)
         => _handlebars.RegisterHelper(name, helper);
@@ -125,3 +145,5 @@ public class TemplateManager
         return new TemplateHealth { Entries = entries };
     }
 }
+
+

@@ -1,6 +1,7 @@
-﻿using GrafcetStudio.CodeGen.Template;
+using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Models;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 
@@ -9,6 +10,22 @@ namespace GrafcetStudio.App.Generators;
 public class UnitConfigGenerator : ICodeGenerator
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly string[] SectionTemplateOrder =
+    [
+        "uc.error",
+        "uc.manual",
+        "uc.origin",
+        "uc.auto"
+    ];
+
+    private static readonly (string TemplateId, string PartialName)[] KnownPartials =
+    [
+        ("uc.stepBody", "step_body"),
+        ("uc.deviceCylinder", "device_cylinder"),
+        ("uc.deviceServo", "device_servo"),
+        ("uc.deviceMotor", "device_motor"),
+        ("uc.deviceGeneric", "device_generic")
+    ];
     private readonly TemplateManager _templates;
 
     public UnitConfigGenerator(TemplateManager templates)
@@ -21,17 +38,54 @@ public class UnitConfigGenerator : ICodeGenerator
     public string Generate(CodegenPayload payload)
     {
         var context = BuildContext(payload);
-        var templateName = ResolveTemplateName();
-        return templateName is null
+        RegisterPartials();
+
+        var renderedSections = ResolveSectionTemplateNames()
+            .Select(templateName => _templates.TryRender(templateName, context, out var result) ? result : string.Empty)
+            .Where(section => !string.IsNullOrWhiteSpace(section))
+            .ToList();
+
+        return renderedSections.Count == 0
             ? JsonSerializer.Serialize(context, JsonOptions)
-            : _templates.Render(templateName, context);
+            : string.Join(Environment.NewLine, renderedSections);
     }
 
-    private string? ResolveTemplateName()
+    private IEnumerable<string> ResolveSectionTemplateNames()
     {
-        if (_templates.IsTemplateLoaded("uc.mainOutput")) return "uc.mainOutput";
-        if (_templates.IsTemplateLoaded("uc.outputLegacy")) return "uc.outputLegacy";
-        return null;
+        foreach (var templateName in SectionTemplateOrder)
+        {
+            if (_templates.IsTemplateLoaded(templateName)) yield return templateName;
+        }
+
+        if (_templates.IsTemplateLoaded("uc.mainOutput"))
+        {
+            yield return "uc.mainOutput";
+        }
+        else if (_templates.IsTemplateLoaded("uc.outputLegacy"))
+        {
+            yield return "uc.outputLegacy";
+        }
+    }
+
+    private void RegisterPartials()
+    {
+        foreach (var (templateId, partialName) in KnownPartials)
+        {
+            RegisterPartialIfLoaded(templateId, partialName);
+        }
+
+        foreach (var templateId in _templates.GetLoadedTemplateIds().Where(id => id.StartsWith("device_", StringComparison.OrdinalIgnoreCase)))
+        {
+            RegisterPartialIfLoaded(templateId, templateId);
+        }
+    }
+
+    private void RegisterPartialIfLoaded(string templateId, string partialName)
+    {
+        if (!_templates.IsTemplateLoaded(templateId) || _templates.IsPartialRegistered(partialName)) return;
+
+        var source = _templates.GetTemplateSource(templateId);
+        if (!string.IsNullOrEmpty(source)) _templates.RegisterPartial(partialName, source);
     }
 
     private static object BuildContext(CodegenPayload payload)
@@ -115,3 +169,5 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
+
+

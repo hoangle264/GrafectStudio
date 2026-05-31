@@ -82,7 +82,7 @@ public class CodeGenerationOrchestrator
                 return;
             }
 
-            await _config.SavePathsAsync(string.Empty, message.TemplatePath, message.OutputPath);
+            await _config.SavePathsAsync(message.DevPath, message.TemplatePath, message.OutputPath);
             payload.EnrichVariables();
             var platform = string.IsNullOrWhiteSpace(payload.Platform) ? message.Platform : payload.Platform;
             var code = _codegen.Generate(platform, payload);

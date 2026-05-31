@@ -96,6 +96,7 @@ public partial class MainWindow : Window
 
                 var message = new GenerateCodePayload
                 {
+                    DevPath=GetOptionalString(payload, "deviceLibraryPath"),
                     Platform = GetOptionalString(payload, "platform"),
                     TemplatePath = GetOptionalString(payload, "templateRootPath"),
                     OutputPath = GetOptionalString(payload, "outputPath"),

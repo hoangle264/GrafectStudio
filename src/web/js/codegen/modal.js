@@ -4,8 +4,7 @@ let cgSavedPaths = { deviceLibraryPath: '', templatePath: '', outputPath: '' };
 
 //  GRAFCET Code Generator - grafcet-codegen.js
 //  Target: Keyence KV Mnemonic IL (.mnm)
-//  Planned: IEC 61131-3 ST (.st) â€” demo/stub only
-//
+//  Planned: IEC 61131-3 ST (.st) demo/stub only
 //  Reads from global: project, loadDiagramData(), flushState(),
 //  resolveStepsThrough(), toast(), esc2()
 //  Show Generate Code Modal 
@@ -354,7 +353,7 @@ function cgBuildCSharpUnitPayload(platform, unitId) {
 
   return {
     platform,
-    codegenAssets: cgGetCodegenAssets(),
+    deviceLibraryPath: cgGetCodegenAssets().deviceLibraryPath,
     templateRootPath: cgGetCodegenAssets().templateRootPath,
     outputPath: cgGetCodegenAssets().outputPath,
     project: {
@@ -454,7 +453,7 @@ function cgUCHighlight(pre, profile) {
 
 // Status badge cho file load 
 
-// â”€â”€â”€ Download / Copy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Download / Copy 
 function cgDownloadCode() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);

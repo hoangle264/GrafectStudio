@@ -2,6 +2,7 @@
 
 public class GenerateCodePayload
 {
+    public string DevPath { get; set; } = string.Empty;
     public string Platform { get; set; } = string.Empty;
     public string TemplatePath { get; set; } = string.Empty;
     public string OutputPath { get; set; } = string.Empty;
