@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using GrafcetStudio.CodeGen.Models;
@@ -53,12 +54,19 @@ public class StGenerator : ICodeGenerator
         var sequence = _sequenceResolver.Resolve(state);
         var lines = new List<string> { $"// Diagram: {meta.Name} ({meta.Mode})" };
 
-        foreach (var entry in sequence)
+        for (var i = 0; i < sequence.Count; i++)
         {
-            var prev = entry.Step.IsInitial ? new List<string> { "TRUE" } : new List<string> { $"S{Math.Max(1, entry.Step.Number - 1):D2}_Done" };
+            var entry = sequence[i];
+            var exec = RequireStepAddress(entry.Step.ExecAddress, entry.Step, "execAddress");
+            var done = RequireStepAddress(entry.Step.DoneAddress, entry.Step, "doneAddress");
+            var prev = entry.Step.IsInitial || i == 0
+                ? new List<string> { "TRUE" }
+                : new List<string> { RequireStepAddress(sequence[i - 1].Step.DoneAddress, sequence[i - 1].Step, "doneAddress") };
             lines.AddRange(RenderStepLogic(new StStepRenderParams
             {
                 StepNum = entry.Step.Number.ToString("D2"),
+                ExecAddress = exec,
+                DoneAddress = done,
                 PrevDoneVars = prev,
                 ActivationCond = NormalizeCondition(entry.InTransition?.Condition),
                 FeedbackCond = NormalizeCondition(entry.OutTransition?.Condition),
@@ -67,7 +75,7 @@ public class StGenerator : ICodeGenerator
 
             foreach (var action in entry.Step.Actions.Where(a => a.Qualifier == Domain.Enums.ActionQualifier.N))
             {
-                lines.Add($"{action.ToPhysicalAddress(state.Variables)} := S{entry.Step.Number:D2}_Exec;");
+                lines.Add($"{action.ToPhysicalAddress(state.Variables)} := {exec};");
             }
 
             lines.Add(string.Empty);
@@ -83,16 +91,16 @@ public class StGenerator : ICodeGenerator
     {
         var prev = p.PrevDoneVars.Count == 0 ? "TRUE" : string.Join(" AND ", p.PrevDoneVars);
         var activation = string.IsNullOrWhiteSpace(p.ActivationCond) ? prev : $"({prev}) AND ({p.ActivationCond})";
-        var feedback = string.IsNullOrWhiteSpace(p.FeedbackCond) ? $"S{p.StepNum}_Exec" : $"S{p.StepNum}_Exec AND ({p.FeedbackCond})";
+        var feedback = string.IsNullOrWhiteSpace(p.FeedbackCond) ? p.ExecAddress : $"{p.ExecAddress} AND ({p.FeedbackCond})";
 
         return new List<string>
         {
             $"// S{p.StepNum} {p.StepLabel}",
             $"IF {activation} THEN",
-            $"    S{p.StepNum}_Exec := TRUE;",
+            $"    {p.ExecAddress} := TRUE;",
             "END_IF;",
             $"IF {feedback} THEN",
-            $"    S{p.StepNum}_Done := TRUE;",
+            $"    {p.DoneAddress} := TRUE;",
             "END_IF;"
         };
     }
@@ -104,6 +112,11 @@ public class StGenerator : ICodeGenerator
         lines.Add("END_IF;");
         return lines;
     }
+
+    private static string RequireStepAddress(string? address, Step step, string propertyName)
+        => string.IsNullOrWhiteSpace(address)
+            ? throw new InvalidOperationException($"Invalid codegen payload: step '{step.Id}' (S{step.Number:D2}) is missing {propertyName}.")
+            : address;
 
     private static string? NormalizeCondition(string? condition)
         => string.IsNullOrWhiteSpace(condition) || condition == "1" || condition.Equals("true", StringComparison.OrdinalIgnoreCase)

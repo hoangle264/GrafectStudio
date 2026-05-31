@@ -265,6 +265,109 @@ function cgGetSelectedDiagramIds() {
   ).map(c => c.value);
 }
 
+
+function parseWordAddress(address) {
+  const match = String(address || '').trim().match(/^([A-Za-z]+)(\d+)$/);
+  if (!match) throw new Error('Invalid word address: ' + address);
+  return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+}
+
+function formatWordAddress(base, offset) {
+  const parsed = parseWordAddress(base);
+  const next = parsed.number + offset;
+  const numberText = parsed.width > 1 ? String(next).padStart(parsed.width, '0') : String(next);
+  return parsed.prefix + numberText;
+}
+
+function formatMrAddress(number) {
+  return '@MR' + Number(number);
+}
+
+function resolveBoolMr(baseMr, offset, boolAddressMode) {
+  const base = Number(baseMr || 0);
+  if (normalizeBoolAddressMode(boolAddressMode) === 'block') {
+    return base + Math.floor(offset / 16) * 100 + (offset % 16);
+  }
+  return base + offset;
+}
+
+function resolveStepAddress(step, flow) {
+  const stepNumber = Number(step && step.number);
+  if (!Number.isInteger(stepNumber) || stepNumber < 1) {
+    throw new Error('Step number must be an integer >= 1');
+  }
+
+  const mode = String((flow && flow.addressMode) || 'bool').toLowerCase();
+  if (mode === 'word') {
+    if (stepNumber > 32) throw new Error('Word address mode supports at most 32 steps per flow');
+    const bitIndex = stepNumber - 1;
+    const wordOffset = Math.floor(bitIndex / 16);
+    const bit = bitIndex % 16;
+    return {
+      execAddress: '@' + formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
+      doneAddress: '@' + formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
+    };
+  }
+
+  const pairOffset = (stepNumber - 1) * 2;
+  return {
+    execAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset, flow.boolAddressMode)),
+    doneAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset + 1, flow.boolAddressMode))
+  };
+}
+
+function cgGetFlowAddressRange(flow, steps) {
+  if (!flow || flow.addressMode !== 'bool') return null;
+  const maxStepNumber = (steps || []).reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
+  const start = Number(flow.baseMr || 0);
+  return { start, end: start + Math.max(1, maxStepNumber) * 2 - 1 };
+}
+
+function cgValidateStepNumbers(steps, flowName) {
+  const seen = new Set();
+  (steps || []).forEach(function(step) {
+    const n = Number(step.number);
+    if (!Number.isInteger(n) || n < 1) throw new Error('Flow "' + flowName + '" has a step.number that is not >= 1.');
+    if (seen.has(n)) throw new Error('Flow "' + flowName + '" has duplicate step.number ' + n + '.');
+    seen.add(n);
+  });
+}
+
+function cgValidateUnitAddressConfig(unitDiagrams) {
+  const boolFlows = [];
+  const usedWords = new Map();
+  (unitDiagrams || []).forEach(function(diag) {
+    if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(diag, true);
+    const data = loadDiagramData(diag.id);
+    const steps = ((data && data.state && data.state.steps) || []);
+    cgValidateStepNumbers(steps, diag.name || diag.id);
+
+    if (diag.addressMode === 'word') {
+      if (steps.some(step => Number(step.number) > 32)) {
+        throw new Error('Flow "' + (diag.name || diag.id) + '" uses word mode but has step.number > 32.');
+      }
+      const maxStepNumber = steps.reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
+      const wordCount = maxStepNumber > 16 ? 2 : 1;
+      [diag.activeWord || 'DM0', diag.completeWord || 'DM100'].forEach(function(word) {
+        for (let offset = 0; offset < wordCount; offset++) {
+          const key = formatWordAddress(word, offset).toUpperCase();
+          if (usedWords.has(key)) throw new Error('Word address ' + key + ' is used by both "' + usedWords.get(key) + '" and "' + (diag.name || diag.id) + '".');
+          usedWords.set(key, diag.name || diag.id);
+        }
+      });
+      return;
+    }
+
+    const range = cgGetFlowAddressRange(diag, steps);
+    boolFlows.forEach(function(existing) {
+      if (range && existing.range && range.start <= existing.range.end && existing.range.start <= range.end) {
+        throw new Error('MR range overlap between "' + existing.name + '" and "' + (diag.name || diag.id) + '".');
+      }
+    });
+    boolFlows.push({ name: diag.name || diag.id, range });
+  });
+}
+
 function cgBuildCSharpPayload(platform, unitId) {
   if (activeDiagramId && typeof flushState === 'function') flushState();
   return cgBuildCSharpUnitPayload(platform, unitId || cgGetDefaultUnitId() || '');
@@ -274,18 +377,24 @@ function cgBuildCSharpFlow(diagId) {
   const diag = (project.diagrams || []).find(d => d.id === diagId) || {};
   const data = loadDiagramData(diagId);
   const s = (data && data.state) || { steps: [], transitions: [], connections: [], vars: [] };
-  const steps = (s.steps || []).map(step => ({
+  if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(diag, true);
+  const steps = (s.steps || []).map(step => {
+    const address = resolveStepAddress(step, diag);
+    return {
     id: step.id || '',
     number: Number(step.number || 0),
     label: step.label || '',
     initial: !!step.initial,
+    execAddress: address.execAddress,
+    doneAddress: address.doneAddress,
     actions: (step.actions || []).map(action => ({
       variable: action.variable || '',
       address: action.address || null,
       qualifier: action.qualifier || 'N',
       timeMs: Number(action.timeMs || action.time || 0)
     }))
-  }));
+  };
+  });
   const stepIds = new Set(steps.map(step => step.id));
   const transitions = (s.transitions || []).map(trans => ({
     id: trans.id || '',
@@ -305,7 +414,12 @@ function cgBuildCSharpFlow(diagId) {
       name: diag.name || diagId,
       mode: diag.mode || '',
       unitId: diag.unitId || '',
-      unit: diag.unit || ''
+      unit: diag.unit || '',
+      addressMode: diag.addressMode || 'bool',
+      boolAddressMode: diag.boolAddressMode || 'linear',
+      baseMr: diag.baseMr ?? null,
+      activeWord: diag.activeWord || '',
+      completeWord: diag.completeWord || ''
     },
     steps,
     transitions,
@@ -321,6 +435,7 @@ function cgBuildCSharpUnitPayload(platform, unitId) {
   const unitDiagrams = (project.diagrams || []).filter(d =>
     unitId === '__none__' ? !d.unitId : d.unitId === unitId
   );
+  cgValidateUnitAddressConfig(unitDiagrams);
   const allVars = [];
   const seenVars = new Set();
   const addVar = v => {
@@ -410,11 +525,21 @@ function cgGenerateViaHost(platform, diagId) {
     return false;
   }
 
-  window.chrome.webview.postMessage({
-    type: 'GENERATE_CODE',
-    payload: cgBuildCSharpPayload(platform, diagId)
-  });
-  return true;
+  try {
+    window.chrome.webview.postMessage({
+      type: 'GENERATE_CODE',
+      payload: cgBuildCSharpPayload(platform, diagId)
+    });
+    return true;
+  } catch (err) {
+    const pre = document.getElementById('cg-preview');
+    const stat = document.getElementById('cg-stat');
+    const message = err && err.message ? err.message : String(err);
+    if (pre) pre.textContent = '; Payload validation error: ' + message;
+    if (stat) stat.textContent = 'Payload validation failed';
+    if (typeof toast === 'function') toast('⚠ ' + message);
+    return false;
+  }
 }
 
 function receiveGeneratedCode(code) {

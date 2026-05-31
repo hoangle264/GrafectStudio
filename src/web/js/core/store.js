@@ -28,6 +28,98 @@ let project = {
 let openTabs = [];         // [{diagramId}]
 let activeDiagramId = null;
 
+
+// ── Flow address configuration ────────────────────────────────
+const GF_ADDRESS_DEFAULT_BOOL_SPAN = 200;
+
+function normalizeBoolAddressMode(mode) {
+  const value = String(mode || '').trim().toLowerCase();
+  return value === 'block' ? 'block' : 'linear';
+}
+
+function getFlowStepMaxNumber(diagId) {
+  const data = loadDiagramData(diagId);
+  const steps = (data && data.state && data.state.steps) || [];
+  return steps.reduce((max, step) => Math.max(max, Number(step && step.number) || 0), 0);
+}
+
+function getBoolAddressRange(flow) {
+  if (!flow || flow.addressMode !== 'bool') return null;
+  const maxStepNumber = Math.max(1, getFlowStepMaxNumber(flow.id));
+  const start = Number(flow.baseMr || 0);
+  return { start, end: start + maxStepNumber * 2 - 1 };
+}
+
+function boolAddressRangesOverlap(a, b) {
+  return !!a && !!b && a.start <= b.end && b.start <= a.end;
+}
+
+function findNextAvailableBaseMr(unitId, excludeDiagId) {
+  let base = 100;
+  while (base < 100000) {
+    const candidate = { start: base, end: base + GF_ADDRESS_DEFAULT_BOOL_SPAN - 1 };
+    const overlaps = (project.diagrams || []).some(function(diag) {
+      if (!diag || diag.id === excludeDiagId) return false;
+      if ((diag.unitId || null) !== (unitId || null)) return false;
+      if ((diag.addressMode || 'bool') !== 'bool' || diag.baseMr === undefined || diag.baseMr === null || diag.baseMr === '') return false;
+      return boolAddressRangesOverlap(candidate, getBoolAddressRange(diag));
+    });
+    if (!overlaps) return base;
+    base += GF_ADDRESS_DEFAULT_BOOL_SPAN;
+  }
+  return base;
+}
+
+function ensureFlowAddressConfig(diag, assignUniqueBase) {
+  if (!diag) return false;
+  let changed = false;
+  if (!diag.addressMode) {
+    diag.addressMode = 'bool';
+    changed = true;
+  }
+  if (diag.addressMode === 'bool') {
+    if (!diag.boolAddressMode) {
+      diag.boolAddressMode = 'linear';
+      changed = true;
+    } else {
+      const normalized = normalizeBoolAddressMode(diag.boolAddressMode);
+      if (diag.boolAddressMode !== normalized) {
+        diag.boolAddressMode = normalized;
+        changed = true;
+      }
+    }
+    if (diag.baseMr === undefined || diag.baseMr === null || diag.baseMr === '') {
+      diag.baseMr = assignUniqueBase ? findNextAvailableBaseMr(diag.unitId || null, diag.id) : 100;
+      changed = true;
+    } else {
+      const n = Number(diag.baseMr);
+      if (Number.isFinite(n) && diag.baseMr !== n) {
+        diag.baseMr = n;
+        changed = true;
+      }
+    }
+  }
+  if (diag.addressMode === 'word') {
+    if (!diag.activeWord) {
+      diag.activeWord = 'DM0';
+      changed = true;
+    }
+    if (!diag.completeWord) {
+      diag.completeWord = 'DM100';
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function migrateFlowAddressConfigs() {
+  let changed = false;
+  (project.diagrams || []).forEach(function(diag) {
+    changed = ensureFlowAddressConfig(diag, true) || changed;
+  });
+  return changed;
+}
+
 // ── Persistence ───────────────────────────────────────────────
 function saveProject() {
   try { localStorage.setItem('gf2-project', JSON.stringify(project)); } catch(e){}
@@ -210,16 +302,17 @@ function loadProject() {
       if (!project.excelVars)     project.excelVars = [];
       if (!project.unitConfig)    project.unitConfig = {};
       ensureProjectIOMapping();
-      if (syncStructDataFromProjectData()) {
-        saveProject();
-      }
-      // Migrate old diagrams that have folderId but no unitId
+      let projectChanged = false;
+      projectChanged = syncStructDataFromProjectData() || projectChanged;
+      // Migrate old diagrams that have folderId but no unitId and no stable address config.
       project.diagrams.forEach(d=>{
-        if(!d.mode)        d.mode = 'Auto';
-        if(!d.diagramType) d.diagramType = 'Main';
-        if(!d.machine)     d.machine = project.machineName;
-        if(!d.unit)        d.unit = '';
+        if(!d.mode)        { d.mode = 'Auto'; projectChanged = true; }
+        if(!d.diagramType) { d.diagramType = 'Main'; projectChanged = true; }
+        if(!d.machine)     { d.machine = project.machineName; projectChanged = true; }
+        if(!d.unit)        { d.unit = ''; projectChanged = true; }
       });
+      projectChanged = migrateFlowAddressConfigs() || projectChanged;
+      if (projectChanged) saveProject();
       const lastId = localStorage.getItem('gf2-active');
       if (lastId && project.diagrams.find(d=>d.id===lastId)) {
         openTab(lastId);

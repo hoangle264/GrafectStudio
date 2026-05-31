@@ -111,12 +111,16 @@ function addDiagram(isFirst=false, unitId=null, mode='Auto', folderId=null) {
   const num = project.diagrams.length + 1;
   const unit = unitId ? (project.units.find(u=>u.id===unitId)?.name||'') : '';
   const name = isFirst ? 'GRAFCET_Main' : `GRAFCET_${mode}`;
-  project.diagrams.push({
+  const diagram = {
     id, name, folderId: folderId||null, unitId: unitId||null,
     mode: mode||'Auto', diagramType:'Main',
     machine: project.machineName||project.name||'Machine',
-    unit: unit, description:''
-  });
+    unit: unit, description:'',
+    addressMode:'bool',
+    boolAddressMode:'linear',
+    baseMr: typeof findNextAvailableBaseMr === 'function' ? findNextAvailableBaseMr(unitId||null, id) : 100
+  };
+  project.diagrams.push(diagram);
   const emptyState = {steps:[],transitions:[],parallels:[],connections:[],vars:[]};
   saveDiagramData(id, emptyState, 1, 0, 100, 80, 1);
   saveProject(); renderTree(); openTab(id);

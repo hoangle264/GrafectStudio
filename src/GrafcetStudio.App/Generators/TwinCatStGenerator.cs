@@ -15,14 +15,17 @@ public class TwinCatStGenerator : ICodeGenerator
         var sb = new StringBuilder();
         sb.AppendLine("// TwinCAT ST stub");
 
-        foreach (var item in seq)
+        for (var i = 0; i < seq.Count; i++)
         {
+            var item = seq[i];
             var n = item.Step.Number;
-            var exec = $"s{n:D2}_exec";
-            var done = $"s{n:D2}_done";
-            sb.AppendLine($"VAR {exec} : BOOL; {done} : BOOL; END_VAR");
+            var exec = RequireStepAddress(item.Step.ExecAddress, item.Step, "execAddress");
+            var done = RequireStepAddress(item.Step.DoneAddress, item.Step, "doneAddress");
+            sb.AppendLine($"// S{n:D2}: exec={exec}, done={done}");
 
-            var prev = item.Step.IsInitial ? "TRUE" : $"s{Math.Max(1, n - 1):D2}_done";
+            var prev = item.Step.IsInitial || i == 0
+                ? "TRUE"
+                : RequireStepAddress(seq[i - 1].Step.DoneAddress, seq[i - 1].Step, "doneAddress");
             var inCond = NormalizeCondition(item.InTransition?.Condition, payload);
             sb.AppendLine($"IF {prev} AND {inCond} THEN {exec} := TRUE; END_IF;");
 
@@ -42,6 +45,11 @@ public class TwinCatStGenerator : ICodeGenerator
 
         return sb.ToString();
     }
+
+    private static string RequireStepAddress(string? address, Step step, string propertyName)
+        => string.IsNullOrWhiteSpace(address)
+            ? throw new InvalidOperationException($"Invalid codegen payload: step '{step.Id}' (S{step.Number:D2}) is missing {propertyName}.")
+            : address;
 
     private static string NormalizeCondition(string? condition, CodegenPayload payload)
     {

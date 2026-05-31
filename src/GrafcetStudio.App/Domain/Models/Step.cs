@@ -18,6 +18,12 @@ public class Step
     [JsonPropertyName("initial")]
     public bool IsInitial { get; init; }
 
+    [JsonPropertyName("execAddress")]
+    public string? ExecAddress { get; init; }
+
+    [JsonPropertyName("doneAddress")]
+    public string? DoneAddress { get; init; }
+
     [JsonPropertyName("actions")]
     public IList<StepAction> Actions { get; init; } = new List<StepAction>();
 }
