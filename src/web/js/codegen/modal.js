@@ -128,7 +128,7 @@ function showGenerateCodeModal() {
       </div>`;
 
   document.body.appendChild(el);
-  cgApplySavedPaths();
+  cgApplySavedPaths({ preview: false });
   cgBuildUnitList();
   cgUpdateAssetPathStatus();
   cgUpdatePreview();
@@ -443,7 +443,7 @@ function cgBuildCSharpUnitPayload(platform, unitId) {
     seenVars.add(v.label);
     allVars.push(v);
   };
-
+  console.log('[Codegen] Building payload for unit', { unitId, selectedUnit, unitDiagramsCount: unitDiagrams.length });
   const flows = unitDiagrams.map(d => {
     const flow = cgBuildCSharpFlow(d.id);
     (flow.variables || []).forEach(addVar);
@@ -666,7 +666,8 @@ function receiveSavedPaths(payload) {
   cgApplySavedPaths();
 }
 
-function cgApplySavedPaths() {
+function cgApplySavedPaths(options = {}) {
+  const shouldPreview = options.preview !== false;
   const data = cgSavedPaths || {};
   const deviceInput = document.getElementById('cg-device-library-path');
   const templateInput = document.getElementById('cg-template-root-path');
@@ -675,7 +676,7 @@ function cgApplySavedPaths() {
   if (templateInput && (data.templateRootPath || data.templatePath)) templateInput.value = data.templateRootPath || data.templatePath;
   if (outputInput && data.outputPath) outputInput.value = data.outputPath;
   cgUpdateAssetPathStatus();
-  cgUpdatePreview();
+  if (shouldPreview) cgUpdatePreview();
 }
 
 function cgToggleAssetPaths() {

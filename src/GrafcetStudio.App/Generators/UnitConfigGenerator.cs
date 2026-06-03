@@ -1,7 +1,11 @@
+﻿using GrafcetStudio.CodeGen.Runtime;
+using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 
@@ -34,10 +38,12 @@ public class UnitConfigGenerator : ICodeGenerator
     }
 
     public string Platform => "unit-config";
-
     public string Generate(CodegenPayload payload)
     {
         var context = BuildContext(payload);
+//#if DEBUG
+//            System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
+//#endif
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()
@@ -97,6 +103,16 @@ public class UnitConfigGenerator : ICodeGenerator
                 ? payload.Unit!.Name!
                 : payload.Project?.Name ?? "Unit";
         var flows = payload.Flows ?? new();
+        var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
+        var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
+#if DEBUG
+        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(runtimePlans, JsonOptions));
+#endif
+        var outputBindings = runtimePlans
+            .SelectMany(plan => plan.OutputBindingPlan.Bindings)
+            .GroupBy(binding => binding.PhysicalOutputRef, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
         var autoFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -137,16 +153,19 @@ public class UnitConfigGenerator : ICodeGenerator
                 unitIndex = 0
             },
             devices,
-            cylinders = devices.Where(d => string.Equals(d.kind, "cylinder", StringComparison.OrdinalIgnoreCase)).ToList(),
-            variables = payload.Variables,
-            deviceTypes = payload.DeviceTypes,
-            stationFlows = autoFlows,
             autoFlows,
             originFlows,
-            flows,
-            originSteps = originFlows.SelectMany(f => f.Steps).Where(s => s.IsInitial).ToList(),
+            outputBindings,
             warnings = Array.Empty<string>()
         };
+    }
+
+    private static DeviceLibraryRoot LoadDeviceLibrary(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return new DeviceLibraryRoot();
+
+        var json = File.ReadAllText(path);
+        return JsonSerializer.Deserialize<DeviceLibraryRoot>(json) ?? new DeviceLibraryRoot();
     }
 
     private static string NormalizeFlowType(FlowInfo flow)
@@ -169,5 +188,8 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
+
+
+
 
 

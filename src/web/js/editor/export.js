@@ -27,7 +27,7 @@ function handleImport(e) {
         if(raw.state.connections) raw.state.connections=raw.state.connections.map(c=>({
           ...c, fromPort:c.fromPort||'bottom', toPort:c.toPort||'top'
         }));
-        saveDiagramData(id, raw.state, raw.nextId||1, raw.nextStepNum||0, 60, 40, 1);
+        saveDiagramData(id, raw.state, raw.nextId||1, Math.max(1, raw.nextStepNum || 1), 60, 40, 1);
         saveProject(); renderTree(); openTab(id);
         toast('✓ Imported v1 diagram');
         return;
@@ -139,7 +139,7 @@ function handleImport(e) {
             newId,
             data.state,
             data.nextId||1,
-            data.nextStepNum||0,
+            Math.max(1, data.nextStepNum || 1),
             data.viewX??60, data.viewY??40, data.viewScale??1
           );
         });
@@ -211,7 +211,7 @@ function exportHTML() {
   flushState();
   const data=loadDiagramData(activeDiagramId);
   if(!data){return;}
-  const s2=data.state, n2=data.nextId||1, ns2=data.nextStepNum||0;
+  const s2=data.state, n2=data.nextId||1, ns2=Math.max(1, data.nextStepNum || 1);
   const all=[
     ...s2.steps.map(s=>{
       const acts=getStepActionsStatic(s);

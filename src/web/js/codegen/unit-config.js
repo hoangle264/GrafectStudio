@@ -96,24 +96,6 @@ function ucBuildSyntheticConfig(selectedUnitId) {
   };
 }
 
-function cgUCBuildContext(unitConfig, selectedUnitId) {
-  const cfg = unitConfig || ucBuildSyntheticConfig(selectedUnitId) || { unit: {}, devices: [] };
-  return {
-    unit: cfg.unit || {},
-    devices: cfg.devices || [],
-    cylinders: (cfg.devices || cfg.cylinders || []).filter(function(d) {
-      return (d.kind || 'cylinder') === 'cylinder';
-    }),
-    stationFlows: [],
-    originSteps: [],
-    warnings: []
-  };
-}
-
-function cgUCBuildTemplateContext(ctx) {
-  return ctx || cgUCBuildContext(null, null);
-}
-
 function cgGenerateUnitConfig() {
   return JSON.stringify(UC_UNIT_CONFIG || ucBuildSyntheticConfig(null) || {}, null, 2);
 }

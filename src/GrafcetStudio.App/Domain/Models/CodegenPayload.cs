@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using System.Linq;
 
@@ -26,6 +26,9 @@ public class CodegenPayload
 
     [JsonPropertyName("deviceTypes")]
     public List<DeviceType> DeviceTypes { get; set; } = new();
+
+    [JsonPropertyName("deviceLibraryPath")]
+    public string DeviceLibraryPath { get; set; } = string.Empty;
 
     public void EnrichVariables()
     {
@@ -101,3 +104,4 @@ public class FlowInfo
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
 }
+

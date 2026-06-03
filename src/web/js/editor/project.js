@@ -122,7 +122,7 @@ function addDiagram(isFirst=false, unitId=null, mode='Auto', folderId=null) {
   };
   project.diagrams.push(diagram);
   const emptyState = {steps:[],transitions:[],parallels:[],connections:[],vars:[]};
-  saveDiagramData(id, emptyState, 1, 0, 100, 80, 1);
+  saveDiagramData(id, emptyState, 1, 1, 100, 80, 1);
   saveProject(); renderTree(); openTab(id);
 }
 
@@ -147,13 +147,13 @@ function openTab(id) {
     if (!state.parallels) state.parallels = [];
     if (!state.vars) state.vars = [];
     nextId = data.nextId || 1;
-    nextStepNum = data.nextStepNum || 0;
+    nextStepNum = Math.max(1, data.nextStepNum || 1);
     viewX = data.viewX ?? 60;
     viewY = data.viewY ?? 40;
     viewScale = data.viewScale ?? 1;
   } else {
     state = {steps:[],transitions:[],parallels:[],connections:[],vars:[]};
-    nextId=1; nextStepNum=0; viewX=60; viewY=40; viewScale=1;
+    nextId=1; nextStepNum=1; viewX=60; viewY=40; viewScale=1;
   }
   selIds.clear();
   renderTabs();

@@ -51,7 +51,6 @@ public class CodeGenerationOrchestrator
             if (!string.IsNullOrWhiteSpace(payload.TemplateRootPath))
             {
                 var loadResult = TemplateLoader.LoadFromPath(payload.TemplateRootPath);
-                Console.WriteLine($"[Template Loader] Path: {payload.TemplateRootPath}; Loaded: {loadResult.LoadedCount}");
 
                 if (!loadResult.IsValid)
                 {

@@ -735,7 +735,7 @@ function addDriverDiagram() {
     mode:'Drivers', diagramType:'Main',
     machine:project.machineName||project.name, unit:'', description:''
   });
-  saveDiagramData(id, {steps:[],transitions:[],parallels:[],connections:[],vars:[]}, 1, 0, 100, 80, 1);
+  saveDiagramData(id, {steps:[],transitions:[],parallels:[],connections:[],vars:[]}, 1, 1, 100, 80, 1);
   saveProject(); renderTree(); openTab(id);
 }
 

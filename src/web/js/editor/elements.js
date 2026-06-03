@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════
 function addStep(x,y,init=false){
   const id='S'+(nextId++);
-  state.steps.push({id,x:snap(x-SW/2),y:snap(y-SH/2),number:nextStepNum++,label:'',actions:[],initial:init});
+  state.steps.push({id,x:snap(x-SW/2),y:snap(y-SH/2),number:Math.max(1, nextStepNum++),label:'',actions:[],initial:init});
   afterChange(); return id;
 }
 function addTransition(x,y){

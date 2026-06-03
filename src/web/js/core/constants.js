@@ -21,7 +21,7 @@ const PAR_PORT_MIN_USABLE = 16;
 
 // ── Per-Diagram runtime state ──
 let state = { steps:[], transitions:[], parallels:[], connections:[] };
-let nextId = 1, nextStepNum = 0;
+let nextId = 1, nextStepNum = 1;
 let viewX=0, viewY=0, viewScale=1;
 let snapOn=true;
 
