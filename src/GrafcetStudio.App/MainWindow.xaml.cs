@@ -74,10 +74,14 @@ public partial class MainWindow : Window
     {
         Close();
     }
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+        #if DEBUG
+               System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(doc, JsonOptions));
+        #endif
         if (!doc.RootElement.TryGetProperty("type", out var typeElement))
         {
             return;

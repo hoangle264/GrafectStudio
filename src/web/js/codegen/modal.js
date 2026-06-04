@@ -427,6 +427,23 @@ function cgBuildCSharpFlow(diagId) {
   };
 }
 
+function cgNormalizeCSharpSignal(deviceTypeName, sig) {
+  const canonicalUnitSignals = new Map(((typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined') ? PROJECT_UNIT_STRUCT_SIGNALS : []).map(item => [item.id, item]));
+  const canonical = deviceTypeName === 'Unit Station' ? canonicalUnitSignals.get(sig && sig.id) : null;
+  const normalized = Object.assign({}, sig || {}, canonical || {});
+  const signalName = normalized.name || normalized.id || '';
+  return Object.assign({}, normalized, { id: signalName, name: signalName });
+}
+
+function cgGetCSharpDeviceTypes() {
+  return ((project && project.devices) || []).map(deviceType => {
+    if (!deviceType) return deviceType;
+    return Object.assign({}, deviceType, {
+      signals: (deviceType.signals || []).map(sig => cgNormalizeCSharpSignal(deviceType.name, sig))
+    });
+  });
+}
+
 function cgBuildCSharpUnitPayload(platform, unitId) {
   const units = project.units || [];
   const selectedUnit = unitId && unitId !== '__none__'
@@ -474,13 +491,29 @@ function cgBuildCSharpUnitPayload(platform, unitId) {
     },
     flows,
     variables: allVars,
-    deviceTypes: (project && project.devices) || []
+    deviceTypes: cgGetCSharpDeviceTypes()
   };
 }
 
 function cgNormalizeFlowType(mode) {
   const value = String(mode || '').trim().toLowerCase();
   return value === 'origin' ? 'origin' : 'auto';
+}
+
+function cgGetCSharpSignalAddresses(v) {
+  const format = v && (v.format || v.dataType || '');
+  const deviceType = ((project && project.devices) || []).find(d => d && d.name === format);
+  const rawAddresses = (v && v.signalAddresses) || {};
+  if (!deviceType || !Array.isArray(deviceType.signals)) return Object.assign({}, rawAddresses);
+
+  const signalAddresses = {};
+  deviceType.signals.forEach(sig => {
+    const normalized = cgNormalizeCSharpSignal(deviceType.name, sig);
+    if (!normalized.name) return;
+    const addr = rawAddresses[normalized.name] || rawAddresses[sig && sig.name] || rawAddresses[sig && sig.id];
+    if (addr) signalAddresses[normalized.name] = addr;
+  });
+  return signalAddresses;
 }
 
 function cgGetCSharpVariables(diagramState) {
@@ -493,7 +526,7 @@ function cgGetCSharpVariables(diagramState) {
       label: v.label,
       format: v.format || v.dataType || '',
       address: v.address || null,
-      signalAddresses: v.signalAddresses || {}
+      signalAddresses: cgGetCSharpSignalAddresses(v)
     });
   };
 
@@ -678,6 +711,10 @@ function cgToggleAssetPaths() {
   if (chevron) chevron.textContent = open ? '>' : 'v';
   if (!open) cgUpdateAssetPathStatus();
 }
+
+
+
+
 
 
 

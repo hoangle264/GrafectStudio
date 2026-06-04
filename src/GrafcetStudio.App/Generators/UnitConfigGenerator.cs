@@ -42,7 +42,7 @@ public class UnitConfigGenerator : ICodeGenerator
     {
         var context = BuildContext(payload);
 //#if DEBUG
-//            System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
+ //          System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
 //#endif
         RegisterPartials();
 
@@ -105,9 +105,9 @@ public class UnitConfigGenerator : ICodeGenerator
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
-#if DEBUG
-        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(runtimePlans, JsonOptions));
-#endif
+//#if DEBUG
+//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(runtimePlans, JsonOptions));
+//#endif
         var outputBindings = runtimePlans
             .SelectMany(plan => plan.OutputBindingPlan.Bindings)
             .GroupBy(binding => binding.PhysicalOutputRef, StringComparer.OrdinalIgnoreCase)
