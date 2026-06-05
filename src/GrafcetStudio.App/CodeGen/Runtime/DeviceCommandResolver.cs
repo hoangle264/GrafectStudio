@@ -58,7 +58,19 @@ public static class DeviceCommandResolver
             FeedbackSignals = feedbackSignals,
             OutputBindings = new List<OutputBinding>
             {
-                new() { PhysicalOutputRef = driveAddr, SourceExecuteBitRef = stepExecAddress }
+                new()
+                {
+                    PhysicalOutputRef = driveAddr,
+                    SourceExecuteBitRef = stepExecAddress,
+                    ActionSymbol = action.Variable,
+                    Qualifier = action.Qualifier.ToString(),
+                    DeviceLabel = deviceLabel,
+                    DeviceFormat = deviceVar.Format,
+                    CommandId = commandId,
+                    ActionLabel = command.ActionLabel,
+                    DriveSignal = command.DriveSignal,
+                    FeedbackSignals = feedbackSignals.ToList()
+                }
             },
             Diagnostics = diagnostics
         };
@@ -92,3 +104,4 @@ public static class DeviceCommandResolver
         return false;
     }
 }
+

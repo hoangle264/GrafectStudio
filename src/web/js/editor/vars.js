@@ -346,10 +346,6 @@ function renderGlobalVarTable() {
             const rec = project.variables[entry.bucket][entry.key];
             if(!rec.signalAddresses) rec.signalAddresses={};
             rec.signalAddresses[sig.id]=addrInp.value;
-            if(entry.source === 'imported' && project.excelVars) {
-              const legacyIdx = project.excelVars.findIndex(function(x) { return x && x.label === rec.label; });
-              if(legacyIdx >= 0) project.excelVars[legacyIdx] = Object.assign({}, rec);
-            }
           } else if(entry.source === 'excel' && project.excelVars[entry.key]){
             if(!project.excelVars[entry.key].signalAddresses) project.excelVars[entry.key].signalAddresses={};
             project.excelVars[entry.key].signalAddresses[sig.id]=addrInp.value;
@@ -391,10 +387,6 @@ function gvtEditVar(source, key, field, value) {
       delete hit.item.signalAddresses;
     }
   }
-  if(source === 'imported' && project.excelVars) {
-    const legacyIdx = project.excelVars.findIndex(function(v) { return v && v.label === hit.item.label; });
-    if(legacyIdx >= 0) project.excelVars[legacyIdx] = Object.assign({}, hit.item);
-  }
   saveProject();
   renderGlobalVarTable();
   if(typeof updateVarDatalist==='function') updateVarDatalist();
@@ -417,9 +409,6 @@ function gvtDeleteVar(source, key) {
     if(!confirm('Delete "'+(hit.item.label||'variable')+'"?')) return;
     const deletedLabel = hit.item.label;
     hit.list.splice(hit.idx,1);
-    if(source === 'imported' && project.excelVars) {
-      project.excelVars = project.excelVars.filter(function(v) { return v && v.label !== deletedLabel; });
-    }
     saveProject();
     renderGlobalVarTable();
     if(typeof updateVarDatalist==='function') updateVarDatalist();
@@ -477,19 +466,6 @@ window.addEventListener('load', ()=>{
   setTimeout(fitView, 200);
 });
 document.getElementById('modal-input').addEventListener('keydown', e=>{ if(e.key==='Enter') confirmRename(); });
-
-// Hiển thị preview đường dẫn code trong modal Diagram Properties
-function updateMetaCodePath() {
-  const el = document.getElementById('meta-codepath');
-  if (!el) return;
-  const machine = (document.getElementById('meta-machine')?.value || 'Machine').trim() || 'Machine';
-  const unit    = (document.getElementById('meta-unit')?.value    || 'Unit').trim()    || 'Unit';
-  const mode    = (document.getElementById('meta-mode')?.value    || 'Auto').trim()    || 'Auto';
-  const name    = (document.getElementById('meta-name')?.value    || '').trim();
-  const dtype   = (document.getElementById('meta-dtype')?.value   || 'Main').trim();
-  const label   = name || mode;
-  el.textContent = `${machine} / ${unit} / ${mode} / ${label}  [${dtype}]`;
-}
 
 // Unit modal enter
 
@@ -562,10 +538,6 @@ function ioResolveVariableAddressTarget(appVariable) {
         const rec = project.variables[entry.bucket][entry.key];
         if(!rec.signalAddresses) rec.signalAddresses = {};
         rec.signalAddresses[sig.id] = value;
-        if(entry.source === 'imported' && project.excelVars) {
-          const legacyIdx = project.excelVars.findIndex(function(x) { return x && x.label === rec.label; });
-          if(legacyIdx >= 0) project.excelVars[legacyIdx] = Object.assign({}, rec);
-        }
       } else if(entry.source === 'excel' && project.excelVars?.[entry.key]) {
         if(!project.excelVars[entry.key].signalAddresses) project.excelVars[entry.key].signalAddresses = {};
         project.excelVars[entry.key].signalAddresses[sig.id] = value;
@@ -714,4 +686,3 @@ function exportIOCode() {
   a.click();
   toast('✓ IO Mapping code exported');
 }
-

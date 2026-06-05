@@ -11,20 +11,10 @@ const ACT_QUAL_COLORS = {
 };
 const ACT_TIME_NEEDED = new Set(['L','D','SD','DS','SL']);
 
-// Get actions as [{qualifier,variable,address,time}] array
-// Supports both old string format and new structured format
+// Get actions as [{qualifier,variable,address,time}] array.
 function getStepActions(s) {
   if(!s) return [];
   if(Array.isArray(s.actions)) return s.actions;
-  // Migrate old text format: each line = "N VarName" or just "VarName"
-  if(typeof s.actions === 'string' && s.actions.trim()) {
-    return s.actions.split('\n').filter(l=>l.trim()).map(line=>{
-      const parts = line.trim().split(/\s+/);
-      const q = ACT_QUALIFIERS.includes(parts[0]) ? parts[0] : 'N';
-      const v = ACT_QUALIFIERS.includes(parts[0]) ? parts.slice(1).join(' ') : line.trim();
-      return {qualifier:q, variable:v, address:'', time:''};
-    });
-  }
   return [];
 }
 

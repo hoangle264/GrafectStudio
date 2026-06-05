@@ -16,7 +16,7 @@ function handleImport(e) {
         const id='diag-'+Date.now();
         const name='Imported: '+file.name.replace(/\.(grafcet|json)$/,'');
         project.diagrams.push({
-          id, name, unitId:null, folderId:null,
+          id, name, unitId:null,
           mode:'Auto', diagramType:'Main',
           machine:project.machineName||'', unit:'', description:'',
           addressMode:'bool', boolAddressMode:'linear',
@@ -60,7 +60,6 @@ function handleImport(e) {
             ioMapping: JSON.parse(JSON.stringify(raw.ioMapping || { physicalIOs:[], entries:[] })),
             excelVars: (raw.excelVars||[]).map(v=>({...v})),
             unitConfig: JSON.parse(JSON.stringify(raw.unitConfig||{})),
-            folders: (raw.folders||[]),
             diagrams: []
           };
           openTabs=[]; activeDiagramId=null;
@@ -105,11 +104,9 @@ function handleImport(e) {
           const newId = mode ? d.id : ('diag-'+Date.now()+'-'+Math.random().toString(36).slice(2,6));
           const idMap = !mode && d.id!==newId ? {[d.id]:newId} : {};
 
-          // Migrate data
+          // Normalize imported diagram data before saving it into localStorage.
           const data = d.data||{};
           if(!data.state) data.state={steps:[],transitions:[],parallels:[],connections:[],vars:[]};
-          if(!data.state.parallels) data.state.parallels=[];
-          if(!data.state.vars) data.state.vars=[];
           if(data.state.connections) data.state.connections=data.state.connections.map(c=>({
             ...c, fromPort:c.fromPort||'bottom', toPort:c.toPort||'top'
           }));
@@ -119,7 +116,6 @@ function handleImport(e) {
             id: newId,
             name: d.name||'Diagram',
             unitId: d.unitId||null,
-            folderId: d.folderId||null,
             mode: d.mode||'Auto',
             diagramType: d.diagramType||'Main',
             machine: d.machine||raw.project?.machineName||'',
@@ -164,7 +160,6 @@ function exportProject() {
     id: d.id,
     name: d.name,
     unitId: d.unitId||null,
-    folderId: d.folderId||null,
     mode: d.mode||'Auto',
     diagramType: d.diagramType||'Main',
     machine: d.machine||project.machineName||'',
@@ -193,7 +188,6 @@ function exportProject() {
     variables: JSON.parse(JSON.stringify(project.variables || {imported:[], user:[]})),
     ioMapping: JSON.parse(JSON.stringify(project.ioMapping || { physicalIOs:[], entries:[] })),
     unitConfig: JSON.parse(JSON.stringify(project.unitConfig || {})),
-    folders: (project.folders||[]),                // legacy folders
     diagrams,
     version: '3.0',
     exported: new Date().toISOString()

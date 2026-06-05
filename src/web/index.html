@@ -82,8 +82,6 @@
         <span class="sub-panel-title">🔧 TOOLS</span>
       </div>
       <div class="panel-scroll">
-        <!-- Alignment (hidden align-bar placeholder kept for compat) -->
-        <div class="align-bar is-hidden" id="align-bar"></div>
         <div class="tools-panel">
     <div class="tool-section">
       <div class="tool-section-title">TOOLS</div>
@@ -528,13 +526,10 @@
 <div class="tree-ctx" id="tree-ctx">
   <div class="tree-ctx-i" id="tctx-open" onclick="tctxOpen()">📂 Open Diagram</div>
   <div class="tree-ctx-i" id="tctx-rename" onclick="tctxRename()">✎ Rename</div>
-  <div class="tree-ctx-i" id="tctx-move" onclick="tctxShowMove(event)">📁 Move to Folder</div>
   <div class="tree-ctx-i" id="tctx-dup" onclick="tctxDup()">⊞ Duplicate</div>
   <div class="tree-ctx-sep"></div>
   <div class="tree-ctx-i r" id="tctx-del" onclick="tctxDel()">⊘ Delete</div>
 </div>
-<!-- Move-to-Folder submenu -->
-<div class="tree-ctx tree-ctx-folders" id="tree-ctx-folders"></div>
 
 <!-- Export Tables Modal -->
 <div class="modal-bg modal-bg-stretch" id="modal-tables">
@@ -574,54 +569,6 @@
   </div>
 </div>
 
-<!-- Diagram Metadata Modal -->
-<div class="modal-bg" id="modal-diag-meta">
-  <div class="modal modal-meta">
-    <h2 id="modal-meta-title">DIAGRAM PROPERTIES</h2>
-    <div class="modal-grid-2">
-      <div>
-        <div class="modal-field-label modal-field-label-tight">DIAGRAM NAME</div>
-        <input type="text" id="meta-name" placeholder="GRAFCET_Auto" class="field-full">
-      </div>
-      <div>
-        <div class="modal-field-label modal-field-label-tight">MACHINE</div>
-        <input type="text" id="meta-machine" placeholder="PaintMachine" class="field-full">
-      </div>
-      <div>
-        <div class="modal-field-label modal-field-label-tight">UNIT</div>
-        <input type="text" id="meta-unit" placeholder="Unit_01_Dispensing" class="field-full">
-      </div>
-      <div>
-        <div class="modal-field-label modal-field-label-tight">MODE</div>
-        <select id="meta-mode" class="modal-select field-full">
-          <option value="Auto">Auto</option>
-          <option value="Manual">Manual</option>
-          <option value="Origin">Origin</option>
-          <option value="Error">Error</option>
-          <option value="Drivers">Drivers</option>
-          <option value="Custom">Custom…</option>
-        </select>
-      </div>
-      <div>
-        <div class="modal-field-label modal-field-label-tight">DIAGRAM TYPE</div>
-        <select id="meta-dtype" class="modal-select field-full">
-          <option value="Main">Main — entry point</option>
-          <option value="SubRoutine">SubRoutine — called from Main</option>
-        </select>
-      </div>
-      <div>
-        <div class="modal-field-label modal-field-label-tight">DESCRIPTION</div>
-        <input type="text" id="meta-desc" placeholder="Optional description" class="field-full">
-      </div>
-    </div>
-    <div id="meta-codepath" class="meta-codepath"></div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeModal('modal-diag-meta')">Cancel</button>
-      <button class="btn a" onclick="confirmDiagMeta()">✓ Save</button>
-    </div>
-  </div>
-</div>
-
 <!-- Project Rename Modal -->
 <div class="modal-bg" id="modal-rename">
   <div class="modal">
@@ -635,8 +582,6 @@
 </div>
 
 
-<script src="js/vendor/handlebars.min.js"></script>
-<!-- CDN fallback (khi deploy lên Netlify, file local vẫn được serve) -->
 <script src="js/core/utils.js"></script>
 <script src="js/core/graph-utils.js"></script>
 <script src="js/core/store.js"></script>

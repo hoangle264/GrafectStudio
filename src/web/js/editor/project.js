@@ -106,13 +106,13 @@ function _showCanvas() {
   showMainView('canvas');
 }
 
-function addDiagram(isFirst=false, unitId=null, mode='Auto', folderId=null) {
+function addDiagram(isFirst=false, unitId=null, mode='Auto') {
   const id = 'diag-'+Date.now();
   const num = project.diagrams.length + 1;
   const unit = unitId ? (project.units.find(u=>u.id===unitId)?.name||'') : '';
   const name = isFirst ? 'GRAFCET_Main' : `GRAFCET_${mode}`;
   const diagram = {
-    id, name, folderId: folderId||null, unitId: unitId||null,
+    id, name, unitId: unitId||null,
     mode: mode||'Auto', diagramType:'Main',
     machine: project.machineName||project.name||'Machine',
     unit: unit, description:'',
@@ -143,9 +143,6 @@ function openTab(id) {
   const data = loadDiagramData(id);
   if (data) {
     state = data.state;
-    // Migrate old format
-    if (!state.parallels) state.parallels = [];
-    if (!state.vars) state.vars = [];
     nextId = data.nextId || 1;
     nextStepNum = Math.max(1, data.nextStepNum || 1);
     viewX = data.viewX ?? 60;
@@ -217,10 +214,6 @@ function confirmRename() {
     const id=renameMode.split(':')[1];
     const d=project.diagrams.find(x=>x.id===id);
     if (d) { d.name=val; saveProject(); renderTabs(); renderTree(); }
-  } else if (renameMode?.startsWith('folder:')) {
-    const id=renameMode.split(':')[1];
-    const f=(project.folders||[]).find(x=>x.id===id);
-    if (f) { f.name=val; saveProject(); renderTree(); }
   }
   closeModal('modal-rename');
 }
@@ -231,7 +224,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Enter'&&document.getElemen
 function newProject() {
   if (!confirm('Create new project? Current project will be cleared.')) return;
   project.diagrams.forEach(d=>deleteDiagramData(d.id));
-  project = { id:'proj-'+Date.now(), name:'New Project', machineName:'Machine', diagrams:[], folders:[], units:[], devices:[], variables:{imported:[], user:[]}, excelVars:[], unitConfig:{}, ioMapping:{ physicalIOs:[], entries:[] } };
+  project = { id:'proj-'+Date.now(), name:'New Project', machineName:'Machine', diagrams:[], units:[], devices:[], variables:{imported:[], user:[]}, excelVars:[], unitConfig:{}, ioMapping:{ physicalIOs:[], entries:[] } };
   openTabs = []; activeDiagramId=null;
   saveProject();
   addDiagram(true);

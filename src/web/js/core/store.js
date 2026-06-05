@@ -17,8 +17,7 @@ let project = {
   name:'My Project',
   machineName:'Machine',   // top-level machine name
   units:[],                // [{id, name, open}]
-  diagrams:[],             // [{id, name, unitId, folderId (legacy), mode, diagramType, machine, unit}]
-  folders:[],              // legacy virtual folders (kept for compat)
+  diagrams:[],             // [{id, name, unitId, mode, diagramType, machine, unit}]
   devices:[],              // [{id, name, open, signals:[{id,name,dataType,ioType,address}]}]
   variables:{ imported:[], user:[] },
   excelVars:[],            // [{label, format, signalAddresses:{...}, comment, _source:'excel'}]
@@ -275,15 +274,6 @@ function upsertProjectVariable(bucket, variableDef) {
   });
   if (idx >= 0) list[idx] = next;
   else list.push(next);
-  if (bucket !== 'user') {
-    if (!project.excelVars) project.excelVars = [];
-    const legacyIdx = project.excelVars.findIndex(function(item) {
-      return item.id === next.id || (item.label && item.label === next.label);
-    });
-    const legacyCopy = Object.assign({}, next);
-    if (legacyIdx >= 0) project.excelVars[legacyIdx] = legacyCopy;
-    else project.excelVars.push(legacyCopy);
-  }
   return next;
 }
 
@@ -293,24 +283,10 @@ function loadProject() {
     const raw = localStorage.getItem('gf2-project');
     if (raw) {
       project = JSON.parse(raw);
-      if (!project.folders)       project.folders = [];
-      if (!project.units)         project.units = [];
-      if (!project.devices)       project.devices = [];
-      ensureProjectVariables();
-      if (!project.devCategories) project.devCategories = [];
-      if (!project.machineName)   project.machineName = project.name || 'Machine';
-      if (!project.excelVars)     project.excelVars = [];
-      if (!project.unitConfig)    project.unitConfig = {};
-      ensureProjectIOMapping();
       let projectChanged = false;
+      ensureProjectVariables();
+      ensureProjectIOMapping();
       projectChanged = syncStructDataFromProjectData() || projectChanged;
-      // Migrate old diagrams that have folderId but no unitId and no stable address config.
-      project.diagrams.forEach(d=>{
-        if(!d.mode)        { d.mode = 'Auto'; projectChanged = true; }
-        if(!d.diagramType) { d.diagramType = 'Main'; projectChanged = true; }
-        if(!d.machine)     { d.machine = project.machineName; projectChanged = true; }
-        if(!d.unit)        { d.unit = ''; projectChanged = true; }
-      });
       projectChanged = migrateFlowAddressConfigs() || projectChanged;
       if (projectChanged) saveProject();
       const lastId = localStorage.getItem('gf2-active');

@@ -50,23 +50,41 @@ public static class OutputBindingPlanner
                         PhysicalOutputRef = binding.PhysicalOutputRef,
                         SourceExecuteBitRefs = new List<string>(),
                         SourceSteps = new List<string>(),
-                        AggregationMode = "OR"
+                        AggregationMode = "OR",
+                        Sources = new List<OutputBindingSource>()
                     };
                     groups[binding.PhysicalOutputRef] = aggregate;
                 }
 
-                if (!aggregate.SourceExecuteBitRefs.Contains(sourceExecuteBitRef, StringComparer.OrdinalIgnoreCase))
-                {
-                    aggregate.SourceExecuteBitRefs.Add(sourceExecuteBitRef);
-                }
+                AddDistinct(aggregate.SourceExecuteBitRefs, sourceExecuteBitRef);
 
                 var sourceStep = string.IsNullOrWhiteSpace(stepPlan.StepLabel)
                     ? stepPlan.StepNumber.ToString()
                     : $"{stepPlan.StepNumber}:{stepPlan.StepLabel}";
+                var sourceStepRef = ResolveSourceStepRef(aggregate.SourceSteps, sourceStep, sourceExecuteBitRef);
 
-                if (!aggregate.SourceSteps.Contains(sourceStep, StringComparer.OrdinalIgnoreCase))
+                AddDistinct(aggregate.SourceSteps, sourceStepRef);
+
+                var source = new OutputBindingSource
                 {
-                    aggregate.SourceSteps.Add(sourceStep);
+                    StepId = stepPlan.StepId,
+                    StepNumber = stepPlan.StepNumber,
+                    StepLabel = stepPlan.StepLabel,
+                    SourceStep = sourceStepRef,
+                    SourceExecuteBitRef = sourceExecuteBitRef,
+                    ActionSymbol = binding.ActionSymbol,
+                    Qualifier = binding.Qualifier,
+                    DeviceLabel = binding.DeviceLabel,
+                    DeviceFormat = binding.DeviceFormat,
+                    CommandId = binding.CommandId,
+                    ActionLabel = binding.ActionLabel,
+                    DriveSignal = binding.DriveSignal,
+                    FeedbackSignals = binding.FeedbackSignals.ToList()
+                };
+
+                if (!aggregate.Sources.Any(existing => IsSameSource(existing, source)))
+                {
+                    aggregate.Sources.Add(source);
                 }
             }
         }
@@ -103,4 +121,30 @@ public static class OutputBindingPlanner
 
         return lines;
     }
+
+    private static void AddDistinct(IList<string> values, string value)
+    {
+        if (!values.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            values.Add(value);
+        }
+    }
+
+    private static string ResolveSourceStepRef(IList<string> sourceSteps, string sourceStep, string sourceExecuteBitRef)
+    {
+        if (!sourceSteps.Contains(sourceStep, StringComparer.OrdinalIgnoreCase))
+        {
+            return sourceStep;
+        }
+
+        var disambiguated = $"{sourceStep} [{sourceExecuteBitRef}]";
+        return sourceSteps.Contains(disambiguated, StringComparer.OrdinalIgnoreCase) ? sourceStep : disambiguated;
+    }
+
+    private static bool IsSameSource(OutputBindingSource left, OutputBindingSource right)
+        => string.Equals(left.SourceExecuteBitRef, right.SourceExecuteBitRef, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(left.ActionSymbol, right.ActionSymbol, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(left.CommandId, right.CommandId, StringComparison.OrdinalIgnoreCase);
 }
+
+

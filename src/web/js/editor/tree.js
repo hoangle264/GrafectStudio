@@ -77,7 +77,6 @@ function bindTreeSectionToggle(section, key) {
 function renderTree() {
   const body = document.getElementById('tree-body');
   body.innerHTML = '';
-  if (!project.folders) project.folders = [];
   if (!project.units) project.units = [];
   if (!project.devices) project.devices = [];
 
@@ -731,7 +730,7 @@ function addDiagramInUnit(unitId, mode) {
 function addDriverDiagram() {
   const id='diag-'+Date.now();
   project.diagrams.push({
-    id, name:'Driver_Device', unitId:null, folderId:null,
+    id, name:'Driver_Device', unitId:null,
     mode:'Drivers', diagramType:'Main',
     machine:project.machineName||project.name, unit:'', description:''
   });
@@ -942,9 +941,6 @@ function saveDiagPropsPanel() {
   toast('✓ Properties saved');
 }
 
-// Legacy alias — keep tctx working
-function showDiagMeta(id){ openDiagPropsPanel(id); }
-
 function removeDiagram(id, e) {
   if (e) e.stopPropagation();
   const allDiags = project.diagrams.length;
@@ -962,52 +958,6 @@ function removeDiagram(id, e) {
   } else { renderTree(); renderTabs(); }
 }
 
-// ─── Folder management ───
-function addFolder() {
-  const id = 'fld-'+Date.now();
-  const num = (project.folders||[]).length + 1;
-  if(!project.folders) project.folders=[];
-  project.folders.push({ id, name:'Folder '+num, open:true });
-  saveProject(); renderTree();
-}
-
-function addDiagramInFolder(folderId) {
-  addDiagram(false, folderId);
-}
-
-function removeFolder(id, e) {
-  if(e) e.stopPropagation();
-  const f = project.folders.find(x=>x.id===id);
-  const diagsIn = project.diagrams.filter(d=>d.folderId===id);
-  const msg = diagsIn.length>0
-    ? `Delete folder "${f?.name}"? ${diagsIn.length} diagram(s) will be moved to root.`
-    : `Delete folder "${f?.name}"?`;
-  if(!confirm(msg)) return;
-  // Move diagrams to root
-  project.diagrams.forEach(d=>{ if(d.folderId===id) d.folderId=null; });
-  project.folders = project.folders.filter(x=>x.id!==id);
-  saveProject(); renderTree();
-}
-
-function renameFolder(id) {
-  renameMode='folder:'+id;
-  const f = project.folders.find(x=>x.id===id);
-  document.getElementById('modal-input').value = f?.name||'';
-  document.getElementById('modal-rename').querySelector('h2').textContent = 'RENAME FOLDER';
-  showModal('modal-rename');
-}
-
-function moveDiagramToFolder(diagId, folderId) {
-  const d = project.diagrams.find(x=>x.id===diagId);
-  if(d){
-    d.folderId = folderId||null;
-    saveProject(); renderTree();
-    const fname = folderId ? (project.folders.find(f=>f.id===folderId)?.name||'folder') : 'Root';
-    toast('✓ Moved to: '+fname);
-  }
-  hideTreeCtx();
-}
-
 // ─── Tree context menu ───
 let treeCtxTarget = null;
 function showTreeCtx(e, id, type) {
@@ -1017,8 +967,6 @@ function showTreeCtx(e, id, type) {
   const isDiag = type==='diagram';
   document.getElementById('tctx-open').style.display = isDiag?'flex':'none';
   document.getElementById('tctx-dup').style.display  = isDiag?'flex':'none';
-  document.getElementById('tctx-move').style.display = isDiag?'flex':'none';
-  document.getElementById('tree-ctx-folders').style.display='none';
   m.style.display='block';
   const vw=window.innerWidth, vh=window.innerHeight;
   m.style.left=e.clientX+'px'; m.style.top=e.clientY+'px';
@@ -1030,61 +978,22 @@ function showTreeCtx(e, id, type) {
 }
 function hideTreeCtx(){
   document.getElementById('tree-ctx').style.display='none';
-  document.getElementById('tree-ctx-folders').style.display='none';
 }
 document.addEventListener('click', e=>{
-  if(!e.target.closest('#tree-ctx')&&!e.target.closest('#tree-ctx-folders')) hideTreeCtx();
+  if(!e.target.closest('#tree-ctx')) hideTreeCtx();
 });
 function tctxOpen(){ if(treeCtxTarget?.type==='diagram') openTab(treeCtxTarget.id); hideTreeCtx(); }
-function tctxRename(){ if(!treeCtxTarget) return; hideTreeCtx(); if(treeCtxTarget.type==='diagram') renameCurrentDiagram(treeCtxTarget.id); else renameFolder(treeCtxTarget.id); }
+function tctxRename(){ if(!treeCtxTarget) return; hideTreeCtx(); if(treeCtxTarget.type==='diagram') renameCurrentDiagram(treeCtxTarget.id); }
 function tctxDup(){
   hideTreeCtx();
   if(!treeCtxTarget||treeCtxTarget.type!=='diagram') return;
   const d=project.diagrams.find(x=>x.id===treeCtxTarget.id); if(!d) return;
   const newId='diag-'+Date.now();
   const srcData=loadDiagramData(d.id);
-  project.diagrams.push({id:newId, name:d.name+' Copy', folderId:d.folderId||null});
+  project.diagrams.push({id:newId, name:d.name+' Copy'});
   if(srcData) saveDiagramData(newId, JSON.parse(JSON.stringify(srcData.state)), srcData.nextId, srcData.nextStepNum, srcData.viewX, srcData.viewY, srcData.viewScale);
   saveProject(); renderTree();
   toast('✓ Duplicated');
 }
-function tctxDel(){ hideTreeCtx(); if(!treeCtxTarget) return; if(treeCtxTarget.type==='diagram') removeDiagram(treeCtxTarget.id); else removeFolder(treeCtxTarget.id); }
-function tctxShowMove(e){
-  if(e){ e.preventDefault(); e.stopPropagation(); }
-  const fm = document.getElementById('tree-ctx-folders');
-  fm.innerHTML='<div style="padding:5px 10px 3px;font-size:8px;color:var(--text3);letter-spacing:1.5px;">MOVE TO</div>';
-  const curDiag=project.diagrams.find(x=>x.id===treeCtxTarget?.id);
-
-  const rootBtn=document.createElement('div');
-  rootBtn.className='tree-ctx-i';
-  rootBtn.innerHTML=(curDiag&&!curDiag.folderId?'<b style="color:var(--blue)">✓</b> ':'  ')+'📂 Root';
-  rootBtn.onclick=(ev)=>{ ev.stopPropagation(); moveDiagramToFolder(treeCtxTarget.id, null); };
-  fm.appendChild(rootBtn);
-
-  (project.folders||[]).forEach(f=>{
-    const fb=document.createElement('div');
-    fb.className='tree-ctx-i';
-    const isHere=curDiag?.folderId===f.id;
-    fb.innerHTML=(isHere?'<b style="color:var(--blue)">✓</b> ':'  ')+'📁 '+esc2(f.name);
-    fb.onclick=(ev)=>{ ev.stopPropagation(); moveDiagramToFolder(treeCtxTarget.id, f.id); };
-    fm.appendChild(fb);
-  });
-
-  if(!(project.folders||[]).length){
-    const noF=document.createElement('div');
-    noF.style.cssText='padding:5px 12px;font-size:9px;color:var(--text3);font-style:italic;';
-    noF.textContent='No folders — create one first';
-    fm.appendChild(noF);
-  }
-
-  const m=document.getElementById('tree-ctx');
-  const mr=m.getBoundingClientRect();
-  const vw=window.innerWidth;
-  fm.style.display='block';
-  fm.style.top=mr.top+'px';
-  requestAnimationFrame(()=>{
-    const fr=fm.getBoundingClientRect();
-    fm.style.left = (mr.right+fr.width+4<vw) ? (mr.right+2)+'px' : (mr.left-fr.width-2)+'px';
-  });
-}
+function tctxDel(){ hideTreeCtx(); if(!treeCtxTarget) return; if(treeCtxTarget.type==='diagram') removeDiagram(treeCtxTarget.id); }
 

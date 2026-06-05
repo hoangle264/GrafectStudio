@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.CodeGen.Runtime;
+using GrafcetStudio.CodeGen.Runtime;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Models;
@@ -105,14 +105,10 @@ public class UnitConfigGenerator : ICodeGenerator
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
+        var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
 //#if DEBUG
-//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(runtimePlans, JsonOptions));
+//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(outputBindings, JsonOptions));
 //#endif
-        var outputBindings = runtimePlans
-            .SelectMany(plan => plan.OutputBindingPlan.Bindings)
-            .GroupBy(binding => binding.PhysicalOutputRef, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToList();
         var autoFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -160,6 +156,34 @@ public class UnitConfigGenerator : ICodeGenerator
         };
     }
 
+
+    private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
+    {
+        return bindings
+            .GroupBy(binding => binding.PhysicalOutputRef, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new AggregatedOutputBinding
+            {
+                PhysicalOutputRef = group.Key,
+                SourceExecuteBitRefs = group
+                    .SelectMany(binding => binding.SourceExecuteBitRefs)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                SourceSteps = group
+                    .SelectMany(binding => binding.SourceSteps)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                AggregationMode = group.Select(binding => binding.AggregationMode).FirstOrDefault(mode => !string.IsNullOrWhiteSpace(mode)) ?? "OR",
+                Sources = group
+                    .SelectMany(binding => binding.Sources)
+                    .GroupBy(source => new { Source = source.SourceExecuteBitRef.ToUpperInvariant(), Action = source.ActionSymbol.ToUpperInvariant(), Command = source.CommandId.ToUpperInvariant() })
+                    .Select(sourceGroup => sourceGroup.First())
+                    .ToList()
+            })
+            .OrderBy(binding => binding.PhysicalOutputRef, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
     private static DeviceLibraryRoot LoadDeviceLibrary(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return new DeviceLibraryRoot();
@@ -188,6 +212,7 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
+
 
 
 
