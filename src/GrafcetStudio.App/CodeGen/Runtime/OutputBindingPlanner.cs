@@ -49,6 +49,7 @@ public static class OutputBindingPlanner
                     {
                         PhysicalOutputRef = binding.PhysicalOutputRef,
                         SourceExecuteBitRefs = new List<string>(),
+                        SourceDoneBitRefs = new List<string>(),
                         SourceSteps = new List<string>(),
                         AggregationMode = "OR",
                         Sources = new List<OutputBindingSource>()
@@ -57,6 +58,7 @@ public static class OutputBindingPlanner
                 }
 
                 AddDistinct(aggregate.SourceExecuteBitRefs, sourceExecuteBitRef);
+                AddDistinct(aggregate.SourceDoneBitRefs, stepPlan.DoneBitRef);
 
                 var sourceStep = string.IsNullOrWhiteSpace(stepPlan.StepLabel)
                     ? stepPlan.StepNumber.ToString()
@@ -72,6 +74,7 @@ public static class OutputBindingPlanner
                     StepLabel = stepPlan.StepLabel,
                     SourceStep = sourceStepRef,
                     SourceExecuteBitRef = sourceExecuteBitRef,
+                    SourceDoneBitRef = stepPlan.DoneBitRef,
                     ActionSymbol = binding.ActionSymbol,
                     Qualifier = binding.Qualifier,
                     DeviceLabel = binding.DeviceLabel,
@@ -146,5 +149,6 @@ public static class OutputBindingPlanner
            && string.Equals(left.ActionSymbol, right.ActionSymbol, StringComparison.OrdinalIgnoreCase)
            && string.Equals(left.CommandId, right.CommandId, StringComparison.OrdinalIgnoreCase);
 }
+
 
 

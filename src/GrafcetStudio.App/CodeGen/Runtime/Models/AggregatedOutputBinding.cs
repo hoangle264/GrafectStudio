@@ -6,6 +6,8 @@ public class AggregatedOutputBinding
 
     public IList<string> SourceExecuteBitRefs { get; init; } = new List<string>();
 
+    public IList<string> SourceDoneBitRefs { get; init; } = new List<string>();
+
     public IList<string> SourceSteps { get; init; } = new List<string>();
 
     public string AggregationMode { get; init; } = "OR";
@@ -24,6 +26,8 @@ public class OutputBindingSource
     public string SourceStep { get; init; } = string.Empty;
 
     public string SourceExecuteBitRef { get; init; } = string.Empty;
+
+    public string SourceDoneBitRef { get; init; } = string.Empty;
 
     public string ActionSymbol { get; init; } = string.Empty;
 

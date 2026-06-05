@@ -169,6 +169,11 @@ public class UnitConfigGenerator : ICodeGenerator
                     .Where(value => !string.IsNullOrWhiteSpace(value))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
+                SourceDoneBitRefs = group
+                    .SelectMany(binding => binding.SourceDoneBitRefs)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
                 SourceSteps = group
                     .SelectMany(binding => binding.SourceSteps)
                     .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -212,6 +217,7 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
+
 
 
 
