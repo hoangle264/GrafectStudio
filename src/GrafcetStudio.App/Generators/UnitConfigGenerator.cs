@@ -107,7 +107,7 @@ public class UnitConfigGenerator : ICodeGenerator
                 : payload.Project?.Name ?? "Unit";
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
-        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables)).ToList();
+        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library)).ToList();
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
         var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
         var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes);
@@ -151,7 +151,8 @@ public class UnitConfigGenerator : ICodeGenerator
             {
                 id = unitId,
                 label = unitLabel,
-                unitIndex = 0
+                unitIndex = 0,
+                variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
             devices,
             autoFlows,
@@ -165,7 +166,7 @@ public class UnitConfigGenerator : ICodeGenerator
 
 
 
-    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables)
+    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables, DeviceLibraryRoot library)
     {
         var state = flow.ToDiagramState(variables);
         var sequence = _sequenceResolver.Resolve(state);
@@ -173,7 +174,7 @@ public class UnitConfigGenerator : ICodeGenerator
         {
             Index = index,
             IsFirst = index == 0,
-            Step = entry.Step,
+            Step = EnrichStepActions(entry.Step, variables, library),
             PreviousStep = index > 0 ? sequence[index - 1].Step : null,
             NextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null,
             InTransition = entry.InTransition,
@@ -193,6 +194,58 @@ public class UnitConfigGenerator : ICodeGenerator
             rawSteps = flow.Steps,
             transitions = flow.Transitions
         };
+    }
+
+
+    private static Step EnrichStepActions(Step step, IList<DeviceVariable> variables, DeviceLibraryRoot library)
+    {
+        if (string.IsNullOrWhiteSpace(step.ExecAddress) || step.Actions.Count == 0) return step;
+
+        var enrichedActions = step.Actions.Select(action => EnrichStepAction(action, step.ExecAddress, variables, library)).ToList();
+        return new Step
+        {
+            Id = step.Id,
+            Number = step.Number,
+            Label = step.Label,
+            IsInitial = step.IsInitial,
+            ExecAddress = step.ExecAddress,
+            DoneAddress = step.DoneAddress,
+            Actions = enrichedActions
+        };
+    }
+
+    private static StepAction EnrichStepAction(
+        StepAction action,
+        string stepExecAddress,
+        IList<DeviceVariable> variables,
+        DeviceLibraryRoot library)
+    {
+        var resolved = DeviceCommandResolver.Resolve(action, stepExecAddress, variables, library);
+        var feedback = resolved?.FeedbackSignals.FirstOrDefault(signal => !string.IsNullOrWhiteSpace(signal.PhysicalAddress));
+        if (feedback is null) return action;
+
+        return new StepAction
+        {
+            Variable = action.Variable,
+            Address = action.Address,
+            Qualifier = action.Qualifier,
+            TimeMs = action.TimeMs,
+            Complete = new StepActionCompletion
+            {
+                Sensor = feedback.SignalName,
+                SensorLabel = feedback.Label,
+                Address = feedback.PhysicalAddress
+            },
+            SensorRef = BuildSensorRef(action.Variable, feedback.SignalName)
+        };
+    }
+
+    private static string? BuildSensorRef(string actionVariable, string sensorName)
+    {
+        var separatorIndex = actionVariable.IndexOf('.');
+        if (separatorIndex <= 0 || string.IsNullOrWhiteSpace(sensorName)) return null;
+
+        return $"{actionVariable[..separatorIndex]}.{sensorName}";
     }
 
     private static IList<DeviceOutputGroup> BuildDeviceOutputGroups(

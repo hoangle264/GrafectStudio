@@ -14,7 +14,7 @@ public class AppConfig
 
 public class ConfigService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
     private readonly string _configPath;
 
     public ConfigService()

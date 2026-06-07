@@ -21,8 +21,28 @@ public class StepAction
     [JsonPropertyName("timeMs")]
     public double TimeMs { get; init; }
 
+    [JsonPropertyName("complete")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StepActionCompletion? Complete { get; init; }
+
+    [JsonPropertyName("sensorRef")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SensorRef { get; init; }
+
     public string ToPhysicalAddress(IList<DeviceVariable> vars)
         => !string.IsNullOrWhiteSpace(Address)
             ? Address!
             : SignalResolver.ResolveAddress(Variable, vars) ?? Variable;
+}
+
+public class StepActionCompletion
+{
+    [JsonPropertyName("sensor")]
+    public string Sensor { get; init; } = string.Empty;
+
+    [JsonPropertyName("sensorLabel")]
+    public string SensorLabel { get; init; } = string.Empty;
+
+    [JsonPropertyName("address")]
+    public string Address { get; init; } = string.Empty;
 }

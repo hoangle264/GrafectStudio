@@ -45,6 +45,12 @@ public partial class MainWindow : Window
         {
             var config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
             await bridge.SendSavedPathsAsync(config.DeviceLibraryPath, config.TemplatePath, config.OutputPath);
+
+            if (!string.IsNullOrWhiteSpace(config.DeviceLibraryPath) && File.Exists(config.DeviceLibraryPath))
+            {
+                var projectJson = await File.ReadAllTextAsync(config.DeviceLibraryPath);
+                //await bridge.LoadProjectDataAsync(projectJson);
+            }
         };
         webView.CoreWebView2.Navigate("https://grafcet.local/index.html");
     }
