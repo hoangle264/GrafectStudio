@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.App.Events;
+using GrafcetStudio.App.Events;
 using GrafcetStudio.App.Generators;
 using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Models;
@@ -80,7 +80,6 @@ public class CodeGenerationOrchestrator
                 await _bridge.SendErrorAsync("template-validation", string.Join("; ", health.Errors));
                 return;
             }
-
             await _config.SavePathsAsync(message.DevPath, message.TemplatePath, message.OutputPath);
             payload.EnrichVariables();
             var platform = string.IsNullOrWhiteSpace(payload.Platform) ? message.Platform : payload.Platform;

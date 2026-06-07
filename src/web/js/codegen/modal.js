@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 let cgSavedPaths = { deviceLibraryPath: '', templatePath: '', outputPath: '' };
 
@@ -66,7 +66,7 @@ function showGenerateCodeModal() {
 
         <!-- Unit + Diagram selector hidden for unit-config -->
         <div id="cg-unit-wrap" style="flex:1;min-width:220px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">UNIT</div>
+          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:8px;">UNIT <button class="btn" onclick="cgGenerateSelectedUnit()" style="padding:2px 8px;font-size:9px;">Send selected</button></div>
           <div id="cg-unit-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
           <div id="cg-unit-diag-section" style="display:none;">
             <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">
@@ -188,7 +188,10 @@ function cgBuildUnitList() {
 //  Called when user selects a unit radio button 
 function cgOnUnitSelect(unitId) {
   cgBuildDiagForUnit(unitId);
-  cgUpdatePreview();
+  const pre = document.getElementById('cg-preview');
+  const stat = document.getElementById('cg-stat');
+  if (pre) pre.textContent = '; Unit selected. Click Send selected to generate payload.';
+  if (stat) stat.textContent = 'Unit selected';
 }
 
 // Build diagram checkboxes for the selected unit
@@ -229,19 +232,18 @@ function cgUpdatePreview() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
 
-  // All codegen targets now use the Unit Config payload shape.
+  // All codegen targets use a single selected Unit Config payload.
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
   const unitWrap    = document.getElementById('cg-unit-wrap');
   if (baseMRWrap) baseMRWrap.style.display = 'none';
-  if (unitWrap)   unitWrap.style.display   = 'none';
+  if (unitWrap)   unitWrap.style.display   = '';
 
   const pre  = document.getElementById('cg-preview');
   const stat = document.getElementById('cg-stat');
   if (!pre) return;
 
-  pre.textContent = '; Waiting for C# generator...';
-  if (stat) stat.textContent = 'C# generator request queued';
-  cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
+  pre.textContent = '; Select a unit above to generate payload.';
+  if (stat) stat.textContent = 'Waiting for unit selection';
 }
 
 // Syntax highlight cho Unit Config output 
@@ -540,6 +542,19 @@ function cgGetCSharpVariables(diagramState) {
   return vars;
 }
 
+function cgGenerateSelectedUnit() {
+  const target = document.getElementById('cg-target')?.value || 'unit-config';
+  const platform = cgResolveHostPlatform(target);
+  const unitId = cgGetDefaultUnitId();
+  if (!unitId) {
+    const pre = document.getElementById('cg-preview');
+    const stat = document.getElementById('cg-stat');
+    if (pre) pre.textContent = '; No unit selected.';
+    if (stat) stat.textContent = 'No unit selected';
+    return false;
+  }
+  return cgGenerateViaHost(platform, unitId);
+}
 function cgGenerateViaHost(platform, diagId) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
     const pre = document.getElementById('cg-preview');
@@ -561,7 +576,7 @@ function cgGenerateViaHost(platform, diagId) {
     const message = err && err.message ? err.message : String(err);
     if (pre) pre.textContent = '; Payload validation error: ' + message;
     if (stat) stat.textContent = 'Payload validation failed';
-    if (typeof toast === 'function') toast('⚠ ' + message);
+    if (typeof toast === 'function') toast('? ' + message);
     return false;
   }
 }
@@ -604,9 +619,7 @@ function cgUCHighlight(pre, profile) {
 
 //  Download / Copy 
 function cgDownloadCode() {
-  const target = document.getElementById('cg-target')?.value || 'unit-config';
-  const platform = cgResolveHostPlatform(target);
-  cgGenerateViaHost(platform, cgGetDefaultUnitId() || '');
+  cgGenerateSelectedUnit();
 }
 function cgExportViaHost(code, platform) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
@@ -623,7 +636,7 @@ function cgExportViaHost(code, platform) {
 function cgCopyCode() {
   const pre = document.getElementById('cg-preview');
   if (!pre) return;
-  navigator.clipboard.writeText(pre.textContent).then(() => toast('âœ“ Copied to clipboard'));
+  navigator.clipboard.writeText(pre.textContent).then(() => toast('✓ Copied to clipboard'));
 }
 
 // JSON Files panel toggle 

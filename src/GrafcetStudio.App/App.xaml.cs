@@ -1,7 +1,8 @@
-﻿using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Generators;
 using GrafcetStudio.App.Services;
 using GrafcetStudio.CodeGen.Profile;
 using GrafcetStudio.CodeGen.Template;
+using GrafcetStudio.Domain.Resolution;
 using HandlebarsDotNet;
 using Prism.DryIoc;
 using Prism.Ioc;
@@ -19,6 +20,7 @@ public partial class App : PrismApplication
     {
         containerRegistry.RegisterSingleton<IWebViewBridgeService, WebViewBridgeService>();
         containerRegistry.RegisterSingleton<IFileService, FileService>();
+        containerRegistry.RegisterSingleton<ISequenceResolver, SequenceResolver>();
         containerRegistry.RegisterSingleton<ICodeGenerator, KeyenceMnemonicGenerator>();
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Kv8000.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Melsec.Id));

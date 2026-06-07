@@ -2,6 +2,7 @@ using GrafcetStudio.CodeGen.Runtime;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Resolution;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -31,10 +32,12 @@ public class UnitConfigGenerator : ICodeGenerator
         ("uc.deviceGeneric", "device_generic")
     ];
     private readonly TemplateManager _templates;
+    private readonly ISequenceResolver _sequenceResolver;
 
-    public UnitConfigGenerator(TemplateManager templates)
+    public UnitConfigGenerator(TemplateManager templates, ISequenceResolver sequenceResolver)
     {
         _templates = templates;
+        _sequenceResolver = sequenceResolver;
     }
 
     public string Platform => "unit-config";
@@ -94,7 +97,7 @@ public class UnitConfigGenerator : ICodeGenerator
         if (!string.IsNullOrEmpty(source)) _templates.RegisterPartial(partialName, source);
     }
 
-    private static object BuildContext(CodegenPayload payload)
+    private object BuildContext(CodegenPayload payload)
     {
         var unitId = payload.Unit?.Id ?? string.Empty;
         var unitLabel = !string.IsNullOrWhiteSpace(payload.Unit?.Label)
@@ -104,13 +107,15 @@ public class UnitConfigGenerator : ICodeGenerator
                 : payload.Project?.Name ?? "Unit";
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
+        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables)).ToList();
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
         var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
+        var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes);
 //#if DEBUG
 //        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(outputBindings, JsonOptions));
 //#endif
-        var autoFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "auto", StringComparison.OrdinalIgnoreCase)).ToList();
-        var originFlows = flows.Where(f => string.Equals(NormalizeFlowType(f), "origin", StringComparison.OrdinalIgnoreCase)).ToList();
+        var autoFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
+        var originFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
         var deviceTypesByName = payload.DeviceTypes.ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
         var devices = payload.Variables.Select(variable =>
@@ -151,11 +156,133 @@ public class UnitConfigGenerator : ICodeGenerator
             devices,
             autoFlows,
             originFlows,
-            outputBindings,
+            //outputBindings,
+            deviceOutputGroups,
             warnings = Array.Empty<string>()
         };
     }
 
+
+
+
+    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables)
+    {
+        var state = flow.ToDiagramState(variables);
+        var sequence = _sequenceResolver.Resolve(state);
+        var resolvedSteps = sequence.Select((entry, index) => new ResolvedStep
+        {
+            Index = index,
+            IsFirst = index == 0,
+            Step = entry.Step,
+            PreviousStep = index > 0 ? sequence[index - 1].Step : null,
+            NextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null,
+            InTransition = entry.InTransition,
+            OutTransition = entry.OutTransition,
+            BranchType = entry.BranchType
+        }).ToList();
+
+        return new ResolvedFlow
+        {
+            id = flow.Id,
+            name = flow.Name,
+            type = flow.Type,
+            mode = flow.Mode,
+            normalizedType = NormalizeFlowType(flow),
+            diagram = flow.Diagram,
+            steps = resolvedSteps,
+            rawSteps = flow.Steps,
+            transitions = flow.Transitions
+        };
+    }
+
+    private static IList<DeviceOutputGroup> BuildDeviceOutputGroups(
+        IList<AggregatedOutputBinding> mergedBindings,
+        IList<DeviceVariable> variables,
+        IList<DeviceType> deviceTypes)
+    {
+        var variablesByLabel = variables.ToDictionary(variable => variable.Label, StringComparer.OrdinalIgnoreCase);
+        var deviceTypesByName = deviceTypes.ToDictionary(deviceType => deviceType.Name, StringComparer.OrdinalIgnoreCase);
+        var flattenedSources = mergedBindings
+            .SelectMany(binding => binding.Sources.Select(source => new { Binding = binding, Source = source }))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Source.DeviceLabel))
+            .ToList();
+
+        return flattenedSources
+            .GroupBy(item => item.Source.DeviceLabel, StringComparer.OrdinalIgnoreCase)
+            .Select(deviceGroup =>
+            {
+                var firstSource = deviceGroup.Select(item => item.Source).First();
+                variablesByLabel.TryGetValue(deviceGroup.Key, out var variable);
+                deviceTypesByName.TryGetValue(firstSource.DeviceFormat, out var deviceType);
+
+                var signals = variable is null || deviceType is null
+                    ? new List<object>()
+                    : deviceType.Signals.Select(signal => new
+                    {
+                        name = signal.Name,
+                        dataType = signal.DataType,
+                        varType = signal.VarType.ToString(),
+                        comment = signal.Comment,
+                        address = variable.GetSignalAddress(signal.Id) ?? variable.GetSignalAddress(signal.Name)
+                    }).Cast<object>().ToList();
+
+                var commands = deviceGroup
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Source.CommandId))
+                    .GroupBy(item => item.Source.CommandId, StringComparer.OrdinalIgnoreCase)
+                    .Select(commandGroup =>
+                    {
+                        var commandSource = commandGroup.Select(item => item.Source).First();
+                        var commandBindings = commandGroup.Select(item => item.Binding);
+
+                        return new DeviceCommandOutput
+                        {
+                            CommandId = commandSource.CommandId,
+                            ActionLabel = commandSource.ActionLabel,
+                            DriveSignal = commandSource.DriveSignal,
+                            PhysicalOutputRef = commandGroup
+                                .Select(item => item.Binding.PhysicalOutputRef)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                            AggregationMode = commandGroup
+                                .Select(item => item.Binding.AggregationMode)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "OR",
+                            SourceSteps = commandBindings
+                                .SelectMany(binding => binding.SourceSteps)
+                                .Where(value => !string.IsNullOrWhiteSpace(value))
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList(),
+                            SourceExecuteBitRefs = commandBindings
+                                .SelectMany(binding => binding.SourceExecuteBitRefs)
+                                .Where(value => !string.IsNullOrWhiteSpace(value))
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList(),
+                            SourceDoneBitRefs = commandBindings
+                                .SelectMany(binding => binding.SourceDoneBitRefs)
+                                .Where(value => !string.IsNullOrWhiteSpace(value))
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList(),
+                            FeedbackSignals = commandGroup
+                                .SelectMany(item => item.Source.FeedbackSignals)
+                                .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
+                                .Select(signalGroup => signalGroup.First())
+                                .ToList()
+                        };
+                    })
+                    .OrderBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new DeviceOutputGroup
+                {
+                    DeviceLabel = deviceGroup.Key,
+                    DeviceFormat = firstSource.DeviceFormat,
+                    DeviceKind = NormalizeDeviceKind(firstSource.DeviceFormat),
+                    Address = variable?.Address,
+                    Signals = signals,
+                    Commands = commands
+                };
+            })
+            .OrderBy(group => group.DeviceLabel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
     {
