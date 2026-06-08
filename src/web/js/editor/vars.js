@@ -19,17 +19,17 @@ const GVT_CYL_SIGNALS = [
 ];
 
 const GVT_UNIT_SIGNALS = [
-  {id:'originBaseAddr', name:'OriginBase', dataType:'Word', varType:'Var', path:'originBaseAddr'},
-  {id:'autoBaseAddr',   name:'AutoBase',   dataType:'Word', varType:'Var', path:'autoBaseAddr'},
-  {id:'flagOrigin',     name:'OriginFlag', dataType:'Bool', varType:'Var', path:'flags.flagOrigin'},
-  {id:'flagAuto',       name:'AutoFlag',   dataType:'Bool', varType:'Var', path:'flags.flagAuto'},
-  {id:'flagManual',     name:'ManualFlag', dataType:'Bool', varType:'Var', path:'flags.flagManual'},
-  {id:'flagError',      name:'ErrorFlag',  dataType:'Bool', varType:'Var', path:'flags.flagError'},
-  {id:'btnStart',       name:'Start',      dataType:'Bool', varType:'Input', path:'io.btnStart'},
-  {id:'hmiStop',        name:'Stop',       dataType:'Bool', varType:'Input', path:'io.hmiStop'},
-  {id:'btnReset',       name:'Reset',      dataType:'Bool', varType:'Input', path:'io.btnReset'},
-  {id:'eStop',          name:'EStop',      dataType:'Bool', varType:'Input', path:'io.eStop'},
-  {id:'outHomed',       name:'HomeDone',   dataType:'Bool', varType:'Output', path:'io.outHomed'},
+  {id:'originBaseAddr', name:'originBaseAddr', dataType:'Word', varType:'Var', path:'originBaseAddr'},
+  {id:'autoBaseAddr',   name:'autoBaseAddr',   dataType:'Word', varType:'Var', path:'autoBaseAddr'},
+  {id:'flagOrigin',     name:'flagOrigin',     dataType:'Bool', varType:'Var', path:'flags.flagOrigin'},
+  {id:'flagAuto',       name:'flagAuto',       dataType:'Bool', varType:'Var', path:'flags.flagAuto'},
+  {id:'flagManual',     name:'flagManual',     dataType:'Bool', varType:'Var', path:'flags.flagManual'},
+  {id:'flagError',      name:'flagError',      dataType:'Bool', varType:'Var', path:'flags.flagError'},
+  {id:'btnStart',       name:'btnStart',       dataType:'Bool', varType:'Input', path:'io.btnStart'},
+  {id:'hmiStop',        name:'hmiStop',        dataType:'Bool', varType:'Input', path:'io.hmiStop'},
+  {id:'btnReset',       name:'btnReset',       dataType:'Bool', varType:'Input', path:'io.btnReset'},
+  {id:'eStop',          name:'eStop',          dataType:'Bool', varType:'Input', path:'io.eStop'},
+  {id:'outHomed',       name:'outHomed',       dataType:'Bool', varType:'Output', path:'io.outHomed'},
 ];
 
 // Danh sách kiểu primitive phổ thông
@@ -76,6 +76,10 @@ function gvtGetEntries() {
 }
 
 function gvtGetUnitAddr(cfg, path) {
+  if (!cfg) return '';
+  if (cfg.signalAddresses && Object.prototype.hasOwnProperty.call(cfg.signalAddresses, path)) {
+    return cfg.signalAddresses[path] || '';
+  }
   return path.split('.').reduce(function(cur, part) {
     return cur && cur[part] != null ? cur[part] : '';
   }, cfg) || '';
@@ -94,6 +98,12 @@ function gvtSetUnitAddr(cfg, path, value) {
 function gvtGetUnitSigList() {
   const devType = (project.devices||[]).find(d=>d.name==='Unit Station');
   const devSigs = devType ? (devType.signals||[]) : [];
+  console.log('[UnitStationDebug][GlobalVars] signal source', {
+    hasDeviceType: !!devType,
+    deviceSignalCount: devSigs.length,
+    fallbackSignalCount: GVT_UNIT_SIGNALS.length,
+    ids: (devSigs.length ? devSigs : GVT_UNIT_SIGNALS).map(function(sig) { return sig && sig.id; })
+  });
   if (!devSigs.length) return GVT_UNIT_SIGNALS;
 
   const unitPaths = GVT_UNIT_SIGNALS.reduce(function(map, sig) {
@@ -207,6 +217,21 @@ function renderGlobalVarTable() {
   if(!tbody) return;
   tbody.innerHTML = '';
   const entries = gvtGetEntries();
+  console.log('[UnitStationDebug][GlobalVars] entries', {
+    unitConfigCount: Object.keys(project.unitConfig || {}).length,
+    importedUnitCount: ((project.variables && project.variables.imported) || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
+    userUnitCount: ((project.variables && project.variables.user) || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
+    excelUnitCount: (project.excelVars || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
+    renderedUnitEntries: entries.filter(function(entry) { return entry && entry.format === 'Unit Station'; }).map(function(entry) {
+      const data = entry.data || {};
+      return {
+        source: entry.source,
+        label: data.label || entry.label || entry.key,
+        signalAddressCount: Object.keys(data.signalAddresses || {}).length,
+        signalAddressKeys: Object.keys(data.signalAddresses || {})
+      };
+    })
+  });
   const filter = (document.getElementById('gvt-search')?.value||'').toLowerCase();
   const filtered = entries.filter(v=>
     !filter ||
@@ -350,7 +375,14 @@ function renderGlobalVarTable() {
             if(!project.excelVars[entry.key].signalAddresses) project.excelVars[entry.key].signalAddresses={};
             project.excelVars[entry.key].signalAddresses[sig.id]=addrInp.value;
           } else if(entry.source === 'unit' && project.unitConfig && project.unitConfig[entry.key]) {
-            gvtSetUnitAddr(project.unitConfig[entry.key], sig.path, addrInp.value);
+            const cfg = project.unitConfig[entry.key];
+            const isKnownPath = GVT_UNIT_SIGNALS.some(function(unitSig) { return unitSig.path === sig.path; });
+            if (isKnownPath) {
+              gvtSetUnitAddr(cfg, sig.path, addrInp.value);
+            } else {
+              if (!cfg.signalAddresses) cfg.signalAddresses = {};
+              cfg.signalAddresses[sig.id] = addrInp.value;
+            }
           }
           saveProject();
           if(typeof updateVarDatalist==='function') updateVarDatalist();
@@ -533,7 +565,14 @@ function ioResolveVariableAddressTarget(appVariable) {
     get: function () { return entry.source === 'unit' ? gvtGetUnitAddr(v, sig.path) : gvtGetExcelSignalAddress(v, sig); },
     set: function (value) {
       if (entry.source === 'unit' && project.unitConfig && project.unitConfig[entry.key]) {
-        gvtSetUnitAddr(project.unitConfig[entry.key], sig.path, value);
+        const cfg = project.unitConfig[entry.key];
+        const isKnownPath = GVT_UNIT_SIGNALS.some(function(unitSig) { return unitSig.path === sig.path; });
+        if (isKnownPath) {
+          gvtSetUnitAddr(cfg, sig.path, value);
+        } else {
+          if (!cfg.signalAddresses) cfg.signalAddresses = {};
+          cfg.signalAddresses[sig.id] = value;
+        }
       } else if ((entry.source === 'imported' || entry.source === 'user') && project.variables?.[entry.bucket]?.[entry.key]) {
         const rec = project.variables[entry.bucket][entry.key];
         if(!rec.signalAddresses) rec.signalAddresses = {};

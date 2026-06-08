@@ -367,7 +367,7 @@ function eiOnImportTypeChange() {
   if (structWrap) structWrap.style.display = type === 'struct' ? '' : 'none';
   if (schemaHint) {
     schemaHint.innerHTML = type === 'unit'
-      ? '<b style="color:var(--cyan);">Unit Station CSV</b>: UnitName · OriginFlag · AutoFlag · ManualFlag · OriginBase · AutoBase · ErrorFlag · Start · Stop · Reset · EStop · HomeDone'
+      ? '<b style="color:var(--cyan);">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed'
       : '<b style="color:var(--cyan);">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
   }
 

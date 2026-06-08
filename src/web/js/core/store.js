@@ -150,17 +150,17 @@ function deleteDiagramData(id) {
 }
 
 const PROJECT_UNIT_STRUCT_SIGNALS = [
-  { id:'originBaseAddr', name:'OriginBase', dataType:'Word', varType:'Var',    comment:'Origin base address' },
-  { id:'autoBaseAddr',   name:'AutoBase',   dataType:'Word', varType:'Var',    comment:'Auto base address' },
-  { id:'flagOrigin',     name:'OriginFlag', dataType:'Bool', varType:'Var',    comment:'Origin mode flag' },
-  { id:'flagAuto',       name:'AutoFlag',   dataType:'Bool', varType:'Var',    comment:'Auto mode flag' },
-  { id:'flagManual',     name:'ManualFlag', dataType:'Bool', varType:'Var',    comment:'Manual mode flag' },
-  { id:'flagError',      name:'ErrorFlag',  dataType:'Bool', varType:'Var',    comment:'Error flag' },
-  { id:'btnStart',       name:'Start',      dataType:'Bool', varType:'Input',  comment:'Start input' },
-  { id:'hmiStop',        name:'Stop',       dataType:'Bool', varType:'Input',  comment:'Stop input' },
-  { id:'btnReset',       name:'Reset',      dataType:'Bool', varType:'Input',  comment:'Reset input' },
-  { id:'eStop',          name:'EStop',      dataType:'Bool', varType:'Input',  comment:'Emergency stop input' },
-  { id:'outHomed',       name:'HomeDone',   dataType:'Bool', varType:'Output', comment:'Homed output' }
+  { id:'originBaseAddr', name:'originBaseAddr', dataType:'Word', varType:'Var',    comment:'Origin base address' },
+  { id:'autoBaseAddr',   name:'autoBaseAddr',   dataType:'Word', varType:'Var',    comment:'Auto base address' },
+  { id:'flagOrigin',     name:'flagOrigin',     dataType:'Bool', varType:'Var',    comment:'Origin mode flag' },
+  { id:'flagAuto',       name:'flagAuto',       dataType:'Bool', varType:'Var',    comment:'Auto mode flag' },
+  { id:'flagManual',     name:'flagManual',     dataType:'Bool', varType:'Var',    comment:'Manual mode flag' },
+  { id:'flagError',      name:'flagError',      dataType:'Bool', varType:'Var',    comment:'Error flag' },
+  { id:'btnStart',       name:'btnStart',       dataType:'Bool', varType:'Input',  comment:'Start input' },
+  { id:'hmiStop',        name:'hmiStop',        dataType:'Bool', varType:'Input',  comment:'Stop input' },
+  { id:'btnReset',       name:'btnReset',       dataType:'Bool', varType:'Input',  comment:'Reset input' },
+  { id:'eStop',          name:'eStop',          dataType:'Bool', varType:'Input',  comment:'Emergency stop input' },
+  { id:'outHomed',       name:'outHomed',       dataType:'Bool', varType:'Output', comment:'Homed output' }
 ];
 
 function ensureStructDataType(name, signals, categoryId) {
@@ -233,6 +233,36 @@ function ensureProjectVariables() {
   return project.variables;
 }
 
+function syncVariableSignalAddressesFromDeviceTypes() {
+  const devicesByName = new Map((project.devices || [])
+    .filter(function(device) { return device && device.name && Array.isArray(device.signals); })
+    .map(function(device) { return [device.name, device]; }));
+  const groups = [];
+  const vars = ensureProjectVariables();
+  groups.push(vars.imported, vars.user, project.excelVars || []);
+  let changed = false;
+
+  groups.forEach(function(list) {
+    (list || []).forEach(function(v) {
+      const format = v && (v.format || v.dataType || '');
+      const device = devicesByName.get(format);
+      if (!device) return;
+      if (!v.signalAddresses || typeof v.signalAddresses !== 'object') {
+        v.signalAddresses = {};
+        changed = true;
+      }
+      (device.signals || []).forEach(function(sig) {
+        const id = sig && (sig.id || sig.name);
+        if (!id || Object.prototype.hasOwnProperty.call(v.signalAddresses, id)) return;
+        v.signalAddresses[id] = '';
+        changed = true;
+      });
+    });
+  });
+
+  return changed;
+}
+
 function normalizeIOMappingDirection(v) {
   const raw = String(v || '').trim().toLowerCase();
   if (raw === 'input' || raw === 'in') return 'Input';
@@ -287,6 +317,7 @@ function loadProject() {
       ensureProjectVariables();
       ensureProjectIOMapping();
       projectChanged = syncStructDataFromProjectData() || projectChanged;
+      projectChanged = syncVariableSignalAddressesFromDeviceTypes() || projectChanged;
       projectChanged = migrateFlowAddressConfigs() || projectChanged;
       if (projectChanged) saveProject();
       const lastId = localStorage.getItem('gf2-active');

@@ -32,37 +32,7 @@ public class CodegenPayload
 
     public void EnrichVariables()
     {
-        // Replace internal signal IDs with friendly names for each variable
-        foreach (var variable in Variables)
-        {
-            // Find matching device type based on variable.Format (e.g., "Cylinder")
-            var deviceType = DeviceTypes?.FirstOrDefault(dt =>
-                string.Equals(dt.Name, variable.Format, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(dt.Name, variable.Format, StringComparison.OrdinalIgnoreCase));
-            if (deviceType == null) continue;
-
-            var newMap = new Dictionary<string, string>();
-            foreach (var kv in variable.SignalAddresses)
-            {
-                // kv.Key is internal ID like "cyl_lsh"
-                // Find signal with that ID in the device type
-                var signal = deviceType.Signals.FirstOrDefault(s =>
-                    string.Equals(s.Id, kv.Key, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(s.Name, kv.Key, StringComparison.OrdinalIgnoreCase));
-                if (signal != null)
-                {
-                    // Use friendly name as key, value remains the address
-                    newMap[signal.Name] = kv.Value;
-                }
-                else
-                {
-                    // Keep original entry if not found (fallback)
-                    newMap[kv.Key] = kv.Value;
-                }
-            }
-            // Replace with the new map containing only friendly names (replace IDs)
-            variable.SignalAddresses = newMap;
-        }
+        // Signal IDs are stable keys from the web model; keep them unchanged for resolution.
     }
 }
 

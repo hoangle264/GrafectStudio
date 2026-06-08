@@ -372,6 +372,9 @@ function cgValidateUnitAddressConfig(unitDiagrams) {
 
 function cgBuildCSharpPayload(platform, unitId) {
   if (activeDiagramId && typeof flushState === 'function') flushState();
+  if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function' && syncVariableSignalAddressesFromDeviceTypes()) {
+    if (typeof saveProject === 'function') saveProject();
+  }
   return cgBuildCSharpUnitPayload(platform, unitId || cgGetDefaultUnitId() || '');
 }
 
@@ -433,17 +436,25 @@ function cgNormalizeCSharpSignal(deviceTypeName, sig) {
   const canonicalUnitSignals = new Map(((typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined') ? PROJECT_UNIT_STRUCT_SIGNALS : []).map(item => [item.id, item]));
   const canonical = deviceTypeName === 'Unit Station' ? canonicalUnitSignals.get(sig && sig.id) : null;
   const normalized = Object.assign({}, sig || {}, canonical || {});
-  const signalName = normalized.name || normalized.id || '';
-  return Object.assign({}, normalized, { id: signalName, name: signalName });
+  const signalId = normalized.id || normalized.name || '';
+  const signalName = normalized.name || signalId;
+  return Object.assign({}, normalized, { id: signalId, name: signalName });
 }
 
 function cgGetCSharpDeviceTypes() {
-  return ((project && project.devices) || []).map(deviceType => {
+  const deviceTypes = ((project && project.devices) || []).map(deviceType => {
     if (!deviceType) return deviceType;
     return Object.assign({}, deviceType, {
       signals: (deviceType.signals || []).map(sig => cgNormalizeCSharpSignal(deviceType.name, sig))
     });
   });
+  const unitDevice = deviceTypes.find(deviceType => deviceType && deviceType.name === 'Unit Station');
+  console.log('[UnitStationDebug][Payload] device type', {
+    hasDeviceType: !!unitDevice,
+    signalCount: ((unitDevice && unitDevice.signals) || []).length,
+    signals: ((unitDevice && unitDevice.signals) || []).map(sig => ({ id: sig.id, name: sig.name }))
+  });
+  return deviceTypes;
 }
 
 function cgBuildCSharpUnitPayload(platform, unitId) {
@@ -506,15 +517,35 @@ function cgGetCSharpSignalAddresses(v) {
   const format = v && (v.format || v.dataType || '');
   const deviceType = ((project && project.devices) || []).find(d => d && d.name === format);
   const rawAddresses = (v && v.signalAddresses) || {};
-  if (!deviceType || !Array.isArray(deviceType.signals)) return Object.assign({}, rawAddresses);
+  if (!deviceType || !Array.isArray(deviceType.signals)) {
+    if (format === 'Unit Station') {
+      console.log('[UnitStationDebug][Payload] no device type for variable', {
+        label: v && v.label,
+        rawAddressCount: Object.keys(rawAddresses).length,
+        rawAddressKeys: Object.keys(rawAddresses)
+      });
+    }
+    return Object.assign({}, rawAddresses);
+  }
 
   const signalAddresses = {};
   deviceType.signals.forEach(sig => {
     const normalized = cgNormalizeCSharpSignal(deviceType.name, sig);
-    if (!normalized.name) return;
+    if (!normalized.id) return;
     const addr = rawAddresses[normalized.name] || rawAddresses[sig && sig.name] || rawAddresses[sig && sig.id];
-    if (addr) signalAddresses[normalized.name] = addr;
+    signalAddresses[normalized.id] = addr || '';
   });
+  if (format === 'Unit Station') {
+    console.log('[UnitStationDebug][Payload] signal addresses from variable', {
+      label: v && v.label,
+      deviceSignalCount: (deviceType.signals || []).length,
+      rawAddressCount: Object.keys(rawAddresses).length,
+      rawAddressKeys: Object.keys(rawAddresses),
+      payloadAddressCount: Object.keys(signalAddresses).length,
+      payloadAddressKeys: Object.keys(signalAddresses),
+      addresses: signalAddresses
+    });
+  }
   return signalAddresses;
 }
 
@@ -538,7 +569,30 @@ function cgGetCSharpVariables(diagramState) {
     (grouped.imported || []).forEach(add);
     (grouped.user || []).forEach(add);
   }
+  Object.keys((project && project.unitConfig) || {}).forEach(key => {
+    const cfg = project.unitConfig[key] || {};
+    const signalAddresses = Object.assign({}, cfg.signalAddresses || {});
+    (typeof GVT_UNIT_SIGNALS !== 'undefined' ? GVT_UNIT_SIGNALS : []).forEach(sig => {
+      if (!sig || !sig.id || !sig.path) return;
+      const addr = sig.path.split('.').reduce((cur, part) => cur && cur[part] != null ? cur[part] : '', cfg) || '';
+      if (addr) signalAddresses[sig.id] = addr;
+    });
+    console.log('[UnitStationDebug][Payload] unitConfig variable candidate', {
+      key,
+      label: cfg.label || key,
+      nestedPathAddressCount: Object.keys(signalAddresses).length,
+      signalAddressKeys: Object.keys(signalAddresses),
+      signalAddresses
+    });
+    add({ label: cfg.label || key, format: 'Unit Station', address: null, signalAddresses });
+  });
   (project.excelVars || []).forEach(add);
+  console.log('[UnitStationDebug][Payload] variables final', vars.filter(v => v && v.format === 'Unit Station').map(v => ({
+    label: v.label,
+    signalAddressCount: Object.keys(v.signalAddresses || {}).length,
+    signalAddressKeys: Object.keys(v.signalAddresses || {}),
+    signalAddresses: v.signalAddresses || {}
+  })));
   return vars;
 }
 

@@ -589,7 +589,7 @@ function openDeviceTypeModal(devId) {
 function devModalAddRow(sig) {
   const tbody=document.getElementById('dev-modal-tbody');
   if(!tbody) return;
-  const sid=sig?.id||('sig-'+Date.now()+'-'+Math.random().toString(36).slice(2,5));
+  const sid=sig?.id||'';
   const tr=document.createElement('tr');
   tr.dataset.sigId=sid;
   tr.innerHTML=`
@@ -617,22 +617,76 @@ function confirmDeviceType() {
   if(!name){alert('Please enter a struct data name.');return;}
   const catId=document.getElementById('dev-modal-cat').value;
   if(!project.devices) project.devices=[];
+  const oldDevice = _devModalDevId ? project.devices.find(x=>x.id===_devModalDevId) : null;
+  const oldDeviceName = oldDevice && oldDevice.name ? oldDevice.name : name;
 
-  const signals=Array.from(document.getElementById('dev-modal-tbody').querySelectorAll('tr')).map(tr=>({
-    id:tr.dataset.sigId||('sig-'+Date.now()),
-    name:    tr.querySelector('[data-f="name"]').value.trim(),
-    dataType:tr.querySelector('[data-f="dataType"]').value,
-    varType: tr.querySelector('[data-f="varType"]').value,
-    address: tr.querySelector('[data-f="address"]')?.value.trim() || '',
-    comment: tr.querySelector('[data-f="comment"]').value.trim()
-  })).filter(s=>s.name);
+  function makeSignalIdFromName(signalName) {
+    return String(signalName || '').trim().replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function rewriteSignalAddressKeys(formatName, idMap) {
+    const groups = [];
+    if (project.variables) {
+      groups.push(project.variables.imported || []);
+      groups.push(project.variables.user || []);
+    }
+    groups.push(project.excelVars || []);
+    groups.forEach(function(list) {
+      (list || []).forEach(function(v) {
+        if (!v || v.format !== formatName || !v.signalAddresses) return;
+        Object.keys(idMap).forEach(function(oldId) {
+          const newId = idMap[oldId];
+          if (!Object.prototype.hasOwnProperty.call(v.signalAddresses, oldId)) return;
+          if (!Object.prototype.hasOwnProperty.call(v.signalAddresses, newId)) {
+            v.signalAddresses[newId] = v.signalAddresses[oldId];
+          }
+          delete v.signalAddresses[oldId];
+        });
+      });
+    });
+  }
+
+  const idMap = {};
+  const usedSignalIds = new Set();
+  const duplicateIds = new Set();
+  const signals=Array.from(document.getElementById('dev-modal-tbody').querySelectorAll('tr')).map(tr=>{
+    const signalName = tr.querySelector('[data-f="name"]').value.trim();
+    if (!signalName) return null;
+    const nextId = makeSignalIdFromName(signalName);
+    if (!nextId) {
+      alert('Signal name "' + signalName + '" cannot create a valid id. Use letters, numbers, or underscore.');
+      return null;
+    }
+    if (usedSignalIds.has(nextId)) duplicateIds.add(nextId);
+    usedSignalIds.add(nextId);
+    const oldId = String(tr.dataset.sigId || '').trim();
+    if (oldId && oldId !== nextId) idMap[oldId] = nextId;
+    return {
+      id: nextId,
+      name: signalName,
+      dataType:tr.querySelector('[data-f="dataType"]').value,
+      varType: tr.querySelector('[data-f="varType"]').value,
+      address: tr.querySelector('[data-f="address"]')?.value.trim() || '',
+      comment: tr.querySelector('[data-f="comment"]').value.trim()
+    };
+  }).filter(Boolean);
+
+  if (duplicateIds.size) {
+    alert('Duplicate signal name/id is not allowed: ' + Array.from(duplicateIds).join(', '));
+    return;
+  }
 
   if(_devModalDevId){
-    const d=project.devices.find(x=>x.id===_devModalDevId);
+    const d=oldDevice;
     if(d){d.name=name;d.categoryId=catId;d.signals=signals;}
   } else {
     project.devices.push({id:'dev-'+Date.now(),name,categoryId:catId,open:true,signals});
   }
+  if (Object.keys(idMap).length) {
+    rewriteSignalAddressKeys(oldDeviceName, idMap);
+    if (oldDeviceName !== name) rewriteSignalAddressKeys(name, idMap);
+  }
+  if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function') syncVariableSignalAddressesFromDeviceTypes();
   saveProject(); renderTree();
   closeModal('modal-device-type');
   toast('✓ Struct Data: '+name);

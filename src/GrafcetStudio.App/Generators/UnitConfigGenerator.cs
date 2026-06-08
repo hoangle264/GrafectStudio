@@ -44,9 +44,9 @@ public class UnitConfigGenerator : ICodeGenerator
     public string Generate(CodegenPayload payload)
     {
         var context = BuildContext(payload);
-//#if DEBUG
- //          System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
-//#endif
+#if DEBUG
+        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
+#endif
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()
