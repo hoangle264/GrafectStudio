@@ -43,10 +43,10 @@ public class UnitConfigGenerator : ICodeGenerator
     public string Platform => "unit-config";
     public string Generate(CodegenPayload payload)
     {
-        var context = BuildContext(payload);
-#if DEBUG
-        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
-#endif
+         var context = BuildContext(payload);
+//#if DEBUG
+//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
+//#endif
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()
@@ -313,6 +313,8 @@ public class UnitConfigGenerator : ICodeGenerator
                                 .Where(value => !string.IsNullOrWhiteSpace(value))
                                 .Distinct(StringComparer.OrdinalIgnoreCase)
                                 .ToList(),
+                            OriginFlows = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), "origin"),
+                            AutoFlows = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), "auto"),
                             FeedbackSignals = commandGroup
                                 .SelectMany(item => item.Source.FeedbackSignals)
                                 .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
@@ -337,6 +339,40 @@ public class UnitConfigGenerator : ICodeGenerator
             .ToList();
     }
 
+
+    private static IList<DeviceCommandFlowOutput> BuildCommandFlowOutputs(IEnumerable<OutputBindingSource> sources, string flowType)
+    {
+        return sources
+            .Where(source => string.Equals(source.FlowType, flowType, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(source => $"{source.FlowId}\u001F{source.FlowName}", StringComparer.OrdinalIgnoreCase)
+            .Select(flowGroup => new DeviceCommandFlowOutput
+            {
+                Id = flowGroup.First().FlowId,
+                Name = flowGroup.First().FlowName,
+                Commands = flowGroup
+                    .Where(source => !string.IsNullOrWhiteSpace(source.SourceExecuteBitRef) || !string.IsNullOrWhiteSpace(source.SourceDoneBitRef))
+                    .GroupBy(source => $"{source.CommandId}\u001F{source.ActionLabel}\u001F{source.SourceStep}\u001F{source.SourceExecuteBitRef}\u001F{source.SourceDoneBitRef}", StringComparer.OrdinalIgnoreCase)
+                    .Select(commandGroup =>
+                    {
+                        var source = commandGroup.First();
+                        return new DeviceCommandFlowBitOutput
+                        {
+                            CommandId = source.CommandId,
+                            ActionLabel = source.ActionLabel,
+                            SourceStep = source.SourceStep,
+                            SourceExecuteBit = source.SourceExecuteBitRef,
+                            SourceDoneBit = source.SourceDoneBitRef
+                        };
+                    })
+                    .OrderBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(command => command.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            })
+            .Where(flow => flow.Commands.Count > 0)
+            .OrderBy(flow => flow.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(flow => flow.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
     private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
     {
         return bindings
@@ -362,7 +398,15 @@ public class UnitConfigGenerator : ICodeGenerator
                 AggregationMode = group.Select(binding => binding.AggregationMode).FirstOrDefault(mode => !string.IsNullOrWhiteSpace(mode)) ?? "OR",
                 Sources = group
                     .SelectMany(binding => binding.Sources)
-                    .GroupBy(source => new { Source = source.SourceExecuteBitRef.ToUpperInvariant(), Action = source.ActionSymbol.ToUpperInvariant(), Command = source.CommandId.ToUpperInvariant() })
+                    .GroupBy(source => new
+                    {
+                        Flow = source.FlowId.ToUpperInvariant(),
+                        Type = source.FlowType.ToUpperInvariant(),
+                        Source = source.SourceExecuteBitRef.ToUpperInvariant(),
+                        Done = source.SourceDoneBitRef.ToUpperInvariant(),
+                        Action = source.ActionSymbol.ToUpperInvariant(),
+                        Command = source.CommandId.ToUpperInvariant()
+                    })
                     .Select(sourceGroup => sourceGroup.First())
                     .ToList()
             })
@@ -397,6 +441,7 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
+
 
 
 

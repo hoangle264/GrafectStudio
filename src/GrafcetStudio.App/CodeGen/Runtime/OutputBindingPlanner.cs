@@ -1,12 +1,13 @@
 using GrafcetStudio.CodeGen.Models;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.Domain.Enums;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.CodeGen.Runtime;
 
 public static class OutputBindingPlanner
 {
-    public static OutputBindingPlan Build(IList<StepRuntimePlan> stepPlans)
+    public static OutputBindingPlan Build(IList<StepRuntimePlan> stepPlans, DiagramMeta? diagram = null)
     {
         var diagnostics = new List<Diagnostic>();
         var groups = new Dictionary<string, AggregatedOutputBinding>(StringComparer.OrdinalIgnoreCase);
@@ -71,6 +72,9 @@ public static class OutputBindingPlanner
                 {
                     StepId = stepPlan.StepId,
                     StepNumber = stepPlan.StepNumber,
+                    FlowId = diagram?.Id ?? string.Empty,
+                    FlowName = diagram?.Name ?? string.Empty,
+                    FlowType = NormalizeFlowType(diagram?.Mode),
                     StepLabel = stepPlan.StepLabel,
                     SourceStep = sourceStepRef,
                     SourceExecuteBitRef = sourceExecuteBitRef,
@@ -125,6 +129,9 @@ public static class OutputBindingPlanner
         return lines;
     }
 
+    private static string NormalizeFlowType(string? value)
+        => string.Equals(value, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
+
     private static void AddDistinct(IList<string> values, string value)
     {
         if (!values.Contains(value, StringComparer.OrdinalIgnoreCase))
@@ -149,6 +156,7 @@ public static class OutputBindingPlanner
            && string.Equals(left.ActionSymbol, right.ActionSymbol, StringComparison.OrdinalIgnoreCase)
            && string.Equals(left.CommandId, right.CommandId, StringComparison.OrdinalIgnoreCase);
 }
+
 
 
 

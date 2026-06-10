@@ -21,6 +21,12 @@ public class OutputBindingSource
 
     public int StepNumber { get; init; }
 
+    public string FlowId { get; init; } = string.Empty;
+
+    public string FlowName { get; init; } = string.Empty;
+
+    public string FlowType { get; init; } = string.Empty;
+
     public string StepLabel { get; init; } = string.Empty;
 
     public string SourceStep { get; init; } = string.Empty;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using HandlebarsDotNet;
 using GrafcetStudio.Domain.Enums;
 
@@ -11,10 +12,12 @@ public class TemplateManager
     private readonly Dictionary<string, string> _sources = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HandlebarsTemplate<object, object>> _compiled = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _registeredPartials = new(StringComparer.OrdinalIgnoreCase);
+    private bool _builtinHelpersRegistered;
 
     public TemplateManager(IHandlebars handlebars)
     {
         _handlebars = handlebars;
+        RegisterBuiltinHelpers();
     }
 
     public void LoadTemplate(string name, string source)
@@ -40,6 +43,22 @@ public class TemplateManager
 
     public void RegisterBuiltinHelpers()
     {
+        if (_builtinHelpersRegistered) return;
+        _builtinHelpersRegistered = true;
+
+        _handlebars.RegisterHelper("renderDevice", (writer, context, parameters) =>
+        {
+            var device = parameters.Length > 0 ? parameters[0] : context.Value;
+            var partialName = ResolveDevicePartialName(device);
+            if (!_sources.TryGetValue(partialName, out var source))
+            {
+                partialName = "device_generic";
+                if (!_sources.TryGetValue(partialName, out source)) return;
+            }
+
+            writer.WriteSafeString(_handlebars.Compile(source)(device));
+        });
+
         _handlebars.RegisterHelper("pad", (writer, context, parameters) =>
         {
             var value = parameters.Length > 0 ? parameters[0]?.ToString() ?? string.Empty : string.Empty;
@@ -112,6 +131,33 @@ public class TemplateManager
 
     public void RegisterHelper(string name, HandlebarsHelper helper)
         => _handlebars.RegisterHelper(name, helper);
+
+    private static string ResolveDevicePartialName(object? device)
+    {
+        var explicitName = GetPropertyValue(device, "partialName") ?? GetPropertyValue(device, "PartialName");
+        if (!string.IsNullOrWhiteSpace(explicitName)) return explicitName!;
+
+        var kind = GetPropertyValue(device, "DeviceKind") ?? GetPropertyValue(device, "kind") ?? GetPropertyValue(device, "DeviceFormat") ?? GetPropertyValue(device, "format");
+        if (string.IsNullOrWhiteSpace(kind)) return "device_generic";
+
+        var normalized = new string(kind!.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');
+        return string.IsNullOrWhiteSpace(normalized) ? "device_generic" : $"device_{normalized}";
+    }
+
+    private static string? GetPropertyValue(object? value, string propertyName)
+    {
+        if (value is null) return null;
+
+        if (value is IDictionary<string, object> dictionary && dictionary.TryGetValue(propertyName, out var item))
+        {
+            return item?.ToString();
+        }
+
+        return value.GetType()
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)
+            ?.GetValue(value)
+            ?.ToString();
+    }
 
     private static string ResolveTemplateKey(TemplateEntry entry)
     {

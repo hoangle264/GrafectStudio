@@ -46,17 +46,18 @@ public static class RuntimePlanBuilder
             };
         }).ToList();
 
-        var outputBindingPlan = OutputBindingPlanner.Build(stepPlans);
+        var diagram = new DiagramMeta
+        {
+            Id = flow.Diagram?.Id ?? flow.Id ?? string.Empty,
+            Name = flow.Diagram?.Name ?? flow.Name ?? string.Empty,
+            Mode = flow.Diagram?.Mode ?? flow.Mode ?? flow.Type ?? string.Empty,
+            UnitId = flow.Diagram?.UnitId ?? string.Empty
+        };
+        var outputBindingPlan = OutputBindingPlanner.Build(stepPlans, diagram);
 
         return new DiagramRuntimePlan
         {
-            Diagram = new DiagramMeta
-            {
-                Id = flow.Diagram?.Id ?? flow.Id ?? string.Empty,
-                Name = flow.Diagram?.Name ?? flow.Name ?? string.Empty,
-                Mode = flow.Diagram?.Mode ?? flow.Mode ?? flow.Type ?? string.Empty,
-                UnitId = flow.Diagram?.UnitId ?? string.Empty
-            },
+            Diagram = diagram,
             BaseMr = flow.Diagram?.BaseMr ?? 0,
             StepPlans = stepPlans,
             OutputBindingPlan = outputBindingPlan

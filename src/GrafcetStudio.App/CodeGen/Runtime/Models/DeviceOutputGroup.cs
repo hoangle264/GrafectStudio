@@ -20,7 +20,33 @@ public class DeviceCommandOutput
 
     public IList<string> SourceDoneBitRefs { get; init; } = new List<string>();
 
+    public IList<DeviceCommandFlowOutput> OriginFlows { get; init; } = new List<DeviceCommandFlowOutput>();
+
+    public IList<DeviceCommandFlowOutput> AutoFlows { get; init; } = new List<DeviceCommandFlowOutput>();
+
     public IList<FeedbackSignalResult> FeedbackSignals { get; init; } = new List<FeedbackSignalResult>();
+}
+
+public class DeviceCommandFlowOutput
+{
+    public string Id { get; init; } = string.Empty;
+
+    public string Name { get; init; } = string.Empty;
+
+    public IList<DeviceCommandFlowBitOutput> Commands { get; init; } = new List<DeviceCommandFlowBitOutput>();
+}
+
+public class DeviceCommandFlowBitOutput
+{
+    public string CommandId { get; init; } = string.Empty;
+
+    public string ActionLabel { get; init; } = string.Empty;
+
+    public string SourceStep { get; init; } = string.Empty;
+
+    public string SourceExecuteBit { get; init; } = string.Empty;
+
+    public string SourceDoneBit { get; init; } = string.Empty;
 }
 
 public class DeviceOutputGroup
