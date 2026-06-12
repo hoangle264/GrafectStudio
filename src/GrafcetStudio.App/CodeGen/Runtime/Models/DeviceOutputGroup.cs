@@ -59,6 +59,10 @@ public class DeviceOutputGroup
 
     public string? Address { get; init; }
 
+    public IDictionary<string, string> SignalAddresses { get; init; } = new Dictionary<string, string>();
+
+    public IDictionary<string, string> UnitAddresses { get; init; } = new Dictionary<string, string>();
+
     public IList<object> Signals { get; init; } = new List<object>();
 
     public IList<DeviceCommandOutput> Commands { get; init; } = new List<DeviceCommandOutput>();

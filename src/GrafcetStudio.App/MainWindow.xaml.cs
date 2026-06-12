@@ -85,9 +85,6 @@ public partial class MainWindow : Window
     private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         using var doc = JsonDocument.Parse(e.WebMessageAsJson);
-        //#if DEBUG
-        //       System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(doc, JsonOptions));
-        //#endif
         if (!doc.RootElement.TryGetProperty("type", out var typeElement))
         {
             return;
@@ -102,7 +99,6 @@ public partial class MainWindow : Window
             {
                 var flowCount = GetOptionalArrayLength(payload, "flows");
                 var variableCount = GetOptionalArrayLength(payload, "variables");
-                Debug.WriteLine($"[Codegen] C# received payload counts: flows={flowCount}, variables={variableCount}");
 
                 var message = new GenerateCodePayload
                 {

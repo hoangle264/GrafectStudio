@@ -67,17 +67,20 @@ public static class TemplateLoader
         var devicesPath = Path.Combine(rootPath, "devices");
         if (!Directory.Exists(devicesPath)) return;
 
-        var mapping = new[]
+        var standardMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            (Filename: "cylinder.hbs", Id: "uc.deviceCylinder"),
-            (Filename: "servo.hbs", Id: "uc.deviceServo"),
-            (Filename: "motor.hbs", Id: "uc.deviceMotor"),
-            (Filename: "generic.hbs", Id: "uc.deviceGeneric")
+            ["cylinder"] = "uc.deviceCylinder",
+            ["servo"] = "uc.deviceServo",
+            ["motor"] = "uc.deviceMotor",
+            ["generic"] = "uc.deviceGeneric"
         };
 
-        foreach (var item in mapping)
+        foreach (var file in Directory.EnumerateFiles(devicesPath, "*.hbs", SearchOption.TopDirectoryOnly))
         {
-            LoadMappedTemplate(Path.Combine(devicesPath, item.Filename), item.Id, item.Filename, true, result);
+            var name = Path.GetFileNameWithoutExtension(file);
+            var partialName = $"device_{NormalizePartialName(name)}";
+            var id = standardMappings.TryGetValue(name, out var standardId) ? standardId : partialName;
+            LoadMappedTemplate(file, id, Path.GetFileName(file), true, result, partialName);
         }
     }
 
@@ -93,6 +96,9 @@ public static class TemplateLoader
             LoadMappedTemplate(file, id, Path.GetFileName(file), true, result, id);
         }
     }
+
+    private static string NormalizePartialName(string value)
+        => new string(value.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');
 
     private static void LoadMappedTemplate(
         string path,

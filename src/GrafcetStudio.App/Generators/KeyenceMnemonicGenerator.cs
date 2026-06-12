@@ -21,7 +21,6 @@ public class KeyenceMnemonicGenerator : ICodeGenerator
         sb.AppendLine($"; Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
         var map = new List<string>();
-        Debug.WriteLine($"[Codegen] C# received payload counts: steps={seq.Count}, transitions={seq.Sum(item => item.Step.Number)}");
 
         for (var i = 0; i < seq.Count; i++)
         {

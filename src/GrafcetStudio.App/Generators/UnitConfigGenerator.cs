@@ -44,9 +44,6 @@ public class UnitConfigGenerator : ICodeGenerator
     public string Generate(CodegenPayload payload)
     {
          var context = BuildContext(payload);
-//#if DEBUG
-//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(context, JsonOptions));
-//#endif
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()
@@ -110,10 +107,9 @@ public class UnitConfigGenerator : ICodeGenerator
         var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library)).ToList();
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
         var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
-        var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes);
-//#if DEBUG
-//        System.Diagnostics.Debug.WriteLine(JsonSerializer.Serialize(outputBindings, JsonOptions));
-//#endif
+        var unitVariable = FindUnitVariable(payload.Variables, unitLabel);
+        var unitAddresses = unitVariable?.SignalAddresses ?? new Dictionary<string, string>();
+        var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes, unitAddresses);
         var autoFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -251,7 +247,8 @@ public class UnitConfigGenerator : ICodeGenerator
     private static IList<DeviceOutputGroup> BuildDeviceOutputGroups(
         IList<AggregatedOutputBinding> mergedBindings,
         IList<DeviceVariable> variables,
-        IList<DeviceType> deviceTypes)
+        IList<DeviceType> deviceTypes,
+        IDictionary<string, string> unitAddresses)
     {
         var variablesByLabel = variables.ToDictionary(variable => variable.Label, StringComparer.OrdinalIgnoreCase);
         var deviceTypesByName = deviceTypes.ToDictionary(deviceType => deviceType.Name, StringComparer.OrdinalIgnoreCase);
@@ -331,12 +328,22 @@ public class UnitConfigGenerator : ICodeGenerator
                     DeviceFormat = firstSource.DeviceFormat,
                     DeviceKind = NormalizeDeviceKind(firstSource.DeviceFormat),
                     Address = variable?.Address,
+                    SignalAddresses = variable?.SignalAddresses ?? new Dictionary<string, string>(),
+                    UnitAddresses = new Dictionary<string, string>(unitAddresses, StringComparer.OrdinalIgnoreCase),
                     Signals = signals,
                     Commands = commands
                 };
             })
             .OrderBy(group => group.DeviceLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static DeviceVariable? FindUnitVariable(IList<DeviceVariable> variables, string unitLabel)
+    {
+        if (string.IsNullOrWhiteSpace(unitLabel)) return null;
+
+        return variables.FirstOrDefault(variable => string.Equals(variable.Label, unitLabel, StringComparison.OrdinalIgnoreCase))
+            ?? variables.FirstOrDefault(variable => variable.Label.Contains(unitLabel, StringComparison.OrdinalIgnoreCase));
     }
 
 

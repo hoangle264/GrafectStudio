@@ -1,0 +1,38 @@
+// Demo cylinder output partial
+// Loaded as: templates/devices/cylinder.hbs -> partial device_cylinder / template uc.deviceCylinder
+// Expected context: one DeviceOutputGroup item from BuildContext(payload).deviceOutputGroups
+
+// -----------------------------------------------------------------------------
+// Cylinder: {{DeviceLabel}}
+// Format  : {{DeviceFormat}}
+// Base    : {{Address}}
+// -----------------------------------------------------------------------------
+
+{{#each Commands}}
+// Command {{CommandId}} - {{ActionLabel}}
+// Output  : {{PhysicalOutputRef}}
+// Mode    : {{AggregationMode}}
+{{PhysicalOutputRef}} := FALSE
+{{#each OriginFlows}}
+// Origin flow: {{Name}}
+{{#each Commands}}
+    OR {{SourceExecuteBit}}
+{{/each}}
+{{/each}}
+{{#each AutoFlows}}
+// Auto flow: {{Name}}
+{{#each Commands}}
+    OR {{SourceExecuteBit}}
+{{/each}}
+{{/each}}
+;
+
+{{#each FeedbackSignals}}
+// Feedback {{SignalName}} {{#if Label}}({{Label}}){{/if}}: {{PhysicalAddress}}
+{{/each}}
+{{/each}}
+
+// Signal map
+{{#each Signals}}
+// {{name}} : {{address}} {{#if comment}}// {{comment}}{{/if}}
+{{/each}}

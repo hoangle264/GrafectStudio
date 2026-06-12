@@ -127,6 +127,7 @@ public class TemplateManager
     {
         _handlebars.RegisterTemplate(name, source);
         _registeredPartials.Add(name);
+        _sources[name] = source;
     }
 
     public void RegisterHelper(string name, HandlebarsHelper helper)
