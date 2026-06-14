@@ -27,6 +27,7 @@ public static class DeviceCommandResolver
 
         var diagnostics = new List<Diagnostic>();
         var feedbackSignals = new List<FeedbackSignalResult>();
+        var interlockAddress = string.Empty;
         if (command.Complete is not null)
         {
             if (TryGetSignalAddress(deviceVar, command.Complete.Sensor, out var feedbackAddr))
@@ -45,6 +46,19 @@ public static class DeviceCommandResolver
                     Level = DiagnosticLevel.Warning,
                     Code = "DEVICE_COMMAND_FEEDBACK_MISSING",
                     Message = $"Feedback signal '{command.Complete.Sensor}' for action '{action.Variable}' was not found."
+                });
+            }
+        }
+
+        if (command.Interlock is not null && !string.IsNullOrWhiteSpace(command.Interlock.Signal))
+        {
+            if (!TryGetSignalAddress(deviceVar, command.Interlock.Signal, out interlockAddress))
+            {
+                diagnostics.Add(new Diagnostic
+                {
+                    Level = DiagnosticLevel.Warning,
+                    Code = "DEVICE_COMMAND_INTERLOCK_MISSING",
+                    Message = $"Interlock signal '{command.Interlock.Signal}' for action '{action.Variable}' was not found."
                 });
             }
         }
@@ -69,6 +83,10 @@ public static class DeviceCommandResolver
                     CommandId = commandId,
                     ActionLabel = command.ActionLabel,
                     DriveSignal = command.DriveSignal,
+                    InterlockSignal = command.Interlock?.Signal ?? string.Empty,
+                    InterlockAddress = interlockAddress,
+                    InterlockLabel = command.Interlock?.Label ?? string.Empty,
+                    InterlockRequiredState = command.Interlock?.RequiredState ?? string.Empty,
                     FeedbackSignals = feedbackSignals.ToList()
                 }
             },

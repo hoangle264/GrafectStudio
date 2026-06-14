@@ -10,6 +10,16 @@ public class DeviceCommandOutput
 
     public string DriveSignal { get; init; } = string.Empty;
 
+    public string InterlockSignal { get; init; } = string.Empty;
+
+    public string InterlockAddress { get; init; } = string.Empty;
+
+    public string InterlockLabel { get; init; } = string.Empty;
+
+    public string InterlockRequiredState { get; init; } = string.Empty;
+
+    public bool HasInterlock { get; init; }
+
     public string PhysicalOutputRef { get; init; } = string.Empty;
 
     public string AggregationMode { get; init; } = "OR";

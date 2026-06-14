@@ -110,6 +110,7 @@ public class UnitConfigGenerator : ICodeGenerator
         var unitVariable = FindUnitVariable(payload.Variables, unitLabel);
         var unitAddresses = unitVariable?.SignalAddresses ?? new Dictionary<string, string>();
         var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes, unitAddresses);
+        var unitStepRange = BuildUnitStepAddressRange(resolvedFlows);
         var autoFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -148,6 +149,8 @@ public class UnitConfigGenerator : ICodeGenerator
                 id = unitId,
                 label = unitLabel,
                 unitIndex = 0,
+                stepMinAddress = unitStepRange.MinAddress,
+                stepMaxAddress = unitStepRange.MaxAddress,
                 variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
             devices,
@@ -177,6 +180,7 @@ public class UnitConfigGenerator : ICodeGenerator
             OutTransition = entry.OutTransition,
             BranchType = entry.BranchType
         }).ToList();
+        var flowStepRange = BuildFlowStepAddressRange(flow);
 
         return new ResolvedFlow
         {
@@ -186,11 +190,159 @@ public class UnitConfigGenerator : ICodeGenerator
             mode = flow.Mode,
             normalizedType = NormalizeFlowType(flow),
             diagram = flow.Diagram,
+            stepMinAddress = flowStepRange.MinAddress,
+            stepMaxAddress = flowStepRange.MaxAddress,
+            sequenceEnd = flowStepRange.SequenceEnd,
             steps = resolvedSteps,
             rawSteps = flow.Steps,
             transitions = flow.Transitions
         };
     }
+
+    private static (string MinAddress, string MaxAddress, string SequenceEnd) BuildFlowStepAddressRange(FlowInfo flow)
+    {
+        var addressedSteps = new List<(Step Step, StepExecAddress Address)>();
+        foreach (var step in flow.Steps)
+        {
+            if (TryParseStepExecAddress(step.ExecAddress, flow.Diagram, out var parsed))
+            {
+                addressedSteps.Add((step, parsed));
+            }
+        }
+
+        if (addressedSteps.Count == 0) return (string.Empty, string.Empty, string.Empty);
+
+        var min = addressedSteps.OrderBy(item => item.Address.SortValue).First();
+        var max = addressedSteps.OrderByDescending(item => item.Address.SortValue).First();
+        var sequenceEnd = ResolveSequenceEnd(max.Step, max.Address, flow.Diagram);
+
+        return (min.Step.ExecAddress ?? string.Empty, max.Step.ExecAddress ?? string.Empty, sequenceEnd);
+    }
+
+    private static (string MinAddress, string MaxAddress) BuildUnitStepAddressRange(IList<ResolvedFlow> flows)
+    {
+        var addresses = new List<(Step Step, StepExecAddress Address)>();
+        foreach (var flow in flows)
+        {
+            foreach (var step in flow.rawSteps)
+            {
+                if (TryParseStepExecAddress(step.ExecAddress, flow.diagram, out var parsed))
+                {
+                    addresses.Add((step, parsed));
+                }
+            }
+        }
+
+        if (addresses.Count == 0) return (string.Empty, string.Empty);
+
+        var min = addresses.OrderBy(item => item.Address.SortValue).First();
+        var max = addresses.OrderByDescending(item => item.Address.SortValue).First();
+        return (min.Step.ExecAddress ?? string.Empty, max.Step.ExecAddress ?? string.Empty);
+    }
+
+    private static string ResolveSequenceEnd(Step step, StepExecAddress parsedAddress, DiagramInfo? diagram)
+    {
+        var stepNumber = step.Number;
+        if (stepNumber < 1) return IncrementParsedAddress(parsedAddress);
+
+        if (string.Equals(diagram?.AddressMode, "word", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatWordStepExecAddress(diagram?.ActiveWord, stepNumber + 1);
+        }
+
+        var baseMr = diagram?.BaseMr ?? ResolveBoolBaseMr(parsedAddress, stepNumber, diagram?.BoolAddressMode);
+        var offset = stepNumber * 2;
+        var nextNumber = ResolveBoolMr(baseMr, offset, diagram?.BoolAddressMode);
+        return $"@MR{nextNumber}";
+    }
+
+    private static int ResolveBoolBaseMr(StepExecAddress parsedAddress, int stepNumber, string? boolAddressMode)
+    {
+        var offset = Math.Max(0, (stepNumber - 1) * 2);
+        if (string.Equals(boolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
+        {
+            return parsedAddress.Number - (offset / 16) * 100 - (offset % 16);
+        }
+
+        return parsedAddress.Number - offset;
+    }
+
+    private static int ResolveBoolMr(int baseMr, int offset, string? boolAddressMode)
+    {
+        return string.Equals(boolAddressMode, "block", StringComparison.OrdinalIgnoreCase)
+            ? baseMr + (offset / 16) * 100 + offset % 16
+            : baseMr + offset;
+    }
+
+    private static string FormatWordStepExecAddress(string? activeWord, int stepNumber)
+    {
+        if (stepNumber < 1) stepNumber = 1;
+
+        var bitIndex = stepNumber - 1;
+        var wordOffset = bitIndex / 16;
+        var bit = bitIndex % 16;
+        var word = FormatWordAddress(activeWord, wordOffset);
+        return $"@{word}.{bit}";
+    }
+
+    private static string FormatWordAddress(string? baseWord, int offset)
+    {
+        var value = string.IsNullOrWhiteSpace(baseWord) ? "DM0" : baseWord.Trim().TrimStart('@');
+        var prefixLength = value.TakeWhile(char.IsLetter).Count();
+        var prefix = prefixLength > 0 ? value[..prefixLength].ToUpperInvariant() : "DM";
+        var numberText = value[prefixLength..];
+        var number = int.TryParse(numberText, out var parsed) ? parsed : 0;
+        var width = numberText.Length > 1 ? numberText.Length : 0;
+        var nextNumber = number + offset;
+        return width > 0 ? $"{prefix}{nextNumber.ToString().PadLeft(width, '0')}" : $"{prefix}{nextNumber}";
+    }
+
+    private static string IncrementParsedAddress(StepExecAddress parsedAddress)
+        => parsedAddress.HasBit
+            ? $"@{parsedAddress.Prefix}{parsedAddress.Number}.{parsedAddress.Bit + 1}"
+            : $"@{parsedAddress.Prefix}{parsedAddress.Number + 1}";
+
+    private static bool TryParseStepExecAddress(string? address, DiagramInfo? diagram, out StepExecAddress parsed)
+    {
+        parsed = default;
+        var value = (address ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        var trimmed = value.TrimStart('@');
+        var dotIndex = trimmed.IndexOf('.');
+        var head = dotIndex >= 0 ? trimmed[..dotIndex] : trimmed;
+        var bitText = dotIndex >= 0 ? trimmed[(dotIndex + 1)..] : string.Empty;
+        var prefixLength = head.TakeWhile(char.IsLetter).Count();
+        if (prefixLength <= 0 || prefixLength >= head.Length) return false;
+
+        var prefix = head[..prefixLength].ToUpperInvariant();
+        if (!int.TryParse(head[prefixLength..], out var number)) return false;
+        var hasBit = int.TryParse(bitText, out var bit);
+        var sortValue = ResolveAddressSortValue(prefix, number, hasBit ? bit : 0, diagram);
+        parsed = new StepExecAddress(prefix, number, hasBit, hasBit ? bit : 0, sortValue);
+        return true;
+    }
+
+    private static long ResolveAddressSortValue(string prefix, int number, int bit, DiagramInfo? diagram)
+    {
+        if (string.Equals(prefix, "MR", StringComparison.OrdinalIgnoreCase))
+        {
+            if (diagram?.BaseMr is int baseMr && string.Equals(diagram.BoolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
+            {
+                var relative = number - baseMr;
+                if (relative >= 0)
+                {
+                    return ((long)(relative / 100) * 16) + relative % 100;
+                }
+            }
+
+            return number;
+        }
+
+        return ((long)number * 16) + bit;
+    }
+
+    private readonly record struct StepExecAddress(string Prefix, int Number, bool HasBit, int Bit, long SortValue);
 
 
     private static Step EnrichStepActions(Step step, IList<DeviceVariable> variables, DeviceLibraryRoot library)
@@ -293,6 +445,21 @@ public class UnitConfigGenerator : ICodeGenerator
                             CommandId = commandSource.CommandId,
                             ActionLabel = commandSource.ActionLabel,
                             DriveSignal = commandSource.DriveSignal,
+                            InterlockSignal = commandGroup
+                                .Select(item => item.Source.InterlockSignal)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                            InterlockAddress = commandGroup
+                                .Select(item => item.Source.InterlockAddress)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                            InterlockLabel = commandGroup
+                                .Select(item => item.Source.InterlockLabel)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                            InterlockRequiredState = commandGroup
+                                .Select(item => item.Source.InterlockRequiredState)
+                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                            HasInterlock = commandGroup.Any(item =>
+                                !string.IsNullOrWhiteSpace(item.Source.InterlockSignal)
+                                || !string.IsNullOrWhiteSpace(item.Source.InterlockAddress)),
                             PhysicalOutputRef = commandGroup
                                 .Select(item => item.Binding.PhysicalOutputRef)
                                 .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
@@ -440,7 +607,8 @@ public class UnitConfigGenerator : ICodeGenerator
                         Source = source.SourceExecuteBitRef.ToUpperInvariant(),
                         Done = source.SourceDoneBitRef.ToUpperInvariant(),
                         Action = source.ActionSymbol.ToUpperInvariant(),
-                        Command = source.CommandId.ToUpperInvariant()
+                        Command = source.CommandId.ToUpperInvariant(),
+                        Interlock = source.InterlockSignal.ToUpperInvariant()
                     })
                     .Select(sourceGroup => sourceGroup.First())
                     .ToList()

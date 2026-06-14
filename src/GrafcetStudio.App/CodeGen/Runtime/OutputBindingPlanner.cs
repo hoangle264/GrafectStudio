@@ -86,6 +86,10 @@ public static class OutputBindingPlanner
                     CommandId = binding.CommandId,
                     ActionLabel = binding.ActionLabel,
                     DriveSignal = binding.DriveSignal,
+                    InterlockSignal = binding.InterlockSignal,
+                    InterlockAddress = binding.InterlockAddress,
+                    InterlockLabel = binding.InterlockLabel,
+                    InterlockRequiredState = binding.InterlockRequiredState,
                     FeedbackSignals = binding.FeedbackSignals.ToList()
                 };
 

@@ -49,5 +49,13 @@ public class OutputBindingSource
 
     public string DriveSignal { get; init; } = string.Empty;
 
+    public string InterlockSignal { get; init; } = string.Empty;
+
+    public string InterlockAddress { get; init; } = string.Empty;
+
+    public string InterlockLabel { get; init; } = string.Empty;
+
+    public string InterlockRequiredState { get; init; } = string.Empty;
+
     public IList<FeedbackSignalResult> FeedbackSignals { get; init; } = new List<FeedbackSignalResult>();
 }

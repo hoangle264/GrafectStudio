@@ -1,81 +1,92 @@
 ;{{DeviceLabel}}
 {{#each Commands}}
+;Action
     {{#each FlowCommands}}
         {{#if IsSingle}}
             {{#if IsOrigin}}
-                LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
-                AND {{SourceExecuteBit}} 
-                ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagOrigin}}    ;origin
+AND  {{SourceExecuteBit}} 
+ANB  {{SourceDoneBit}}
             {{else}}
-                LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
-                AND {{SourceExecuteBit}}
-                ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagAuto}}    ;auto
+AND  {{SourceExecuteBit}}
+ANB  {{SourceDoneBit}}
             {{/if}}
         {{else}}
             {{#if IsFirst}}
                 {{#if IsOrigin}}
-                    LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
-                    AND {{SourceExecuteBit}}
-                    ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagOrigin}}    ;origin
+AND  {{SourceExecuteBit}}
+ANB  {{SourceDoneBit}}
                 {{else}}
-                    LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
-                    AND {{SourceExecuteBit}}
-                    ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagAuto}}    ;auto
+AND  {{SourceExecuteBit}}
+ANB  {{SourceDoneBit}}
                 {{/if}}
             {{else}}
                 {{#if IsOrigin}}
-                    LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
-                    AND {{SourceExecuteBit}}
-                    ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagOrigin}}    ;origin
+AND  {{SourceExecuteBit}}
+ANB  {{SourceDoneBit}}
                 {{else}}
-                    LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
-                    AND {{SourceExecuteBit}}
-                    ANB {{SourceExecuteBit}}
+LD   {{../../UnitAddresses.flagAuto}}    ;auto
+AND  {{SourceExecuteBit}}
+ANB  {{SourceDoneBit}}
                 {{/if}}
-                ORL
+ORL
             {{/if}}
         {{/if}} 
     {{/each}}
-    LD {{../UnitAddresses.flagManual}}  ;manual
-    ANF {{../SignalAddresses.SysManCy}}    ;System Manual Cylinder
-    ORL
-    ANB {{../SignalAddresses.LockA}}   ;LockA
-    SET {{PhysicalOutputRef}}   ;{{DeviceLabel}}
-    CON
-    RST NULL
-    action {{ActionLabel}}
-    physical {{PhysicalOutputRef}}
+LD   {{../UnitAddresses.flagManual}}    ;manual
+    {{#if (eq CommandId "CoilA")}}
+ANP  {{../SignalAddresses.SysManCy}}    ;sys man cyl
+    {{else}}
+ANF  {{../SignalAddresses.SysManCy}}    ;sys man cyl
+    {{/if}}
+ORL
+{{#if (eq CommandId "CoilA")}}
+AND  {{../SignalAddresses.LockA}}    ;Lock A
+SET  {{../SignalAddresses.CoilA}}    ;coil A
+CON
+RES  {{../SignalAddresses.CoilB}}    ;coil B
+{{else}}
+AND  {{../SignalAddresses.LockB}}    ;Lock B
+SET  {{../SignalAddresses.CoilB}}    ;coil B
+CON
+RES  {{../SignalAddresses.CoilA}}    ;coil A
+{{/if}}
 ;Error
-LD Disable
-ANB {{FeedbackSignals.PhysicalAddress}} ;Feedback
+{{#if (eq CommandId "CoilA")}}
+LDB  {{../SignalAddresses.DisSnsH}}    ;dis sns high
+AND  {{../SignalAddresses.LSH}}    ;Feedback
 INV
-AND {{PhysicalOutputRef}}
-ONDL #500 ERROr
+AND  {{PhysicalOutputRef}}    ;{{CommandId}}
+ONDL #500 {{../SignalAddresses.ErrorA}}    ;error A
+{{else}}
+LDB  {{../SignalAddresses.DisSnsL}}    ;dis sns low
+AND  {{../SignalAddresses.LSL}}    ;Feedback
+INV
+AND  {{PhysicalOutputRef}}    ;{{CommandId}}
+ONDL #500 {{../SignalAddresses.ErrorB}}    ;error B
+{{/if}}
 ;State
-LD {{PhysicalOutputRef}}
-LD Disable 
-AND Error
-LDB Disable
-AND {{FeedbackSignals.PhysicalAddress}} ;Feedback
+{{#if (eq CommandId "CoilA")}}
+LD   {{PhysicalOutputRef}}      ;{{CommandId}}
+LD   {{../SignalAddresses.DisSnsH}}     ;dis sns high
+AND  {{../SignalAddresses.ErrorA}}      ;error A
+LDB  {{../SignalAddresses.DisSnsH}}     ;dis sns high
+AND  {{../SignalAddresses.LSH}}     ;LSH
 ORL
 ANL
-{{#if (eq CommandId "CoilA")}}
-    SET {{../SignalAddresses.State}}   ;State
+SET  {{../SignalAddresses.State}}       ;state
 {{else}}
-    RST {{../SignalAddresses.State}}   ;State
-{{/if}}
-{{CommandId}} cmd
-{{eq CommandId "CoilA"}} teset
-
-=========
-{{!-- In ra kết quả eq --}}
-eq result: {{eq CommandId "CoilA"}}
-
-{{!-- Dùng trong if --}}
-{{#if (eq CommandId "CoilA")}}
-  MATCH
-{{else}}
-  NO MATCH
+LD   {{PhysicalOutputRef}}  ;{{CommandId}}
+LD   {{../SignalAddresses.DisSnsL}}     ;dis sns low
+AND  {{../SignalAddresses.ErrorB}}      ;error B
+LDB  {{../SignalAddresses.DisSnsL}}     ;dis sns low
+AND  {{../SignalAddresses.LSL}}     ;LSL
+ORL
+ANL
+RES  {{../SignalAddresses.State}}       ;state
 {{/if}}
 {{/each}}
-

@@ -17,6 +17,12 @@ public class ResolvedFlow
 
     public DiagramInfo? diagram { get; init; }
 
+    public string stepMinAddress { get; init; } = string.Empty;
+
+    public string stepMaxAddress { get; init; } = string.Empty;
+
+    public string sequenceEnd { get; init; } = string.Empty;
+
     public IList<ResolvedStep> steps { get; init; } = new List<ResolvedStep>();
 
     public IList<ResolvedStep> resolvedSteps => steps;

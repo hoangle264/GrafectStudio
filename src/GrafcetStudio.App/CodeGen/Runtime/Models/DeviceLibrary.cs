@@ -16,6 +16,18 @@ public class DeviceCommandComplete
     public string? Value { get; init; }
 }
 
+public class DeviceCommandInterlock
+{
+    [JsonPropertyName("signal")]
+    public string Signal { get; init; } = string.Empty;
+
+    [JsonPropertyName("label")]
+    public string Label { get; init; } = string.Empty;
+
+    [JsonPropertyName("requiredState")]
+    public string RequiredState { get; init; } = string.Empty;
+}
+
 public class DeviceCommand
 {
     [JsonPropertyName("actionLabel")]
@@ -26,6 +38,9 @@ public class DeviceCommand
 
     [JsonPropertyName("complete")]
     public DeviceCommandComplete? Complete { get; init; }
+
+    [JsonPropertyName("interlock")]
+    public DeviceCommandInterlock? Interlock { get; init; }
 }
 
 public class DeviceLibraryEntry
