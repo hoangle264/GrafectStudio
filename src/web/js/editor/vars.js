@@ -98,13 +98,7 @@ function gvtSetUnitAddr(cfg, path, value) {
 function gvtGetUnitSigList() {
   const devType = (project.devices||[]).find(d=>d.name==='Unit Station');
   const devSigs = devType ? (devType.signals||[]) : [];
-  console.log('[UnitStationDebug][GlobalVars] signal source', {
-    hasDeviceType: !!devType,
-    deviceSignalCount: devSigs.length,
-    fallbackSignalCount: GVT_UNIT_SIGNALS.length,
-    ids: (devSigs.length ? devSigs : GVT_UNIT_SIGNALS).map(function(sig) { return sig && sig.id; })
-  });
-  if (!devSigs.length) return GVT_UNIT_SIGNALS;
+    if (!devSigs.length) return GVT_UNIT_SIGNALS;
 
   const unitPaths = GVT_UNIT_SIGNALS.reduce(function(map, sig) {
     map[sig.id] = sig.path;
@@ -120,8 +114,8 @@ function gvtGetUnitSigList() {
 function gvtGetSigList(v) {
   const devType = (project.devices||[]).find(d=>d.name===(v.format||''));
   const devSigs = devType ? (devType.signals||[]) : [];
-  const hasCylIds = devSigs.some(s=>s.id&&s.id.startsWith('cyl_'));
-  return (v.format==='Cylinder' && !hasCylIds) ? GVT_CYL_SIGNALS : devSigs;
+  if (v.format === 'Cylinder') return devSigs.length ? devSigs : GVT_CYL_SIGNALS;
+  return devSigs;
 }
 
 function gvtGetExcelSignalAddress(v, sig) {
@@ -150,6 +144,39 @@ function gvtGetExcelSignalAddress(v, sig) {
 }
 
 // ── Compatibility: getVars() dùng bởi actions.js / updateVarDatalist ──
+
+function gvtSetSignalAddress(entry, sig, value) {
+  if (!entry || !sig) return false;
+  if((entry.source === 'imported' || entry.source === 'user') && project.variables && project.variables[entry.bucket] && project.variables[entry.bucket][entry.key]){
+    const rec = project.variables[entry.bucket][entry.key];
+    if(!rec.signalAddresses) rec.signalAddresses={};
+    rec.signalAddresses[sig.id]=value;
+  } else if(entry.source === 'excel' && project.excelVars[entry.key]){
+    if(!project.excelVars[entry.key].signalAddresses) project.excelVars[entry.key].signalAddresses={};
+    project.excelVars[entry.key].signalAddresses[sig.id]=value;
+  } else if(entry.source === 'unit' && project.unitConfig && project.unitConfig[entry.key]) {
+    const cfg = project.unitConfig[entry.key];
+    const isKnownPath = GVT_UNIT_SIGNALS.some(function(unitSig) { return unitSig.path === sig.path; });
+    if (isKnownPath) {
+      gvtSetUnitAddr(cfg, sig.path, value);
+    } else {
+      if (!cfg.signalAddresses) cfg.signalAddresses = {};
+      cfg.signalAddresses[sig.id] = value;
+    }
+  } else {
+    return false;
+  }
+  return true;
+}
+
+function gvtFlushFocusedAddressInput() {
+  const active = document.activeElement;
+  if (!active || typeof active.dispatchEvent !== 'function') return;
+  if (active.classList && (active.classList.contains('vt-sig-addr') || active.classList.contains('addr'))) {
+    active.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
 function getVars() {
   if (typeof ensureProjectVariables === 'function') ensureProjectVariables();
   const imported = (project.variables && project.variables.imported) || [];
@@ -217,22 +244,7 @@ function renderGlobalVarTable() {
   if(!tbody) return;
   tbody.innerHTML = '';
   const entries = gvtGetEntries();
-  console.log('[UnitStationDebug][GlobalVars] entries', {
-    unitConfigCount: Object.keys(project.unitConfig || {}).length,
-    importedUnitCount: ((project.variables && project.variables.imported) || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
-    userUnitCount: ((project.variables && project.variables.user) || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
-    excelUnitCount: (project.excelVars || []).filter(function(v) { return v && v.format === 'Unit Station'; }).length,
-    renderedUnitEntries: entries.filter(function(entry) { return entry && entry.format === 'Unit Station'; }).map(function(entry) {
-      const data = entry.data || {};
-      return {
-        source: entry.source,
-        label: data.label || entry.label || entry.key,
-        signalAddressCount: Object.keys(data.signalAddresses || {}).length,
-        signalAddressKeys: Object.keys(data.signalAddresses || {})
-      };
-    })
-  });
-  const filter = (document.getElementById('gvt-search')?.value||'').toLowerCase();
+    const filter = (document.getElementById('gvt-search')?.value||'').toLowerCase();
   const filtered = entries.filter(v=>
     !filter ||
     (v.label||'').toLowerCase().includes(filter) ||
@@ -323,6 +335,11 @@ function renderGlobalVarTable() {
       // Ngăn propagation khi đang gõ (tránh trigger event ngoài)
       addrInput.addEventListener('input', function(e) {
         e.stopPropagation();
+        const hit = gvtResolveEntry(entry.source, String(entry.key));
+        if(hit.item) {
+          hit.item.address = this.value;
+          saveProject();
+        }
       });
 
       tdTog.appendChild(addrInput);
@@ -366,27 +383,16 @@ function renderGlobalVarTable() {
         addrInp.className='vt-cell addr vt-sig-addr';
         addrInp.value=entry.source === 'unit' ? gvtGetUnitAddr(v, sig.path) : gvtGetExcelSignalAddress(v, sig);
         addrInp.placeholder=sig.varType==='Input'?'MR…':sig.varType==='Output'?'LR…':'MR…';
-        addrInp.addEventListener('change',function(){
-          if((entry.source === 'imported' || entry.source === 'user') && project.variables && project.variables[entry.bucket] && project.variables[entry.bucket][entry.key]){
-            const rec = project.variables[entry.bucket][entry.key];
-            if(!rec.signalAddresses) rec.signalAddresses={};
-            rec.signalAddresses[sig.id]=addrInp.value;
-          } else if(entry.source === 'excel' && project.excelVars[entry.key]){
-            if(!project.excelVars[entry.key].signalAddresses) project.excelVars[entry.key].signalAddresses={};
-            project.excelVars[entry.key].signalAddresses[sig.id]=addrInp.value;
-          } else if(entry.source === 'unit' && project.unitConfig && project.unitConfig[entry.key]) {
-            const cfg = project.unitConfig[entry.key];
-            const isKnownPath = GVT_UNIT_SIGNALS.some(function(unitSig) { return unitSig.path === sig.path; });
-            if (isKnownPath) {
-              gvtSetUnitAddr(cfg, sig.path, addrInp.value);
-            } else {
-              if (!cfg.signalAddresses) cfg.signalAddresses = {};
-              cfg.signalAddresses[sig.id] = addrInp.value;
-            }
-          }
+        function commitSignalAddress() {
+          if (!gvtSetSignalAddress(entry, sig, addrInp.value)) return;
           saveProject();
           if(typeof updateVarDatalist==='function') updateVarDatalist();
+        }
+        addrInp.addEventListener('input', function(e) {
+          e.stopPropagation();
+          commitSignalAddress();
         });
+        addrInp.addEventListener('change', commitSignalAddress);
         tdSAddr.appendChild(addrInp);
         subTr.appendChild(tdSAddr);
         tbody.appendChild(subTr);

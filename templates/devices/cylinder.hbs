@@ -1,38 +1,81 @@
-// Demo cylinder output partial
-// Loaded as: templates/devices/cylinder.hbs -> partial device_cylinder / template uc.deviceCylinder
-// Expected context: one DeviceOutputGroup item from BuildContext(payload).deviceOutputGroups
-
-// -----------------------------------------------------------------------------
-// Cylinder: {{DeviceLabel}}
-// Format  : {{DeviceFormat}}
-// Base    : {{Address}}
-// -----------------------------------------------------------------------------
-
+;{{DeviceLabel}}
 {{#each Commands}}
-// Command {{CommandId}} - {{ActionLabel}}
-// Output  : {{PhysicalOutputRef}}
-// Mode    : {{AggregationMode}}
-{{PhysicalOutputRef}} := FALSE
-{{#each OriginFlows}}
-// Origin flow: {{Name}}
-{{#each Commands}}
-    OR {{SourceExecuteBit}}
-{{/each}}
-{{/each}}
-{{#each AutoFlows}}
-// Auto flow: {{Name}}
-{{#each Commands}}
-    OR {{SourceExecuteBit}}
-{{/each}}
-{{/each}}
-;
+    {{#each FlowCommands}}
+        {{#if IsSingle}}
+            {{#if IsOrigin}}
+                LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
+                AND {{SourceExecuteBit}} 
+                ANB {{SourceExecuteBit}}
+            {{else}}
+                LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
+                AND {{SourceExecuteBit}}
+                ANB {{SourceExecuteBit}}
+            {{/if}}
+        {{else}}
+            {{#if IsFirst}}
+                {{#if IsOrigin}}
+                    LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
+                    AND {{SourceExecuteBit}}
+                    ANB {{SourceExecuteBit}}
+                {{else}}
+                    LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
+                    AND {{SourceExecuteBit}}
+                    ANB {{SourceExecuteBit}}
+                {{/if}}
+            {{else}}
+                {{#if IsOrigin}}
+                    LD {{../unit.variable.signalAddresses.flagOrigin}}  ;origin
+                    AND {{SourceExecuteBit}}
+                    ANB {{SourceExecuteBit}}
+                {{else}}
+                    LD {{../unit.variable.signalAddresses.flagAuto}}  ;auto
+                    AND {{SourceExecuteBit}}
+                    ANB {{SourceExecuteBit}}
+                {{/if}}
+                ORL
+            {{/if}}
+        {{/if}} 
+    {{/each}}
+    LD {{../UnitAddresses.flagManual}}  ;manual
+    ANF {{../SignalAddresses.SysManCy}}    ;System Manual Cylinder
+    ORL
+    ANB {{../SignalAddresses.LockA}}   ;LockA
+    SET {{PhysicalOutputRef}}   ;{{DeviceLabel}}
+    CON
+    RST NULL
+    action {{ActionLabel}}
+    physical {{PhysicalOutputRef}}
+;Error
+LD Disable
+ANB {{FeedbackSignals.PhysicalAddress}} ;Feedback
+INV
+AND {{PhysicalOutputRef}}
+ONDL #500 ERROr
+;State
+LD {{PhysicalOutputRef}}
+LD Disable 
+AND Error
+LDB Disable
+AND {{FeedbackSignals.PhysicalAddress}} ;Feedback
+ORL
+ANL
+{{#if (eq CommandId "CoilA")}}
+    SET {{../SignalAddresses.State}}   ;State
+{{else}}
+    RST {{../SignalAddresses.State}}   ;State
+{{/if}}
+{{CommandId}} cmd
+{{eq CommandId "CoilA"}} teset
 
-{{#each FeedbackSignals}}
-// Feedback {{SignalName}} {{#if Label}}({{Label}}){{/if}}: {{PhysicalAddress}}
-{{/each}}
+=========
+{{!-- In ra kết quả eq --}}
+eq result: {{eq CommandId "CoilA"}}
+
+{{!-- Dùng trong if --}}
+{{#if (eq CommandId "CoilA")}}
+  MATCH
+{{else}}
+  NO MATCH
+{{/if}}
 {{/each}}
 
-// Signal map
-{{#each Signals}}
-// {{name}} : {{address}} {{#if comment}}// {{comment}}{{/if}}
-{{/each}}

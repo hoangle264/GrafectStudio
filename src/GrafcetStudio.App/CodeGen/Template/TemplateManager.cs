@@ -65,9 +65,10 @@ public class TemplateManager
             writer.WriteSafeString(value.PadRight(12));
         });
 
-        _handlebars.RegisterHelper("eq", (writer, context, parameters) =>
+        _handlebars.RegisterHelper("eq", (context, arguments) =>
         {
-            writer.WriteSafeString(parameters.Length >= 2 && Equals(parameters[0], parameters[1]) ? "true" : "false");
+            if (arguments.Length < 2) return false;
+            return Equals(arguments[0], arguments[1]);
         });
 
         _handlebars.RegisterHelper("padStart2", (writer, context, parameters) =>
@@ -192,5 +193,3 @@ public class TemplateManager
         return new TemplateHealth { Entries = entries };
     }
 }
-
-

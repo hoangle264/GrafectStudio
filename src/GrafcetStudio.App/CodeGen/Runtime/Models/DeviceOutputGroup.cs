@@ -20,9 +20,17 @@ public class DeviceCommandOutput
 
     public IList<string> SourceDoneBitRefs { get; init; } = new List<string>();
 
-    public IList<DeviceCommandFlowOutput> OriginFlows { get; init; } = new List<DeviceCommandFlowOutput>();
+    public IList<DeviceCommandFlowOutput> FlowCommands { get; init; } = new List<DeviceCommandFlowOutput>();
 
-    public IList<DeviceCommandFlowOutput> AutoFlows { get; init; } = new List<DeviceCommandFlowOutput>();
+    public int FlowCommandCount { get; init; }
+
+    public int OriginCommandCount { get; init; }
+
+    public int AutoCommandCount { get; init; }
+
+    public bool HasOriginCommands { get; init; }
+
+    public bool HasAutoCommands { get; init; }
 
     public IList<FeedbackSignalResult> FeedbackSignals { get; init; } = new List<FeedbackSignalResult>();
 }
@@ -33,11 +41,12 @@ public class DeviceCommandFlowOutput
 
     public string Name { get; init; } = string.Empty;
 
-    public IList<DeviceCommandFlowBitOutput> Commands { get; init; } = new List<DeviceCommandFlowBitOutput>();
-}
+    public string FlowType { get; init; } = string.Empty;
 
-public class DeviceCommandFlowBitOutput
-{
+    public bool IsOrigin { get; init; }
+
+    public bool IsAuto { get; init; }
+
     public string CommandId { get; init; } = string.Empty;
 
     public string ActionLabel { get; init; } = string.Empty;
@@ -47,6 +56,18 @@ public class DeviceCommandFlowBitOutput
     public string SourceExecuteBit { get; init; } = string.Empty;
 
     public string SourceDoneBit { get; init; } = string.Empty;
+
+    public int Index { get; init; }
+
+    public int Number { get; init; }
+
+    public int TotalCount { get; init; }
+
+    public bool IsFirst { get; init; }
+
+    public bool IsLast { get; init; }
+
+    public bool IsSingle { get; init; }
 }
 
 public class DeviceOutputGroup

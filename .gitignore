@@ -42,3 +42,7 @@ _ReSharper*/
 
 # Node.js
 node_modules/
+
+#template
+templates/
+config/

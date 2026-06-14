@@ -371,6 +371,7 @@ function cgValidateUnitAddressConfig(unitDiagrams) {
 }
 
 function cgBuildCSharpPayload(platform, unitId) {
+  if (typeof gvtFlushFocusedAddressInput === 'function') gvtFlushFocusedAddressInput();
   if (activeDiagramId && typeof flushState === 'function') flushState();
   if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function' && syncVariableSignalAddressesFromDeviceTypes()) {
     if (typeof saveProject === 'function') saveProject();
@@ -449,12 +450,7 @@ function cgGetCSharpDeviceTypes() {
     });
   });
   const unitDevice = deviceTypes.find(deviceType => deviceType && deviceType.name === 'Unit Station');
-  console.log('[UnitStationDebug][Payload] device type', {
-    hasDeviceType: !!unitDevice,
-    signalCount: ((unitDevice && unitDevice.signals) || []).length,
-    signals: ((unitDevice && unitDevice.signals) || []).map(sig => ({ id: sig.id, name: sig.name }))
-  });
-  return deviceTypes;
+    return deviceTypes;
 }
 
 function cgBuildCSharpUnitPayload(platform, unitId) {
@@ -513,18 +509,33 @@ function cgNormalizeFlowType(mode) {
   return value === 'origin' ? 'origin' : 'auto';
 }
 
+
+function cgGetCylinderSignalAddress(rawAddresses, sig) {
+  const key = String((sig && sig.name) || (sig && sig.id) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const byStructName = rawAddresses[(sig && sig.name) || ''];
+  if (byStructName) return byStructName;
+  if (key === 'lsh') return rawAddresses.LSH || rawAddresses.cyl_lsh || '';
+  if (key === 'lsl') return rawAddresses.LSL || rawAddresses.cyl_lsl || '';
+  if (key === 'locka') return rawAddresses.LockA || rawAddresses.cyl_lockA || '';
+  if (key === 'lockb') return rawAddresses.LockB || rawAddresses.cyl_lockB || '';
+  if (key === 'dissnslsh' || key === 'dissnsh') return rawAddresses.DisSnsLSH || rawAddresses.DisSnsH || rawAddresses.cyl_disSnsH || '';
+  if (key === 'dissnslsl' || key === 'dissnsl') return rawAddresses.DisSnsLSL || rawAddresses.DisSnsL || rawAddresses.cyl_disSnsL || '';
+  if (key === 'state') return rawAddresses.State || rawAddresses.cyl_state || '';
+  if (key === 'errora' || key === 'erra') return rawAddresses.ErrorA || rawAddresses.ErrA || rawAddresses.cyl_errA || '';
+  if (key === 'errorb' || key === 'errb') return rawAddresses.ErrorB || rawAddresses.ErrB || rawAddresses.cyl_errB || '';
+  if (key === 'coila') return rawAddresses.CoilA || rawAddresses.cyl_coilA || '';
+  if (key === 'coilb') return rawAddresses.CoilB || rawAddresses.cyl_coilB || '';
+  if (key === 'hmimanbtn' || key === 'hmiman') return rawAddresses.HmiManBtn || rawAddresses.HmiMan || rawAddresses.cyl_hmiMan || '';
+  return rawAddresses[(sig && sig.id) || ''] || '';
+}
+
 function cgGetCSharpSignalAddresses(v) {
   const format = v && (v.format || v.dataType || '');
   const deviceType = ((project && project.devices) || []).find(d => d && d.name === format);
   const rawAddresses = (v && v.signalAddresses) || {};
   if (!deviceType || !Array.isArray(deviceType.signals)) {
     if (format === 'Unit Station') {
-      console.log('[UnitStationDebug][Payload] no device type for variable', {
-        label: v && v.label,
-        rawAddressCount: Object.keys(rawAddresses).length,
-        rawAddressKeys: Object.keys(rawAddresses)
-      });
-    }
+          }
     return Object.assign({}, rawAddresses);
   }
 
@@ -532,42 +543,39 @@ function cgGetCSharpSignalAddresses(v) {
   deviceType.signals.forEach(sig => {
     const normalized = cgNormalizeCSharpSignal(deviceType.name, sig);
     if (!normalized.id) return;
-    const addr = rawAddresses[normalized.name] || rawAddresses[sig && sig.name] || rawAddresses[sig && sig.id];
+    const addr = format === 'Cylinder'
+      ? cgGetCylinderSignalAddress(rawAddresses, normalized)
+      : (rawAddresses[normalized.name] || rawAddresses[sig && sig.name] || rawAddresses[sig && sig.id]);
     signalAddresses[normalized.id] = addr || '';
   });
   if (format === 'Unit Station') {
-    console.log('[UnitStationDebug][Payload] signal addresses from variable', {
-      label: v && v.label,
-      deviceSignalCount: (deviceType.signals || []).length,
-      rawAddressCount: Object.keys(rawAddresses).length,
-      rawAddressKeys: Object.keys(rawAddresses),
-      payloadAddressCount: Object.keys(signalAddresses).length,
-      payloadAddressKeys: Object.keys(signalAddresses),
-      addresses: signalAddresses
-    });
-  }
+      }
   return signalAddresses;
 }
 
 function cgGetCSharpVariables(diagramState) {
   const vars = [];
   const seen = new Set();
-  const add = function(v) {
-    if (!v || !v.label || seen.has(v.label)) return;
-    seen.add(v.label);
+  const add = function(v, source) {
+    if (!v || !v.label) return;
+    const signalAddresses = cgGetCSharpSignalAddresses(v);
+    if (seen.has(v.label)) {
+            return;
+    }
+        seen.add(v.label);
     vars.push({
       label: v.label,
       format: v.format || v.dataType || '',
       address: v.address || null,
-      signalAddresses: cgGetCSharpSignalAddresses(v)
+      signalAddresses: signalAddresses
     });
   };
 
-  (diagramState.vars || []).forEach(add);
+  (diagramState.vars || []).forEach(v => add(v, 'diagramState.vars'));
   if (typeof ensureProjectVariables === 'function') {
     const grouped = ensureProjectVariables();
-    (grouped.imported || []).forEach(add);
-    (grouped.user || []).forEach(add);
+    (grouped.imported || []).forEach(v => add(v, 'project.variables.imported'));
+    (grouped.user || []).forEach(v => add(v, 'project.variables.user'));
   }
   Object.keys((project && project.unitConfig) || {}).forEach(key => {
     const cfg = project.unitConfig[key] || {};
@@ -577,23 +585,10 @@ function cgGetCSharpVariables(diagramState) {
       const addr = sig.path.split('.').reduce((cur, part) => cur && cur[part] != null ? cur[part] : '', cfg) || '';
       if (addr) signalAddresses[sig.id] = addr;
     });
-    console.log('[UnitStationDebug][Payload] unitConfig variable candidate', {
-      key,
-      label: cfg.label || key,
-      nestedPathAddressCount: Object.keys(signalAddresses).length,
-      signalAddressKeys: Object.keys(signalAddresses),
-      signalAddresses
-    });
-    add({ label: cfg.label || key, format: 'Unit Station', address: null, signalAddresses });
+        add({ label: cfg.label || key, format: 'Unit Station', address: null, signalAddresses }, 'project.unitConfig');
   });
-  (project.excelVars || []).forEach(add);
-  console.log('[UnitStationDebug][Payload] variables final', vars.filter(v => v && v.format === 'Unit Station').map(v => ({
-    label: v.label,
-    signalAddressCount: Object.keys(v.signalAddresses || {}).length,
-    signalAddressKeys: Object.keys(v.signalAddresses || {}),
-    signalAddresses: v.signalAddresses || {}
-  })));
-  return vars;
+  (project.excelVars || []).forEach(v => add(v, 'project.excelVars'));
+    return vars;
 }
 
 function cgGenerateSelectedUnit() {

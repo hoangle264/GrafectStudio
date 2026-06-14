@@ -284,6 +284,10 @@ public class UnitConfigGenerator : ICodeGenerator
                         var commandSource = commandGroup.Select(item => item.Source).First();
                         var commandBindings = commandGroup.Select(item => item.Binding);
 
+                        var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source));
+                        var originCommandCount = flowCommands.Count(command => command.IsOrigin);
+                        var autoCommandCount = flowCommands.Count(command => command.IsAuto);
+
                         return new DeviceCommandOutput
                         {
                             CommandId = commandSource.CommandId,
@@ -310,8 +314,12 @@ public class UnitConfigGenerator : ICodeGenerator
                                 .Where(value => !string.IsNullOrWhiteSpace(value))
                                 .Distinct(StringComparer.OrdinalIgnoreCase)
                                 .ToList(),
-                            OriginFlows = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), "origin"),
-                            AutoFlows = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), "auto"),
+                            FlowCommands = flowCommands,
+                            FlowCommandCount = flowCommands.Count,
+                            OriginCommandCount = originCommandCount,
+                            AutoCommandCount = autoCommandCount,
+                            HasOriginCommands = originCommandCount > 0,
+                            HasAutoCommands = autoCommandCount > 0,
                             FeedbackSignals = commandGroup
                                 .SelectMany(item => item.Source.FeedbackSignals)
                                 .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
@@ -347,37 +355,57 @@ public class UnitConfigGenerator : ICodeGenerator
     }
 
 
-    private static IList<DeviceCommandFlowOutput> BuildCommandFlowOutputs(IEnumerable<OutputBindingSource> sources, string flowType)
+    private static IList<DeviceCommandFlowOutput> BuildCommandFlowOutputs(IEnumerable<OutputBindingSource> sources)
     {
-        return sources
-            .Where(source => string.Equals(source.FlowType, flowType, StringComparison.OrdinalIgnoreCase))
-            .GroupBy(source => $"{source.FlowId}\u001F{source.FlowName}", StringComparer.OrdinalIgnoreCase)
-            .Select(flowGroup => new DeviceCommandFlowOutput
+        var commands = sources
+            .Where(source => !string.IsNullOrWhiteSpace(source.SourceExecuteBitRef) || !string.IsNullOrWhiteSpace(source.SourceDoneBitRef))
+            .GroupBy(source => $"{source.FlowType}\u001F{source.FlowId}\u001F{source.FlowName}\u001F{source.CommandId}\u001F{source.ActionLabel}\u001F{source.SourceStep}\u001F{source.SourceExecuteBitRef}\u001F{source.SourceDoneBitRef}", StringComparer.OrdinalIgnoreCase)
+            .Select(commandGroup =>
             {
-                Id = flowGroup.First().FlowId,
-                Name = flowGroup.First().FlowName,
-                Commands = flowGroup
-                    .Where(source => !string.IsNullOrWhiteSpace(source.SourceExecuteBitRef) || !string.IsNullOrWhiteSpace(source.SourceDoneBitRef))
-                    .GroupBy(source => $"{source.CommandId}\u001F{source.ActionLabel}\u001F{source.SourceStep}\u001F{source.SourceExecuteBitRef}\u001F{source.SourceDoneBitRef}", StringComparer.OrdinalIgnoreCase)
-                    .Select(commandGroup =>
-                    {
-                        var source = commandGroup.First();
-                        return new DeviceCommandFlowBitOutput
-                        {
-                            CommandId = source.CommandId,
-                            ActionLabel = source.ActionLabel,
-                            SourceStep = source.SourceStep,
-                            SourceExecuteBit = source.SourceExecuteBitRef,
-                            SourceDoneBit = source.SourceDoneBitRef
-                        };
-                    })
-                    .OrderBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(command => command.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
-                    .ToList()
+                var source = commandGroup.First();
+                var flowType = string.Equals(source.FlowType, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
+
+                return new DeviceCommandFlowOutput
+                {
+                    Id = source.FlowId,
+                    Name = source.FlowName,
+                    FlowType = flowType,
+                    IsOrigin = string.Equals(flowType, "origin", StringComparison.OrdinalIgnoreCase),
+                    IsAuto = string.Equals(flowType, "auto", StringComparison.OrdinalIgnoreCase),
+                    CommandId = source.CommandId,
+                    ActionLabel = source.ActionLabel,
+                    SourceStep = source.SourceStep,
+                    SourceExecuteBit = source.SourceExecuteBitRef,
+                    SourceDoneBit = source.SourceDoneBitRef
+                };
             })
-            .Where(flow => flow.Commands.Count > 0)
-            .OrderBy(flow => flow.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(flow => flow.Id, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(command => command.IsAuto)
+            .ThenBy(command => command.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(command => command.Id, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(command => command.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return commands
+            .Select((command, index) => new DeviceCommandFlowOutput
+            {
+                Id = command.Id,
+                Name = command.Name,
+                FlowType = command.FlowType,
+                IsOrigin = command.IsOrigin,
+                IsAuto = command.IsAuto,
+                CommandId = command.CommandId,
+                ActionLabel = command.ActionLabel,
+                SourceStep = command.SourceStep,
+                SourceExecuteBit = command.SourceExecuteBit,
+                SourceDoneBit = command.SourceDoneBit,
+                Index = index,
+                Number = index + 1,
+                TotalCount = commands.Count,
+                IsFirst = index == 0,
+                IsLast = index == commands.Count - 1,
+                IsSingle = commands.Count == 1
+            })
             .ToList();
     }
     private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
