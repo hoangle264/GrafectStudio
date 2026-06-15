@@ -1,5 +1,13 @@
 {
   "dependencies": {
     "@openai/codex-sdk": "^0.133.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:ts": "tsc",
+    "build": "npm run build:ts"
   }
 }
