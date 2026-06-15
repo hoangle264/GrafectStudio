@@ -58,47 +58,51 @@ P10 — Architecture Review
 - Verification run: `npm.cmd run typecheck`, `npm.cmd run build:ts`, `npm.cmd run build`, `node --check src/web/js/core/interop.js`, `node --check src/web/js/core/utils.js`, `node --check src/web/js/codegen/modal.js`, and `dotnet build src\GrafcetStudio.App\GrafcetStudio.App.csproj -v:minimal`.
 
 ### P1 — Foundation Types
-- [ ] Create `types/project.ts`.
-- [ ] Define core app types: `Project`, `Unit`, `DiagramMeta`, `DiagramState`, `Step`, `Transition`, `Connection`, `StepAction`.
-- [ ] Define device/variable types: `DeviceType`, `DeviceSignal`, `DeviceVariable`, `ProjectVariable`, `ProjectVariables`.
-- [ ] Define config/import types: `FlowInfo`, `AppConfig`, `UnitConfig`, `IOMapping`, `PhysicalIO`, `IOMappingEntry`.
-- [ ] Align payload-facing types with C# models without losing JS/localStorage fields.
-- [ ] Run TypeScript typecheck.
+- [x] Create `types/project.ts`.
+- [x] Define core app types: `Project`, `Unit`, `DiagramMeta`, `DiagramState`, `Step`, `Transition`, `Connection`, `StepAction`.
+- [x] Define device/variable types: `DeviceType`, `DeviceSignal`, `DeviceVariable`, `ProjectVariable`, `ProjectVariables`.
+- [x] Define config/import types: `FlowInfo`, `AppConfig`, `UnitConfig`, `IOMapping`, `PhysicalIO`, `IOMappingEntry`.
+- [x] Align payload-facing types with C# models without losing JS/localStorage fields.
+- [x] Run TypeScript typecheck.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/types/project.ts` with project, payload, config, and IO mapping definitions that preserve legacy JS/localStorage fields.
+- Verification: `npm.cmd run typecheck` passed.
 
 ### P2 — Codegen Payload
-- [ ] Extract codegen payload logic from `codegen/modal.js` into `codegen/payload.ts`.
-- [ ] Export `buildCSharpPayload`, `buildCSharpFlow`, `buildCSharpUnitPayload`, `validateUnitAddressConfig`, `resolveStepAddress`.
-- [ ] Move required helpers with the payload builder: word/MR address formatting, flow range validation, signal normalization, variable collection.
-- [ ] Keep `modal.js` responsible for DOM, host bridge calls, `flushState`, `saveProject`, preview, copy/download, and path browsing.
-- [ ] Expose compiled payload API through a global bridge for `modal.js`.
-- [ ] Verify generated C# payload shape still matches `CodegenPayload.cs`.
+- [x] Extract codegen payload logic from `codegen/modal.js` into `codegen/payload.ts`.
+- [x] Export `buildCSharpPayload`, `buildCSharpFlow`, `buildCSharpUnitPayload`, `validateUnitAddressConfig`, `resolveStepAddress`.
+- [x] Move required helpers with the payload builder: word/MR address formatting, flow range validation, signal normalization, variable collection.
+- [x] Keep `modal.js` responsible for DOM, host bridge calls, `flushState`, `saveProject`, preview, copy/download, and path browsing.
+- [x] Expose compiled payload API through a global bridge for `modal.js`.
+- [x] Verify generated C# payload shape still matches `CodegenPayload.cs`.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/codegen/payload.ts` and compiled `src/web/js/codegen/payload.js`; `modal.js` now delegates payload building through `GrafcetStudioInterop`.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/codegen/payload.js`, `node --check src/web/js/codegen/modal.js`, and `dotnet build src\GrafcetStudio.App\GrafcetStudio.App.csproj -v:minimal` passed.
 
 ### P3 — Excel Import Parser
-- [ ] Extract CSV parsing from `editor/excel-import.js` into `editor/excel-import.ts`.
-- [ ] Export `parseCSV`, `parseUnitCSV`, `parseStructCSV`, `parsePhysicalIOCSV`.
-- [ ] Make parser functions return data/results instead of directly rendering UI.
-- [ ] Keep modal DOM, file input, toast, save, render, and project mutation in JS wrapper.
-- [ ] Verify unit config, struct variables, and physical IO imports still behave as before.
+- [x] Extract CSV parsing from `editor/excel-import.js` into `editor/excel-import.ts`.
+- [x] Export `parseCSV`, `parseUnitCSV`, `parseStructCSV`, `parsePhysicalIOCSV`.
+- [x] Make parser functions return data/results instead of directly rendering UI.
+- [x] Keep modal DOM, file input, toast, save, render, and project mutation in JS wrapper.
+- [x] Verify unit config, struct variables, and physical IO imports still behave as before.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/editor/excel-import.ts` parser bridge and moved the legacy UI/project wrapper to `src/web/js/editor/excel-import-ui.js`.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/editor/excel-import.js`, and `node --check src/web/js/editor/excel-import-ui.js` passed.
 
 ### P4 — Store Helpers + Persistence
-- [ ] Extract low-risk store helpers into `core/store.ts`.
-- [ ] Include `ensureProjectVariables`, `upsertProjectVariable`, `normalizeVariableRecord`, `syncStructData`, `findNextAvailableBaseMr`, `ensureFlowAddressConfig`, `migrateFlowAddressConfigs`.
-- [ ] Keep `project`, `openTabs`, and `activeDiagramId` global ownership stable during this phase.
-- [ ] Extract persistence to `core/store-persistence.ts` only after helper extraction is stable.
-- [ ] Keep `saveProject`, `loadDiagramData`, `saveDiagramData`, `deleteDiagramData` backward compatible.
-- [ ] Verify existing localStorage projects still load and migrate correctly.
+- [x] Extract low-risk store helpers into `core/store.ts`.
+- [x] Include `ensureProjectVariables`, `upsertProjectVariable`, `normalizeVariableRecord`, `syncStructData`, `findNextAvailableBaseMr`, `ensureFlowAddressConfig`, `migrateFlowAddressConfigs`.
+- [x] Keep `project`, `openTabs`, and `activeDiagramId` global ownership stable during this phase.
+- [x] Extract persistence to `core/store-persistence.ts` only after helper extraction is stable.
+- [x] Keep `saveProject`, `loadDiagramData`, `saveDiagramData`, `deleteDiagramData` backward compatible.
+- [x] Verify existing localStorage projects still load and migrate correctly.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/core/store.ts` helper bridge and `src/web/ts/core/store-persistence.ts`; compiled JS keeps legacy global function names and state ownership in `store.js`.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/core/store.js`, `node --check src/web/js/core/store-persistence.js`, and a Node VM localStorage migration smoke test passed.
 
 ### P5 — Tree Logic
 - [ ] Extract non-DOM tree mutations from `editor/tree.js` into `editor/tree.ts`.
@@ -172,6 +176,7 @@ P10 — Architecture Review
 - [x] Run JS syntax checks for touched compiled/legacy JS files.
 - [ ] Run `dotnet build src/GrafcetStudio.App/GrafcetStudio.App.csproj -v:minimal` after payload-related changes.
 - [ ] Manually verify WebView/browser startup after P0, P2, P4, and P8.
+- [x] Run automated localStorage migration smoke test after P4.
 - [ ] Manually verify codegen, CSV import, project load/save, tree operations, vars/IO mapping, table export, and canvas drag behavior.
 - [ ] Re-run targeted checks after P9 cleanup to confirm no runtime bridge/global usage was removed incorrectly.
 
@@ -180,6 +185,8 @@ P10 — Architecture Review
 - Completed work is tracked by changing `[ ]` to `[x]` in `plan.md`.
 - The migration preserves the current global-script runtime first, not immediately converting the whole app to ES modules.
 - Existing `WORKPLAN.md` is not modified unless explicitly requested.
+
+
 
 
 

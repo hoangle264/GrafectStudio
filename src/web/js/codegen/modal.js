@@ -268,329 +268,46 @@ function cgGetSelectedDiagramIds() {
 }
 
 
-function parseWordAddress(address) {
-  const match = String(address || '').trim().match(/^([A-Za-z]+)(\d+)$/);
-  if (!match) throw new Error('Invalid word address: ' + address);
-  return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+function cgGetPayloadApi() {
+  return window.GrafcetStudio && window.GrafcetStudio.codegenPayload;
 }
 
-function formatWordAddress(base, offset) {
-  const parsed = parseWordAddress(base);
-  const next = parsed.number + offset;
-  const numberText = parsed.width > 1 ? String(next).padStart(parsed.width, '0') : String(next);
-  return parsed.prefix + numberText;
-}
-
-function formatMrAddress(number) {
-  return '@MR' + Number(number);
-}
-
-function resolveBoolMr(baseMr, offset, boolAddressMode) {
-  const base = Number(baseMr || 0);
-  if (normalizeBoolAddressMode(boolAddressMode) === 'block') {
-    return base + Math.floor(offset / 16) * 100 + (offset % 16);
-  }
-  return base + offset;
-}
-
-function resolveStepAddress(step, flow) {
-  const stepNumber = Number(step && step.number);
-  if (!Number.isInteger(stepNumber) || stepNumber < 1) {
-    throw new Error('Step number must be an integer >= 1');
-  }
-
-  const mode = String((flow && flow.addressMode) || 'bool').toLowerCase();
-  if (mode === 'word') {
-    if (stepNumber > 32) throw new Error('Word address mode supports at most 32 steps per flow');
-    const bitIndex = stepNumber - 1;
-    const wordOffset = Math.floor(bitIndex / 16);
-    const bit = bitIndex % 16;
-    return {
-      execAddress: '@' + formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
-      doneAddress: '@' + formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
-    };
-  }
-
-  const pairOffset = (stepNumber - 1) * 2;
+function cgBuildPayloadContext() {
   return {
-    execAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset, flow.boolAddressMode)),
-    doneAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset + 1, flow.boolAddressMode))
+    project,
+    loadDiagramData,
+    getAssets: cgGetCodegenAssets,
+    ensureFlowAddressConfig: typeof ensureFlowAddressConfig === 'function' ? ensureFlowAddressConfig : undefined,
+    ensureProjectVariables: typeof ensureProjectVariables === 'function' ? ensureProjectVariables : undefined,
+    syncVariableSignalAddressesFromDeviceTypes: typeof syncVariableSignalAddressesFromDeviceTypes === 'function' ? syncVariableSignalAddressesFromDeviceTypes : undefined,
+    saveProject: typeof saveProject === 'function' ? saveProject : undefined,
+    getDefaultUnitId: cgGetDefaultUnitId,
+    unitSignals: typeof GVT_UNIT_SIGNALS !== 'undefined' ? GVT_UNIT_SIGNALS : [],
+    projectUnitStructSignals: typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined' ? PROJECT_UNIT_STRUCT_SIGNALS : []
   };
 }
 
-function cgGetFlowAddressRange(flow, steps) {
-  if (!flow || flow.addressMode !== 'bool') return null;
-  const maxStepNumber = (steps || []).reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
-  const start = Number(flow.baseMr || 0);
-  return { start, end: start + Math.max(1, maxStepNumber) * 2 - 1 };
-}
-
-function cgValidateStepNumbers(steps, flowName) {
-  const seen = new Set();
-  (steps || []).forEach(function(step) {
-    const n = Number(step.number);
-    if (!Number.isInteger(n) || n < 1) throw new Error('Flow "' + flowName + '" has a step.number that is not >= 1.');
-    if (seen.has(n)) throw new Error('Flow "' + flowName + '" has duplicate step.number ' + n + '.');
-    seen.add(n);
-  });
+function resolveStepAddress(step, flow) {
+  return cgGetPayloadApi().resolveStepAddress(step, flow);
 }
 
 function cgValidateUnitAddressConfig(unitDiagrams) {
-  const boolFlows = [];
-  const usedWords = new Map();
-  (unitDiagrams || []).forEach(function(diag) {
-    if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(diag, true);
-    const data = loadDiagramData(diag.id);
-    const steps = ((data && data.state && data.state.steps) || []);
-    cgValidateStepNumbers(steps, diag.name || diag.id);
-
-    if (diag.addressMode === 'word') {
-      if (steps.some(step => Number(step.number) > 32)) {
-        throw new Error('Flow "' + (diag.name || diag.id) + '" uses word mode but has step.number > 32.');
-      }
-      const maxStepNumber = steps.reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
-      const wordCount = maxStepNumber > 16 ? 2 : 1;
-      [diag.activeWord || 'DM0', diag.completeWord || 'DM100'].forEach(function(word) {
-        for (let offset = 0; offset < wordCount; offset++) {
-          const key = formatWordAddress(word, offset).toUpperCase();
-          if (usedWords.has(key)) throw new Error('Word address ' + key + ' is used by both "' + usedWords.get(key) + '" and "' + (diag.name || diag.id) + '".');
-          usedWords.set(key, diag.name || diag.id);
-        }
-      });
-      return;
-    }
-
-    const range = cgGetFlowAddressRange(diag, steps);
-    boolFlows.forEach(function(existing) {
-      if (range && existing.range && range.start <= existing.range.end && existing.range.start <= range.end) {
-        throw new Error('MR range overlap between "' + existing.name + '" and "' + (diag.name || diag.id) + '".');
-      }
-    });
-    boolFlows.push({ name: diag.name || diag.id, range });
-  });
+  return cgGetPayloadApi().validateUnitAddressConfig(cgBuildPayloadContext(), unitDiagrams);
 }
 
 function cgBuildCSharpPayload(platform, unitId) {
   if (typeof gvtFlushFocusedAddressInput === 'function') gvtFlushFocusedAddressInput();
   if (activeDiagramId && typeof flushState === 'function') flushState();
-  if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function' && syncVariableSignalAddressesFromDeviceTypes()) {
-    if (typeof saveProject === 'function') saveProject();
-  }
-  return cgBuildCSharpUnitPayload(platform, unitId || cgGetDefaultUnitId() || '');
+  return cgGetPayloadApi().buildCSharpPayload(cgBuildPayloadContext(), platform, unitId || cgGetDefaultUnitId() || '');
 }
 
 function cgBuildCSharpFlow(diagId) {
-  const diag = (project.diagrams || []).find(d => d.id === diagId) || {};
-  const data = loadDiagramData(diagId);
-  const s = (data && data.state) || { steps: [], transitions: [], connections: [], vars: [] };
-  if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(diag, true);
-  const steps = (s.steps || []).map(step => {
-    const address = resolveStepAddress(step, diag);
-    return {
-    id: step.id || '',
-    number: Number(step.number || 0),
-    label: step.label || '',
-    initial: !!step.initial,
-    execAddress: address.execAddress,
-    doneAddress: address.doneAddress,
-    actions: (step.actions || []).map(action => ({
-      variable: action.variable || '',
-      address: action.address || null,
-      qualifier: action.qualifier || 'N',
-      timeMs: Number(action.timeMs || action.time || 0)
-    }))
-  };
-  });
-  const stepIds = new Set(steps.map(step => step.id));
-  const transitions = (s.transitions || []).map(trans => ({
-    id: trans.id || '',
-    label: trans.label || '',
-    condition: trans.condition || '',
-    fromStepIds: (s.connections || [])
-      .filter(conn => conn.to === trans.id && stepIds.has(conn.from))
-      .map(conn => conn.from),
-    toStepIds: (s.connections || [])
-      .filter(conn => conn.from === trans.id && stepIds.has(conn.to))
-      .map(conn => conn.to)
-  }));
-
-  return {
-    diagram: {
-      id: diag.id || diagId,
-      name: diag.name || diagId,
-      mode: diag.mode || '',
-      unitId: diag.unitId || '',
-      unit: diag.unit || '',
-      addressMode: diag.addressMode || 'bool',
-      boolAddressMode: diag.boolAddressMode || 'linear',
-      baseMr: diag.baseMr ?? null,
-      activeWord: diag.activeWord || '',
-      completeWord: diag.completeWord || ''
-    },
-    steps,
-    transitions,
-    variables: cgGetCSharpVariables(s)
-  };
-}
-
-function cgNormalizeCSharpSignal(deviceTypeName, sig) {
-  const canonicalUnitSignals = new Map(((typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined') ? PROJECT_UNIT_STRUCT_SIGNALS : []).map(item => [item.id, item]));
-  const canonical = deviceTypeName === 'Unit Station' ? canonicalUnitSignals.get(sig && sig.id) : null;
-  const normalized = Object.assign({}, sig || {}, canonical || {});
-  const signalId = normalized.id || normalized.name || '';
-  const signalName = normalized.name || signalId;
-  return Object.assign({}, normalized, { id: signalId, name: signalName });
-}
-
-function cgGetCSharpDeviceTypes() {
-  const deviceTypes = ((project && project.devices) || []).map(deviceType => {
-    if (!deviceType) return deviceType;
-    return Object.assign({}, deviceType, {
-      signals: (deviceType.signals || []).map(sig => cgNormalizeCSharpSignal(deviceType.name, sig))
-    });
-  });
-  const unitDevice = deviceTypes.find(deviceType => deviceType && deviceType.name === 'Unit Station');
-    return deviceTypes;
+  return cgGetPayloadApi().buildCSharpFlow(cgBuildPayloadContext(), diagId);
 }
 
 function cgBuildCSharpUnitPayload(platform, unitId) {
-  const units = project.units || [];
-  const selectedUnit = unitId && unitId !== '__none__'
-    ? units.find(u => u.id === unitId)
-    : null;
-  const unitDiagrams = (project.diagrams || []).filter(d =>
-    unitId === '__none__' ? !d.unitId : d.unitId === unitId
-  );
-  cgValidateUnitAddressConfig(unitDiagrams);
-  const allVars = [];
-  const seenVars = new Set();
-  const addVar = v => {
-    if (!v || !v.label || seenVars.has(v.label)) return;
-    seenVars.add(v.label);
-    allVars.push(v);
-  };
-
-  const flows = unitDiagrams.map(d => {
-    const flow = cgBuildCSharpFlow(d.id);
-    (flow.variables || []).forEach(addVar);
-    return {
-      id: flow.diagram.id,
-      name: flow.diagram.name,
-      type: cgNormalizeFlowType(flow.diagram.mode),
-      mode: flow.diagram.mode,
-      diagram: flow.diagram,
-      steps: flow.steps,
-      transitions: flow.transitions
-    };
-  });
-  return {
-    platform,
-    deviceLibraryPath: cgGetCodegenAssets().deviceLibraryPath,
-    templateRootPath: cgGetCodegenAssets().templateRootPath,
-    outputPath: cgGetCodegenAssets().outputPath,
-    project: {
-      id: project.id || '',
-      name: project.name || '',
-      machineName: project.machineName || ''
-    },
-    unit: {
-      id: selectedUnit ? selectedUnit.id : (unitId || ''),
-      name: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : ''),
-      label: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : '')
-    },
-    flows,
-    variables: allVars,
-    deviceTypes: cgGetCSharpDeviceTypes()
-  };
+  return cgGetPayloadApi().buildCSharpUnitPayload(cgBuildPayloadContext(), platform, unitId);
 }
-
-function cgNormalizeFlowType(mode) {
-  const value = String(mode || '').trim().toLowerCase();
-  return value === 'origin' ? 'origin' : 'auto';
-}
-
-
-function cgGetCylinderSignalAddress(rawAddresses, sig) {
-  const key = String((sig && sig.name) || (sig && sig.id) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const byStructName = rawAddresses[(sig && sig.name) || ''];
-  if (byStructName) return byStructName;
-  if (key === 'lsh') return rawAddresses.LSH || rawAddresses.cyl_lsh || '';
-  if (key === 'lsl') return rawAddresses.LSL || rawAddresses.cyl_lsl || '';
-  if (key === 'locka') return rawAddresses.LockA || rawAddresses.cyl_lockA || '';
-  if (key === 'lockb') return rawAddresses.LockB || rawAddresses.cyl_lockB || '';
-  if (key === 'dissnslsh' || key === 'dissnsh') return rawAddresses.DisSnsLSH || rawAddresses.DisSnsH || rawAddresses.cyl_disSnsH || '';
-  if (key === 'dissnslsl' || key === 'dissnsl') return rawAddresses.DisSnsLSL || rawAddresses.DisSnsL || rawAddresses.cyl_disSnsL || '';
-  if (key === 'state') return rawAddresses.State || rawAddresses.cyl_state || '';
-  if (key === 'errora' || key === 'erra') return rawAddresses.ErrorA || rawAddresses.ErrA || rawAddresses.cyl_errA || '';
-  if (key === 'errorb' || key === 'errb') return rawAddresses.ErrorB || rawAddresses.ErrB || rawAddresses.cyl_errB || '';
-  if (key === 'coila') return rawAddresses.CoilA || rawAddresses.cyl_coilA || '';
-  if (key === 'coilb') return rawAddresses.CoilB || rawAddresses.cyl_coilB || '';
-  if (key === 'hmimanbtn' || key === 'hmiman') return rawAddresses.HmiManBtn || rawAddresses.HmiMan || rawAddresses.cyl_hmiMan || '';
-  return rawAddresses[(sig && sig.id) || ''] || '';
-}
-
-function cgGetCSharpSignalAddresses(v) {
-  const format = v && (v.format || v.dataType || '');
-  const deviceType = ((project && project.devices) || []).find(d => d && d.name === format);
-  const rawAddresses = (v && v.signalAddresses) || {};
-  if (!deviceType || !Array.isArray(deviceType.signals)) {
-    if (format === 'Unit Station') {
-          }
-    return Object.assign({}, rawAddresses);
-  }
-
-  const signalAddresses = {};
-  deviceType.signals.forEach(sig => {
-    const normalized = cgNormalizeCSharpSignal(deviceType.name, sig);
-    if (!normalized.id) return;
-    const addr = format === 'Cylinder'
-      ? cgGetCylinderSignalAddress(rawAddresses, normalized)
-      : (rawAddresses[normalized.name] || rawAddresses[sig && sig.name] || rawAddresses[sig && sig.id]);
-    signalAddresses[normalized.id] = addr || '';
-  });
-  if (format === 'Unit Station') {
-      }
-  return signalAddresses;
-}
-
-function cgGetCSharpVariables(diagramState) {
-  const vars = [];
-  const seen = new Set();
-  const add = function(v, source) {
-    if (!v || !v.label) return;
-    const signalAddresses = cgGetCSharpSignalAddresses(v);
-    if (seen.has(v.label)) {
-            return;
-    }
-        seen.add(v.label);
-    vars.push({
-      label: v.label,
-      format: v.format || v.dataType || '',
-      address: v.address || null,
-      signalAddresses: signalAddresses
-    });
-  };
-
-  (diagramState.vars || []).forEach(v => add(v, 'diagramState.vars'));
-  if (typeof ensureProjectVariables === 'function') {
-    const grouped = ensureProjectVariables();
-    (grouped.imported || []).forEach(v => add(v, 'project.variables.imported'));
-    (grouped.user || []).forEach(v => add(v, 'project.variables.user'));
-  }
-  Object.keys((project && project.unitConfig) || {}).forEach(key => {
-    const cfg = project.unitConfig[key] || {};
-    const signalAddresses = Object.assign({}, cfg.signalAddresses || {});
-    (typeof GVT_UNIT_SIGNALS !== 'undefined' ? GVT_UNIT_SIGNALS : []).forEach(sig => {
-      if (!sig || !sig.id || !sig.path) return;
-      const addr = sig.path.split('.').reduce((cur, part) => cur && cur[part] != null ? cur[part] : '', cfg) || '';
-      if (addr) signalAddresses[sig.id] = addr;
-    });
-        add({ label: cfg.label || key, format: 'Unit Station', address: null, signalAddresses }, 'project.unitConfig');
-  });
-  (project.excelVars || []).forEach(v => add(v, 'project.excelVars'));
-    return vars;
-}
-
 function cgGenerateSelectedUnit() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
@@ -773,10 +490,3 @@ function cgToggleAssetPaths() {
   if (chevron) chevron.textContent = open ? '>' : 'v';
   if (!open) cgUpdateAssetPathStatus();
 }
-
-
-
-
-
-
-
