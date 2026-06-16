@@ -49,3 +49,31 @@ function resolveStepsThrough(startId, direction, connections, steps, parallels, 
   }
   return result;
 }
+
+/**
+ * Resolve normalized branch-port spacing for a parallel bar.
+ * Uses optional constants when they are available in the host page.
+ *
+ * @param {Object} parallelBar
+ * @param {Object} options
+ * @returns {{ports:number,inset:number,gap:number,startX:number,usableWidth:number}}
+ */
+function getParallelPortMetrics(parallelBar, options={}) {
+  const ports = Math.max(2, parallelBar.ports || 3);
+  const minInset = options.portInset ?? (typeof PAR_PORT_INSET !== 'undefined' ? PAR_PORT_INSET : 50);
+  const minUsable = options.minUsable ?? (typeof PAR_PORT_MIN_USABLE !== 'undefined' ? PAR_PORT_MIN_USABLE : 16);
+  const minAllowedInset = options.minInset ?? (typeof PAR_PORT_MIN_INSET !== 'undefined' ? PAR_PORT_MIN_INSET : 8);
+  const maxInset = (parallelBar.width - minUsable) / 2;
+  const inset = Math.min(minInset, Math.max(minAllowedInset, maxInset));
+  const usableWidth = Math.max(1, parallelBar.width - inset * 2);
+  const gap = ports === 1 ? 0 : usableWidth / (ports - 1);
+  return { ports, inset, gap, startX: parallelBar.x + inset, usableWidth };
+}
+
+if (typeof window !== 'undefined') {
+  window.getParallelPortMetrics = getParallelPortMetrics;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { resolveStepsThrough, getParallelPortMetrics };
+}

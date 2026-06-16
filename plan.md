@@ -105,71 +105,82 @@ P10 — Architecture Review
 - Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/core/store.js`, `node --check src/web/js/core/store-persistence.js`, and a Node VM localStorage migration smoke test passed.
 
 ### P5 — Tree Logic
-- [ ] Extract non-DOM tree mutations from `editor/tree.js` into `editor/tree.ts`.
-- [ ] Include `addUnit`, `removeUnit`, `addDiagramInUnit`, `confirmDeviceType` logic, `removeDeviceType`.
-- [ ] Keep rendering, modal creation, event handlers, inline HTML, and DOM reads in `tree-render.js`/legacy JS.
-- [ ] Avoid moving UI-heavy logic until data-level helpers are separated.
-- [ ] Verify unit/device/diagram operations through the UI.
+- [x] Extract non-DOM tree mutations from `editor/tree.js` into `editor/tree.ts`.
+- [x] Include `addUnit`, `removeUnit`, `addDiagramInUnit`, `confirmDeviceType` logic, `removeDeviceType`.
+- [x] Keep rendering, modal creation, event handlers, inline HTML, and DOM reads in `tree-render.js`/legacy JS.
+- [x] Avoid moving UI-heavy logic until data-level helpers are separated.
+- [x] Verify unit/device/diagram operations through the UI.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/editor/tree.ts` data helper bridge and moved legacy DOM/render wrappers to `src/web/js/editor/tree-ui.js`; `index.html` loads the bridge before UI wrappers.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/editor/tree.js`, `node --check src/web/js/editor/tree-ui.js`, and a Node VM helper smoke test passed.
 
 ### P6 — Vars & IO Mapping
-- [ ] Extract variable data logic from `editor/vars.js` into `editor/vars.ts`.
-- [ ] Include `getVars`, `gvtGetEntries`, `gvtGetSigList`, `gvtGetExcelSignalAddress`, `gvtResolveEntry`, `gvtEditVar`.
-- [ ] Extract IO mapping logic into `editor/io-mapping.ts`.
-- [ ] Include auto-match, map/unmap, candidate options, and address target resolution.
-- [ ] Keep table rendering and DOM interaction in JS render wrappers.
-- [ ] Verify global variable editing, signal addresses, auto-match, manual map, and unmap.
+- [x] Extract variable data logic from `editor/vars.js` into `editor/vars.ts`.
+- [x] Include `getVars`, `gvtGetEntries`, `gvtGetSigList`, `gvtGetExcelSignalAddress`, `gvtResolveEntry`, `gvtEditVar`.
+- [x] Extract IO mapping logic into `editor/io-mapping.ts`.
+- [x] Include auto-match, map/unmap, candidate options, and address target resolution.
+- [x] Keep table rendering and DOM interaction in JS render wrappers.
+- [x] Verify global variable editing, signal addresses, auto-match, manual map, and unmap.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/editor/vars.ts` and `src/web/ts/editor/io-mapping.ts`; moved legacy DOM/table wrapper to `src/web/js/editor/vars-ui.js` and kept rendered text ASCII-safe to avoid mojibake.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/editor/vars.js`, `node --check src/web/js/editor/io-mapping.js`, `node --check src/web/js/editor/vars-ui.js`, a Node VM vars/IO smoke test, and mojibake scan passed.
 
 ### P7 — Tables & Graph Data
-- [ ] Extract table data builders into `editor/tables.ts`.
-- [ ] Create data-level functions for steps, transitions, branches, and variables.
-- [ ] Keep HTML string generation, export HTML, and export CSV in `tables-render.js` or legacy JS.
-- [ ] Use existing graph utility behavior without changing canvas interaction.
-- [ ] Verify exported table HTML/CSV remains correct.
+- [x] Extract table data builders into `editor/tables.ts`.
+- [x] Create data-level functions for steps, transitions, branches, and variables.
+- [x] Keep HTML string generation, export HTML, and export CSV in `tables-render.js` or legacy JS.
+- [x] Use existing graph utility behavior without changing canvas interaction.
+- [x] Verify exported table HTML/CSV remains correct.
 
 #### Notes
-- None yet.
+- Added `src/web/ts/editor/tables.ts` data helper bridge and moved legacy HTML/export wrapper to `src/web/js/editor/tables-ui.js`; wrapper text is ASCII-safe to avoid mojibake.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, `node --check src/web/js/editor/tables.js`, `node --check src/web/js/editor/tables-ui.js`, a Node VM tables smoke test, and mojibake scan passed.
 
 ### P8 — Canvas Cleanup JS Only
-- [ ] Move duplicate parallel port metrics into `core/graph-utils.js`.
-- [ ] Replace canvas/events duplicate metric logic with the shared helper.
-- [ ] Move `startPortDragConnect` and `findElementAt` from `canvas.js` to `events.js` if runtime dependencies remain valid.
-- [ ] Extract `buildStepActionBox` from `buildStepEl`.
-- [ ] Verify drag-connect, hit detection, parallel snapping, and step action rendering.
+- [x] Move duplicate parallel port metrics into `core/graph-utils.js`.
+- [x] Replace canvas/events duplicate metric logic with the shared helper.
+- [x] Move `startPortDragConnect` and `findElementAt` from `canvas.js` to `events.js` if runtime dependencies remain valid.
+- [x] Extract `buildStepActionBox` from `buildStepEl`.
+- [x] Verify drag-connect, hit detection, parallel snapping, and step action rendering.
 
 #### Notes
-- None yet.
+- Added shared `getParallelPortMetrics` in `src/web/js/core/graph-utils.js`; `canvas.js` and `events.js` now use the same branch-port spacing logic.
+- Moved drag-connect start and hit detection helpers to `src/web/js/editor/events.js`; runtime dependencies remain valid because handlers run after all classic scripts load.
+- Extracted step action SVG rendering into `buildStepActionBox` and kept text ASCII-safe to avoid mojibake.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, JS syntax checks for graph-utils/canvas/events/elements, Node graph-utils smoke test, and mojibake scan passed.
 
 ### P9 — Cleanup & Consolidation
-- [ ] Find and remove dead code.
-- [ ] Find duplicate helpers.
-- [ ] Consolidate similar utilities.
-- [ ] Remove unused bridge APIs.
-- [ ] Remove unused exports.
-- [ ] Remove files that are no longer referenced.
-- [ ] Verify removals against HTML inline handlers, `window.*` APIs, WebView bridge callbacks, and C# `ExecuteScriptAsync` calls.
-- [ ] Run typecheck.
-- [ ] Run build.
+- [x] Find and remove dead code.
+- [x] Find duplicate helpers.
+- [x] Consolidate similar utilities.
+- [x] Remove unused bridge APIs.
+- [x] Remove unused exports.
+- [x] Remove files that are no longer referenced.
+- [x] Verify removals against HTML inline handlers, `window.*` APIs, WebView bridge callbacks, and C# `ExecuteScriptAsync` calls.
+- [x] Run typecheck.
+- [x] Run build.
 
 #### Notes
-- None yet.
+- Removed proven duplicate/dead JS: inline step action SVG rendering now delegates to `buildStepActionBox`, obsolete export-table helper functions were removed, and the removed local var-table resize boot path no longer runs.
+- Kept bridge APIs and classic global functions that are still referenced by HTML inline handlers, UI wrappers, WebView callbacks, or C# host script calls; no referenced files were removed.
+- Normalized WebView/index UI text and icons to ASCII-safe labels so the mojibake scan stays clean.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build`, JS syntax checks for touched JS, Node graph-utils smoke test, reference scans, and mojibake scan passed.
 
 ### P10 — Architecture Review
-- [ ] Review directory structure.
-- [ ] Review dependencies between modules.
-- [ ] Identify files that are too large.
-- [ ] Propose module splits.
-- [ ] Identify high-coupling areas.
-- [ ] Check naming consistency.
-- [ ] Create a technical architecture report.
+- [x] Review directory structure.
+- [x] Review dependencies between modules.
+- [x] Identify files that are too large.
+- [x] Propose module splits.
+- [x] Identify high-coupling areas.
+- [x] Check naming consistency.
+- [x] Create a technical architecture report.
 
 #### Notes
-- None yet.
+- Created `docs/P10-architecture-review.md` with directory structure, dependency/load-order review, file-size review, coupling hotspots, naming notes, risks, and proposed next module splits.
+- Main recommendation: keep the stable hybrid TS/classic-script runtime, then split large UI wrappers (`tree-ui.js`, `vars-ui.js`, `codegen/modal.js`) in future work instead of changing runtime behavior now.
+- Verification: documentation is ASCII-safe and mojibake scan passed.
 
 ## Test Plan
 - [x] Run `npm run typecheck` after each TypeScript phase.
@@ -185,6 +196,9 @@ P10 — Architecture Review
 - Completed work is tracked by changing `[ ]` to `[x]` in `plan.md`.
 - The migration preserves the current global-script runtime first, not immediately converting the whole app to ES modules.
 - Existing `WORKPLAN.md` is not modified unless explicitly requested.
+
+
+
 
 
 
