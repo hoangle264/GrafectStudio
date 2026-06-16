@@ -182,6 +182,31 @@ P10 — Architecture Review
 - Main recommendation: keep the stable hybrid TS/classic-script runtime, then split large UI wrappers (`tree-ui.js`, `vars-ui.js`, `codegen/modal.js`) in future work instead of changing runtime behavior now.
 - Verification: documentation is ASCII-safe and mojibake scan passed.
 
+
+### P11 - Wrapper Decomposition
+- [x] Split `tree-ui.js` by UI responsibility.
+- [x] Split `vars-ui.js` by UI responsibility.
+- [x] Split `codegen/modal.js` by modal lifecycle, host bridge calls, and preview/export helpers.
+- [x] Preserve all existing global callbacks, bridge names, inline handlers, and script order.
+- [x] Keep behavior unchanged.
+
+#### Notes
+- Split tree wrapper into `tree-ui.js`, `tree-devices-ui.js`, and `tree-diagrams-ui.js` while preserving classic global callbacks.
+- Split vars/IO wrapper into `vars-ui.js`, `vars-boot-ui.js`, and `io-mapping-ui.js` while preserving sidebar boot and inline handler names.
+- Split codegen modal wrapper into `modal.js`, `modal-selectors.js`, `modal-host.js`, `modal-export.js`, and `modal-assets.js` with script order updated in `index.html`.
+- Verification: JS syntax checks for all new wrapper files, `npm.cmd run typecheck`, and `npm.cmd run build` passed.
+
+### P12 - Runtime Hardening
+- [ ] Remove only proven-unused globals, shims, helpers, and bridge exports.
+- [ ] Add lightweight contract checks for bridge presence and script-order assumptions.
+- [ ] Consolidate naming and comments for remaining wrapper APIs.
+- [ ] Keep canvas/runtime behavior unchanged.
+- [ ] Verify removals against HTML inline handlers, UI wrappers, WebView callbacks, and C# host calls.
+
+#### Notes
+- Future roadmap item only; no ES-module rewrite is planned for this phase.
+- Every removal must have explicit non-use proof across HTML, JS wrappers, bridge APIs, and C# host calls.
+
 ## Test Plan
 - [x] Run `npm run typecheck` after each TypeScript phase.
 - [x] Run JS syntax checks for touched compiled/legacy JS files.
