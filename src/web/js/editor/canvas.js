@@ -54,15 +54,6 @@ function getPortXY(id, port) {
   return null;
 }
 
-function getParallelPortMetrics(p){
-  const ports=Math.max(2, p.ports||3);
-  const minInset=PAR_PORT_INSET;
-  const maxInset=(p.width-PAR_PORT_MIN_USABLE)/2;
-  const inset=Math.min(minInset, Math.max(PAR_PORT_MIN_INSET, maxInset));
-  const usableWidth=Math.max(1, p.width-inset*2);
-  const gap=ports===1 ? 0 : usableWidth/(ports-1);
-  return {ports, inset, gap, startX:p.x+inset};
-}
 function buildConnEl(c) {
   const fp=getPortXY(c.from, c.fromPort||'bottom');
   const tp=getPortXY(c.to, c.toPort||'top');
@@ -131,73 +122,7 @@ function buildStepEl(s) {
     g.appendChild(lbl);
   }
 
-  // Action box — IEC 61131-3 qualified actions, dynamic height
-  const acts = getStepActions(s); // [{qualifier,variable,time}]
-  const hasAct = acts.length > 0;
-  if(hasAct){
-    const lineH=15, pad=6;
-    const aH=Math.max(SH, acts.length*lineH+pad*2);
-    // Box
-    const ab=svgE('rect'); ab.setAttribute('class','s-act-box');
-    ab.setAttribute('x',s.x+SW); ab.setAttribute('y',s.y);
-    ab.setAttribute('width',ACT_W); ab.setAttribute('height',aH);
-    g.appendChild(ab);
-    // Vertical separator line
-    const vsep=svgE('line');
-    vsep.setAttribute('x1',s.x+SW+18);vsep.setAttribute('y1',s.y+2);
-    vsep.setAttribute('x2',s.x+SW+18);vsep.setAttribute('y2',s.y+aH-2);
-    vsep.setAttribute('stroke','#1e3a5a');vsep.setAttribute('stroke-width','1');
-    g.appendChild(vsep);
-
-    acts.forEach((act,i)=>{
-      const y0=s.y+pad+lineH*i+lineH-4;
-      // Qualifier badge
-      const qColor=ACT_QUAL_COLORS[act.qualifier]||'#f5a623';
-      const qBg=svgE('rect');
-      qBg.setAttribute('x',s.x+SW+2);qBg.setAttribute('y',s.y+pad+lineH*i+1);
-      qBg.setAttribute('width',14);qBg.setAttribute('height',lineH-3);
-      qBg.setAttribute('rx','2');qBg.setAttribute('fill',qColor);qBg.setAttribute('opacity','.18');
-      g.appendChild(qBg);
-      const qt=svgE('text');
-      qt.setAttribute('x',s.x+SW+9);qt.setAttribute('y',y0-1);
-      qt.setAttribute('text-anchor','middle');qt.setAttribute('font-size','9');
-      qt.setAttribute('font-family','Share Tech Mono,monospace');qt.setAttribute('font-weight','bold');
-      qt.setAttribute('fill',qColor);
-      qt.textContent=act.qualifier||'N';
-      g.appendChild(qt);
-      // Variable name
-      const varTxt=svgE('text'); varTxt.setAttribute('class','s-act-txt');
-      varTxt.setAttribute('x',s.x+SW+22);varTxt.setAttribute('y',y0-1);
-      varTxt.setAttribute('font-size','10');
-      const vdisp=act.variable||(act.address?'@'+act.address:'');
-      varTxt.textContent=vdisp.length>14?vdisp.slice(0,13)+'\u2026':vdisp;
-      g.appendChild(varTxt);
-      // Time for L/D
-      if((act.qualifier==='L'||act.qualifier==='D')&&act.time){
-        const tt=svgE('text');
-        tt.setAttribute('x',s.x+SW+ACT_W-3);tt.setAttribute('y',y0-1);
-        tt.setAttribute('text-anchor','end');tt.setAttribute('font-size','8');
-        tt.setAttribute('fill','#22d3ee');tt.setAttribute('font-family','Share Tech Mono,monospace');
-        tt.textContent=act.time;
-        g.appendChild(tt);
-      }
-      // Row separator
-      if(i<acts.length-1){
-        const rl=svgE('line');
-        rl.setAttribute('x1',s.x+SW+1);rl.setAttribute('y1',s.y+pad+lineH*(i+1));
-        rl.setAttribute('x2',s.x+SW+ACT_W-1);rl.setAttribute('y2',s.y+pad+lineH*(i+1));
-        rl.setAttribute('stroke','#1e3050');rl.setAttribute('stroke-width','0.5');
-        g.appendChild(rl);
-      }
-    });
-    if(aH>SH){
-      const extLine=svgE('line');
-      extLine.setAttribute('x1',s.x);extLine.setAttribute('y1',s.y+aH);
-      extLine.setAttribute('x2',s.x+SW);extLine.setAttribute('y2',s.y+aH);
-      extLine.setAttribute('stroke','#2a3a55');extLine.setAttribute('stroke-width','1');
-      g.appendChild(extLine);
-    }
-  }
+  buildStepActionBox(g, s);
 
   // Ports
   addPort(g, s.x+SW/2, s.y, s.id,'step','top');
@@ -206,6 +131,74 @@ function buildStepEl(s) {
   g.addEventListener('mousedown',e=>elDown(e,s.id,'step'));
   g.addEventListener('click',e=>{e.stopPropagation();selectEl(s.id,'step',e);});
   return g;
+}
+
+function buildStepActionBox(g, s) {
+  const acts = getStepActions(s); // [{qualifier,variable,time}]
+  if(!acts.length) return;
+
+  const lineH=15, pad=6;
+  const aH=Math.max(SH, acts.length*lineH+pad*2);
+  const ab=svgE('rect'); ab.setAttribute('class','s-act-box');
+  ab.setAttribute('x',s.x+SW); ab.setAttribute('y',s.y);
+  ab.setAttribute('width',ACT_W); ab.setAttribute('height',aH);
+  g.appendChild(ab);
+
+  const vsep=svgE('line');
+  vsep.setAttribute('x1',s.x+SW+18);vsep.setAttribute('y1',s.y+2);
+  vsep.setAttribute('x2',s.x+SW+18);vsep.setAttribute('y2',s.y+aH-2);
+  vsep.setAttribute('stroke','#1e3a5a');vsep.setAttribute('stroke-width','1');
+  g.appendChild(vsep);
+
+  acts.forEach((act,i)=>{
+    const y0=s.y+pad+lineH*i+lineH-4;
+    const qColor=ACT_QUAL_COLORS[act.qualifier]||'#f5a623';
+    const qBg=svgE('rect');
+    qBg.setAttribute('x',s.x+SW+2);qBg.setAttribute('y',s.y+pad+lineH*i+1);
+    qBg.setAttribute('width',14);qBg.setAttribute('height',lineH-3);
+    qBg.setAttribute('rx','2');qBg.setAttribute('fill',qColor);qBg.setAttribute('opacity','.18');
+    g.appendChild(qBg);
+
+    const qt=svgE('text');
+    qt.setAttribute('x',s.x+SW+9);qt.setAttribute('y',y0-1);
+    qt.setAttribute('text-anchor','middle');qt.setAttribute('font-size','9');
+    qt.setAttribute('font-family','Share Tech Mono,monospace');qt.setAttribute('font-weight','bold');
+    qt.setAttribute('fill',qColor);
+    qt.textContent=act.qualifier||'N';
+    g.appendChild(qt);
+
+    const varTxt=svgE('text'); varTxt.setAttribute('class','s-act-txt');
+    varTxt.setAttribute('x',s.x+SW+22);varTxt.setAttribute('y',y0-1);
+    varTxt.setAttribute('font-size','10');
+    const vdisp=act.variable||(act.address?'@'+act.address:'');
+    varTxt.textContent=vdisp.length>14?vdisp.slice(0,13)+'...':vdisp;
+    g.appendChild(varTxt);
+
+    if((act.qualifier==='L'||act.qualifier==='D')&&act.time){
+      const tt=svgE('text');
+      tt.setAttribute('x',s.x+SW+ACT_W-3);tt.setAttribute('y',y0-1);
+      tt.setAttribute('text-anchor','end');tt.setAttribute('font-size','8');
+      tt.setAttribute('fill','#22d3ee');tt.setAttribute('font-family','Share Tech Mono,monospace');
+      tt.textContent=act.time;
+      g.appendChild(tt);
+    }
+
+    if(i<acts.length-1){
+      const rl=svgE('line');
+      rl.setAttribute('x1',s.x+SW+1);rl.setAttribute('y1',s.y+pad+lineH*(i+1));
+      rl.setAttribute('x2',s.x+SW+ACT_W-1);rl.setAttribute('y2',s.y+pad+lineH*(i+1));
+      rl.setAttribute('stroke','#1e3050');rl.setAttribute('stroke-width','0.5');
+      g.appendChild(rl);
+    }
+  });
+
+  if(aH>SH){
+    const extLine=svgE('line');
+    extLine.setAttribute('x1',s.x);extLine.setAttribute('y1',s.y+aH);
+    extLine.setAttribute('x2',s.x+SW);extLine.setAttribute('y2',s.y+aH);
+    extLine.setAttribute('stroke','#2a3a55');extLine.setAttribute('stroke-width','1');
+    g.appendChild(extLine);
+  }
 }
 
 function buildTransEl(t) {
@@ -412,59 +405,4 @@ function addPort(g, x, y, id, type, port) {
   g.appendChild(c);
 }
 
-// Drag-to-connect: start connecting from a port via mousedown
-let portDragging = false;
-
-function startPortDragConnect(id, type, port, wx, wy, e) {
-  // If already connecting, treat as target click
-  if(connecting) {
-    handlePortClick(id, type, port);
-    return;
-  }
-  // Begin connect from this port
-  portDragging = true;
-  connecting = true;
-  connFrom = {id, type, port};
-  document.getElementById('conn-hint').style.display='block';
-  document.getElementById('s-tool').textContent = 'CONNECTING FROM '+id+' ['+port+']';
-  // Show ghost line from port position
-  const fp = getPortXY(id, port);
-  if(fp){
-    document.getElementById('ghost-path').setAttribute('d',`M${fp.x},${fp.y} L${fp.x},${fp.y}`);
-    document.getElementById('ghost-path').setAttribute('display','');
-  }
-  // Listen for mouseup on SVG to finish connection
-  const svg = document.getElementById('svg-canvas');
-  function onDragUp(ev) {
-    svg.removeEventListener('mouseup', onDragUp);
-    portDragging = false;
-    if(!connecting) return;
-    // Find element under mouse
-    const p = w2s(ev.clientX, ev.clientY);
-    const target = findElementAt(p.x, p.y);
-    if(target && target.id !== id) {
-      const tp = target.type==='parallel'
-        ? getNearestParPort(state.parallels.find(x=>x.id===target.id), p.x, p.y)
-        : guessTargetPort(connFrom, target.id, target.type, null);
-      addConn(connFrom.id, connFrom.port, target.id, tp);
-    }
-    cancelConnect();
-  }
-  svg.addEventListener('mouseup', onDragUp);
-}
-
-// Find which element (step/transition/parallel) is at world coords
-function findElementAt(wx, wy) {
-  for(const s of state.steps){
-    if(wx>=s.x&&wx<=s.x+SW&&wy>=s.y&&wy<=s.y+SH) return {id:s.id,type:'step'};
-  }
-  for(const t of state.transitions){
-    if(wx>=t.x&&wx<=t.x+TW&&wy>=t.y-12&&wy<=t.y+TH+12) return {id:t.id,type:'transition'};
-  }
-  for(const p of state.parallels){
-    const barH=PH*2+4;
-    if(wx>=p.x&&wx<=p.x+p.width&&wy>=p.y-16&&wy<=p.y+barH+16) return {id:p.id,type:'parallel'};
-  }
-  return null;
-}
 

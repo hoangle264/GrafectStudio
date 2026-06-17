@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "none",
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "rootDir": "src/web/ts",
+    "outDir": "src/web/js",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "removeComments": false,
+    "sourceMap": false,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "src/web/ts/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

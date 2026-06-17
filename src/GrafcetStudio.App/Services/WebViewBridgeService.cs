@@ -1,4 +1,4 @@
-﻿using Microsoft.Web.WebView2.Wpf;
+using Microsoft.Web.WebView2.Wpf;
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -22,6 +22,18 @@ public class WebViewBridgeService : IWebViewBridgeService
     public async Task SendAiChunkAsync(string chunk)
     {
         await ExecuteAsync($"receiveAiChunk({JsonSerializer.Serialize(chunk)});");
+    }
+
+    public async Task SendAiResponseAsync(string rawText)
+    {
+        await SendAiChunkAsync(rawText);
+        await SendAiChunkAsync("__STREAM_END__");
+    }
+
+    public async Task SendAiStreamEventAsync(string kind, string? text = null, bool done = false)
+    {
+        var payload = JsonSerializer.Serialize(new { kind, text = text ?? string.Empty, done });
+        await ExecuteAsync($"receiveAiStreamEvent({payload});");
     }
 
     public async Task SendErrorAsync(string source, string message)

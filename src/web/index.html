@@ -37,6 +37,7 @@
         <button onclick="showExcelImportModal()">Import CSV/Excel</button>
         <button onclick="showExportTablesModal()">Tables</button>
         <button onclick="showGenerateCodeModal()">Code</button>
+        <button onclick="toggleAiChatPanel(true)">AI Preview</button>
       </div>
     </div>
     <button class="btn" onclick="newProject()">✦ New Project</button>
@@ -45,6 +46,7 @@
     <button class="btn p" onclick="exportProject()">⬆ Export Project</button>
     <button class="btn btn-cyan" onclick="showExportTablesModal()">⊞ Tables</button>
     <button class="btn btn-purple" onclick="showGenerateCodeModal()">⟨/⟩ Code</button>
+    <button class="btn btn-cyan" onclick="toggleAiChatPanel(true)">AI Preview</button>
     <button class="btn" onclick="triggerImport()">↑ Import</button>
     <input type="file" id="file-input" accept=".json,.grafcet,.grafcet2" class="is-hidden" onchange="handleImport(event)">
   </nav>
@@ -497,6 +499,27 @@
     </div>
   </div><!-- /dp-panel -->
 
+  <section class="ai-chat-panel" id="ai-chat-panel" aria-label="AI proposal preview">
+    <div class="ai-chat-head">
+      <span class="ai-chat-title">AI PREVIEW</span>
+      <button class="pin-btn" onclick="toggleAiChatPanel(false)" title="Close">âœ•</button>
+    </div>
+    <div class="ai-chat-body" id="ai-chat-body"></div>
+    <div class="ai-chat-compose">
+      <select class="ai-chat-intent" id="ai-chat-intent" title="AI intent">
+        <option value="create-variable">create-variable</option>
+        <option value="clone-variable">clone-variable</option>
+        <option value="map-io">map-io</option>
+        <option value="create-flow">create-flow</option>
+      </select>
+      <textarea id="ai-chat-input" class="ai-chat-input" rows="3" placeholder="Describe the proposal to preview..."></textarea>
+      <div class="ai-chat-actions">
+        <button class="btn" onclick="aiChatInsertMockProposal()">Mock Preview</button>
+        <button class="btn a" onclick="aiChatSend()">Send</button>
+      </div>
+    </div>
+  </section>
+
 </aside><!-- /right-panel -->
 </main>
 
@@ -582,10 +605,26 @@
 </div>
 
 
+<script src="js/core/interop.js"></script>
 <script src="js/core/utils.js"></script>
 <script src="js/core/graph-utils.js"></script>
+<script src="js/core/store-persistence.js"></script>
 <script src="js/core/store.js"></script>
 <script src="js/core/constants.js"></script>
+<script src="js/ai/contracts.js"></script>
+<script src="js/ai/sanitizer.js"></script>
+<script src="js/ai/sanitizer-validation.js"></script>
+<script src="js/ai/context-builder.js"></script>
+<script src="js/ai/context-builder-validation.js"></script>
+<script src="js/ai/parser.js"></script>
+<script src="js/ai/parser-validation.js"></script>
+<script src="js/ai/mock-service.js"></script>
+<script src="js/ai/mock-service-validation.js"></script>
+<script src="js/ai/apply.js"></script>
+<script src="js/ai/apply-validation.js"></script>
+<script src="js/ai/p10-validation.js"></script>
+<script src="js/ai/bridge.js"></script>
+<script src="js/editor/ai-chat-ui.js"></script>
 <script src="js/editor/change-manager.js"></script>
 <script src="js/editor/actions.js"></script>
 <script src="js/editor/panels.js"></script>
@@ -593,15 +632,29 @@
 <script src="js/editor/elements.js"></script>
 <script src="js/editor/events.js"></script>
 <script src="js/editor/tree.js"></script>
+<script src="js/editor/tree-ui.js"></script>
+<script src="js/editor/tree-devices-ui.js"></script>
+<script src="js/editor/tree-diagrams-ui.js"></script>
 <script src="js/editor/project.js"></script>
 <script src="js/editor/export.js"></script>
 <script src="js/editor/tables.js"></script>
+<script src="js/editor/tables-ui.js"></script>
 <script src="js/editor/vars.js"></script>
+<script src="js/editor/io-mapping.js"></script>
+<script src="js/editor/vars-ui.js"></script>
+<script src="js/editor/vars-boot-ui.js"></script>
+<script src="js/editor/io-mapping-ui.js"></script>
 <script src="js/editor/excel-import.js"></script>
+<script src="js/editor/excel-import-ui.js"></script>
 <!-- Force generation via C# host in the WPF app; disable in-browser JS generators -->
 <script>window.__ONLY_CSHARP_CODEGEN__ = true;</script>
 <!-- Keep Unit Config UI and modal; code generation runs in the C# host. -->
 <script src="js/codegen/unit-config.js"></script>
+<script src="js/codegen/payload.js"></script>
 <script src="js/codegen/modal.js"></script>
+<script src="js/codegen/modal-selectors.js"></script>
+<script src="js/codegen/modal-host.js"></script>
+<script src="js/codegen/modal-export.js"></script>
+<script src="js/codegen/modal-assets.js"></script>
 </body>
 </html>
