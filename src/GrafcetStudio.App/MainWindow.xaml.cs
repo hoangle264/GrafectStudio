@@ -119,7 +119,8 @@ public partial class MainWindow : Window
                     Prompt = GetOptionalString(payload, "prompt", "message"),
                     DiagramContext = GetOptionalString(payload, "diagramContext"),
                     RequestJson = payload.ValueKind == JsonValueKind.Undefined ? string.Empty : payload.GetRawText(),
-                    FixtureName = GetOptionalString(payload, "fixtureName", "mockFixture")
+                    FixtureName = GetOptionalString(payload, "fixtureName", "mockFixture"),
+                    Stream = GetOptionalBool(payload, "stream")
                 };
                 _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
                 break;
@@ -171,6 +172,9 @@ public partial class MainWindow : Window
         return string.Empty;
     }
 
+
+    private static bool GetOptionalBool(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.True;
     private static int GetOptionalArrayLength(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array
             ? property.GetArrayLength()

@@ -27,8 +27,15 @@ public class AiRequestOrchestrator
         }
 
         var fixtureName = AiContractGuard.NormalizeFixtureName(payload.FixtureName);
-        var result = await _aiCompletionService.CompleteAsync(new AiCompletionRequest(sanitized.Request, fixtureName));
+        var request = new AiCompletionRequest(sanitized.Request, fixtureName);
 
+        if (payload.Stream)
+        {
+            await HandleStreamingRequestAsync(payload, request);
+            return;
+        }
+
+        var result = await _aiCompletionService.CompleteAsync(request);
         if (!result.Ok)
         {
             await SendErrorProposalAsync(payload, result.Errors);
@@ -36,6 +43,54 @@ public class AiRequestOrchestrator
         }
 
         await _webViewBridgeService.SendAiResponseAsync(result.RawText);
+    }
+
+    private async Task HandleStreamingRequestAsync(AiRequestPayload payload, AiCompletionRequest request)
+    {
+        using var timeout = new CancellationTokenSource(GetStreamingTimeout());
+        var finalText = string.Empty;
+
+        try
+        {
+            await _webViewBridgeService.SendAiStreamEventAsync("start", "AI streaming started.");
+            await foreach (var chunk in _aiCompletionService.StreamAsync(request, timeout.Token))
+            {
+                if (chunk.Kind == "status")
+                {
+                    await _webViewBridgeService.SendAiStreamEventAsync("status", chunk.Text);
+                    continue;
+                }
+
+                if (chunk.Kind == "delta")
+                {
+                    await _webViewBridgeService.SendAiStreamEventAsync("delta", chunk.Text);
+                    continue;
+                }
+
+                if (chunk.IsFinal || chunk.Kind == "final")
+                {
+                    finalText = chunk.Text;
+                    await _webViewBridgeService.SendAiStreamEventAsync("final", finalText, done: true);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(finalText))
+            {
+                await _webViewBridgeService.SendAiStreamEventAsync("error", "AI stream ended without a final proposal.", done: true);
+            }
+
+            await _webViewBridgeService.SendAiStreamEventAsync("end", string.Empty, done: true);
+        }
+        catch (OperationCanceledException)
+        {
+            await _webViewBridgeService.SendAiStreamEventAsync("error", "AI streaming request was canceled or timed out.", done: true);
+            await _webViewBridgeService.SendAiStreamEventAsync("end", string.Empty, done: true);
+        }
+        catch (Exception)
+        {
+            await _webViewBridgeService.SendAiStreamEventAsync("error", "AI streaming service failed before producing a validated proposal.", done: true);
+            await _webViewBridgeService.SendAiStreamEventAsync("end", string.Empty, done: true);
+        }
     }
 
     private async Task SendErrorProposalAsync(AiRequestPayload payload, IReadOnlyList<string> errors)
@@ -52,12 +107,18 @@ public class AiRequestOrchestrator
             summary = "Host AI service could not produce a valid proposal.",
             warnings = Array.Empty<string>(),
             errors,
-
             data = BuildErrorProposalData(intent)
-
         });
 
         await _webViewBridgeService.SendAiResponseAsync(rawText);
+    }
+
+    private static TimeSpan GetStreamingTimeout()
+    {
+        var value = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_AI_STREAM_TIMEOUT_MS");
+        return int.TryParse(value, out var milliseconds) && milliseconds > 0
+            ? TimeSpan.FromMilliseconds(milliseconds)
+            : TimeSpan.FromSeconds(30);
     }
 
     private static object BuildErrorProposalData(string intent)
@@ -97,5 +158,3 @@ public class AiRequestOrchestrator
         }
     }
 }
-
-

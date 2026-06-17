@@ -20,8 +20,18 @@ public partial class App : PrismApplication
     {
         if (e.Args.Any(arg => string.Equals(arg, "--validate-ai-mock", StringComparison.OrdinalIgnoreCase)))
         {
-            RunAiMockValidationAsync().GetAwaiter().GetResult();
-            Shutdown(0);
+            try
+            {
+                Console.WriteLine("AI mock validation starting.");
+                Task.Run(RunAiMockValidationAsync).GetAwaiter().GetResult();
+                Environment.Exit(0);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine(error.Message);
+                Environment.Exit(1);
+            }
+
             return;
         }
 
@@ -76,13 +86,59 @@ public partial class App : PrismApplication
             throw new InvalidOperationException("AI mock validation request failed sanitization: " + string.Join("; ", sanitized.Errors));
         }
 
-        var result = await new MockAiCompletionService().CompleteAsync(new AiCompletionRequest(sanitized.Request));
+        var service = new MockAiCompletionService();
+        var result = await service.CompleteAsync(new AiCompletionRequest(sanitized.Request));
         if (!result.Ok || !result.RawText.Contains("\"intent\":\"create-variable\"", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("AI mock validation did not produce a create-variable proposal.");
         }
 
+        await ValidateMockStreamAsync(service, sanitized.Request, null, shouldProduceFinal: true);
+        await ValidateMockStreamAsync(service, sanitized.Request, "partial-json", shouldProduceFinal: true);
+        await ValidateMockStreamAsync(service, sanitized.Request, "malformed-json", shouldProduceFinal: true);
+        await ValidateMockStreamFailureAsync(service, sanitized.Request, "stream-cancel", TimeSpan.FromSeconds(2));
+        await ValidateMockStreamFailureAsync(service, sanitized.Request, "stream-error", TimeSpan.FromSeconds(2));
+        await ValidateMockStreamFailureAsync(service, sanitized.Request, "stream-timeout", TimeSpan.FromMilliseconds(50));
+
         Console.WriteLine("AI mock validation passed.");
+    }
+
+
+    private static async Task ValidateMockStreamAsync(MockAiCompletionService service, SanitizedAiRequest request, string? fixtureName, bool shouldProduceFinal)
+    {
+        var finalText = string.Empty;
+        var deltaCount = 0;
+        await foreach (var chunk in service.StreamAsync(new AiCompletionRequest(request, fixtureName)))
+        {
+            if (chunk.Kind == "delta") deltaCount++;
+            if (chunk.IsFinal) finalText = chunk.Text;
+        }
+
+        if (shouldProduceFinal && (string.IsNullOrWhiteSpace(finalText) || deltaCount == 0))
+        {
+            throw new InvalidOperationException("AI mock streaming validation did not produce partial chunks and a final payload for fixture: " + (fixtureName ?? "default"));
+        }
+    }
+
+    private static async Task ValidateMockStreamFailureAsync(MockAiCompletionService service, SanitizedAiRequest request, string fixtureName, TimeSpan timeout)
+    {
+        using var cancellation = new CancellationTokenSource(timeout);
+        try
+        {
+            await foreach (var _ in service.StreamAsync(new AiCompletionRequest(request, fixtureName), cancellation.Token))
+            {
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("AI mock streaming failure fixture did not fail: " + fixtureName);
     }
 
     private static void RegisterAiServices(IContainerRegistry containerRegistry)

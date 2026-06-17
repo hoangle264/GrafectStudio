@@ -152,14 +152,16 @@ P10 Ã¢â‚¬â€ Integration + Security Tests
 
 
 ### P9 Ã¢â‚¬â€ Streaming Support
-- [ ] Add streaming only after the non-streaming flow is stable.
-- [ ] Stream assistant text/status updates separately from the final structured proposal when possible.
-- [ ] Accumulate final JSON safely and validate it with the same proposal validator.
-- [ ] Handle partial chunks, canceled requests, timeout, malformed final JSON, and service errors.
-- [ ] Keep Apply disabled until a complete validated proposal exists.
+- [x] Add streaming only after the non-streaming flow is stable.
+- [x] Stream assistant text/status updates separately from the final structured proposal when possible.
+- [x] Accumulate final JSON safely and validate it with the same proposal validator.
+- [x] Handle partial chunks, canceled requests, timeout, malformed final JSON, and service errors.
+- [x] Keep Apply disabled until a complete validated proposal exists.
 
 #### Notes
 - Streaming improves perceived responsiveness but must not bypass schema validation or user preview.
+- P9 completed: added host-side streaming abstraction (`IAiCompletionService.StreamAsync`) with mock and Gemini SSE implementations, WebView stream events for status/delta/final/error/end, UI accumulation that keeps partial chunks separate from final proposal validation, and mock fixtures for partial JSON, cancel, timeout, malformed JSON, and service errors. Final structured proposals still pass through the existing parser/validator/preview path and Apply remains disabled until a complete validated proposal exists. Validated C# build, TS typecheck/build, JS streaming validation, and host mock streaming; real Gemini streaming was not run because no API key was present in the environment.
+
 
 ### P10 Ã¢â‚¬â€ Integration + Security Tests
 - [ ] Run TypeScript typecheck/build after each TS/JS-related phase.

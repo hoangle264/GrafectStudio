@@ -8,6 +8,7 @@ public interface IWebViewBridgeService
     Task SendGeneratedCodeAsync(string code);
     Task SendAiChunkAsync(string chunk);
     Task SendAiResponseAsync(string rawText);
+    Task SendAiStreamEventAsync(string kind, string? text = null, bool done = false);
     Task SendErrorAsync(string source, string message);
     Task LoadProjectDataAsync(string json);
     Task UpdateDiagramStateAsync(string actionsJson);

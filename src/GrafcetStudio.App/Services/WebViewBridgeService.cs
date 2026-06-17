@@ -30,6 +30,12 @@ public class WebViewBridgeService : IWebViewBridgeService
         await SendAiChunkAsync("__STREAM_END__");
     }
 
+    public async Task SendAiStreamEventAsync(string kind, string? text = null, bool done = false)
+    {
+        var payload = JsonSerializer.Serialize(new { kind, text = text ?? string.Empty, done });
+        await ExecuteAsync($"receiveAiStreamEvent({payload});");
+    }
+
     public async Task SendErrorAsync(string source, string message)
     {
         var payload = JsonSerializer.Serialize(new { source, message });

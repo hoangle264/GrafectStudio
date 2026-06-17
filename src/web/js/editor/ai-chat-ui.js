@@ -4,7 +4,9 @@ const AI_CHAT_STATE = {
   messages: [],
   proposals: {},
   pendingRawText: '',
-  pendingRequestId: null
+  pendingRequestId: null,
+  pendingStreamMessageId: null,
+  pendingStreamFinalText: ''
 };
 
 function aiChatBridge() {
@@ -46,6 +48,73 @@ function aiChatAddMessage(role, text, options) {
   return message;
 }
 
+function aiChatFindMessage(messageId) {
+  for (let index = 0; index < AI_CHAT_STATE.messages.length; index++) {
+    if (AI_CHAT_STATE.messages[index].id === messageId) return AI_CHAT_STATE.messages[index];
+  }
+  return null;
+}
+
+function aiChatResetPendingStream() {
+  AI_CHAT_STATE.pendingRawText = '';
+  AI_CHAT_STATE.pendingStreamFinalText = '';
+  AI_CHAT_STATE.pendingStreamMessageId = null;
+}
+
+function aiChatEnsureStreamMessage() {
+  let message = aiChatFindMessage(AI_CHAT_STATE.pendingStreamMessageId);
+  if (!message) {
+    message = aiChatAddMessage('assistant', 'AI streaming started...', { streaming: true, streamStatus: [], streamText: '', streamDone: false });
+    AI_CHAT_STATE.pendingStreamMessageId = message.id;
+  }
+  return message;
+}
+
+function aiChatAppendStreamStatus(text) {
+  const message = aiChatEnsureStreamMessage();
+  const value = aiChatText(text, 'Streaming update.');
+  if (value) message.streamStatus.push(value);
+  message.text = message.streamStatus.slice(-3).join('\n');
+  aiChatRender();
+}
+
+function aiChatAppendStreamDelta(text) {
+  const message = aiChatEnsureStreamMessage();
+  message.streamText += String(text == null ? '' : text);
+  AI_CHAT_STATE.pendingRawText += String(text == null ? '' : text);
+  message.text = 'Receiving proposal JSON... ' + message.streamText.length + ' chars';
+  aiChatRender();
+}
+
+function aiChatFinalizeStream(rawText) {
+  const bridge = aiChatBridge();
+  const finalText = String(rawText == null || rawText === '' ? AI_CHAT_STATE.pendingRawText : rawText);
+  const message = aiChatEnsureStreamMessage();
+  message.streamDone = true;
+  message.text = 'Validating final AI proposal...';
+  const result = bridge && bridge.mockService
+    ? bridge.mockService.receiveHostResponse(finalText)
+    : { ok: false, errors: ['AI bridge is not available.'] };
+  if (result.ok && result.proposal) {
+    aiChatAddProposal(result.proposal, result.rawText);
+    message.text = 'Streaming complete. Proposal is ready for preview.';
+  } else {
+    message.error = true;
+    message.text = (result.errors || ['AI streaming response failed validation.']).join('; ');
+  }
+  aiChatResetPendingStream();
+  aiChatRender();
+  return result;
+}
+
+function aiChatFailStream(text) {
+  const message = aiChatEnsureStreamMessage();
+  message.error = true;
+  message.streamDone = true;
+  message.text = aiChatText(text, 'AI streaming failed before producing a complete validated proposal.');
+  aiChatResetPendingStream();
+  aiChatRender();
+}
 function aiChatMakeApplyContext() {
   return {
     getProject: function() { return project; },
@@ -262,10 +331,10 @@ function aiChatSend() {
     aiChatAddMessage('assistant', requestResult.errors.join('; '), { error: true });
     return;
   }
-  AI_CHAT_STATE.pendingRawText = '';
+  aiChatResetPendingStream();
   AI_CHAT_STATE.pendingRequestId = requestResult.request.id;
   if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-    window.chrome.webview.postMessage({ type: 'AI_REQUEST', payload: Object.assign({}, requestResult.request, { prompt: message, mockFixture: intent }) });
+    window.chrome.webview.postMessage({ type: 'AI_REQUEST', payload: Object.assign({}, requestResult.request, { prompt: message, mockFixture: intent, stream: true }) });
   } else {
     const result = bridge.mockService.generateMockResponse(requestResult.request);
     if (result.ok && result.proposal) aiChatAddProposal(result.proposal, result.rawText);
@@ -289,15 +358,45 @@ function aiChatInsertMockProposal() {
 function receiveAiChunk(chunk) {
   toggleAiChatPanel(true);
   if (chunk === '__STREAM_END__') {
-    const result = aiChatBridge().mockService.receiveHostResponse(AI_CHAT_STATE.pendingRawText);
-    if (result.ok && result.proposal) aiChatAddProposal(result.proposal, result.rawText);
-    else aiChatAddMessage('assistant', (result.errors || ['AI response failed.']).join('; '), { error: true });
-    AI_CHAT_STATE.pendingRawText = '';
+    aiChatFinalizeStream(AI_CHAT_STATE.pendingRawText);
     return;
   }
-  AI_CHAT_STATE.pendingRawText += String(chunk == null ? '' : chunk);
+  aiChatAppendStreamDelta(chunk);
 }
 
+function receiveAiStreamEvent(event) {
+  toggleAiChatPanel(true);
+  const payload = event || {};
+  const kind = String(payload.kind || 'delta');
+  const text = String(payload.text == null ? '' : payload.text);
+  if (kind === 'start') {
+    aiChatResetPendingStream();
+    aiChatAppendStreamStatus(text || 'AI streaming started.');
+    return;
+  }
+  if (kind === 'status') {
+    aiChatAppendStreamStatus(text);
+    return;
+  }
+  if (kind === 'delta') {
+    aiChatAppendStreamDelta(text);
+    return;
+  }
+  if (kind === 'final') {
+    AI_CHAT_STATE.pendingStreamFinalText = text;
+    aiChatFinalizeStream(text);
+    return;
+  }
+  if (kind === 'error') {
+    aiChatFailStream(text);
+    return;
+  }
+  if (kind === 'end') {
+    if (AI_CHAT_STATE.pendingStreamMessageId && AI_CHAT_STATE.pendingRawText) aiChatFinalizeStream(AI_CHAT_STATE.pendingStreamFinalText || AI_CHAT_STATE.pendingRawText);
+    return;
+  }
+  aiChatAppendStreamDelta(text);
+}
 function runAiChatUiValidation() {
   const bridge = aiChatBridge();
   if (!bridge) return { ok: false, errors: ['AI bridge is not available.'] };
@@ -344,6 +443,54 @@ function runAiChatUiValidation() {
   return { ok: errors.length === 0, errors };
 }
 
+function runAiChatStreamingValidation() {
+  const bridge = aiChatBridge();
+  if (!bridge) return { ok: false, errors: ['AI bridge is not available.'] };
+  const errors = [];
+  const originalProject = project;
+  const originalMessages = AI_CHAT_STATE.messages;
+  const originalProposals = AI_CHAT_STATE.proposals;
+  const originalRawText = AI_CHAT_STATE.pendingRawText;
+  const originalRequestId = AI_CHAT_STATE.pendingRequestId;
+  const originalStreamMessageId = AI_CHAT_STATE.pendingStreamMessageId;
+  const originalFinalText = AI_CHAT_STATE.pendingStreamFinalText;
+  project = { id: 'proj-ai-stream-test', name: 'AI Stream Test', diagrams: [], units: [], devices: [], variables: { imported: [], user: [] }, excelVars: [], unitConfig: {}, ioMapping: { physicalIOs: [], entries: [] } };
+  AI_CHAT_STATE.messages = [];
+  AI_CHAT_STATE.proposals = {};
+  aiChatResetPendingStream();
+  try {
+    const raw = bridge.mockService.getFixtureRawText('create-variable');
+    receiveAiStreamEvent({ kind: 'start', text: 'test start' });
+    receiveAiStreamEvent({ kind: 'status', text: 'status update' });
+    receiveAiStreamEvent({ kind: 'delta', text: raw.slice(0, 13) });
+    if (Object.keys(AI_CHAT_STATE.proposals).length !== 0) errors.push('partial streaming JSON must not create a proposal before final.');
+    receiveAiStreamEvent({ kind: 'delta', text: raw.slice(13) });
+    receiveAiStreamEvent({ kind: 'final', text: raw });
+    if (Object.keys(AI_CHAT_STATE.proposals).length !== 1) errors.push('final streaming JSON should create exactly one validated preview proposal.');
+
+    receiveAiStreamEvent({ kind: 'start', text: 'malformed start' });
+    receiveAiStreamEvent({ kind: 'delta', text: bridge.mockService.getFixtureRawText('malformed-json') });
+    const malformedResult = aiChatFinalizeStream('');
+    if (malformedResult.ok) errors.push('malformed final JSON must fail parser validation.');
+
+    receiveAiStreamEvent({ kind: 'start', text: 'error start' });
+    receiveAiStreamEvent({ kind: 'error', text: 'mock error' });
+    const lastMessage = AI_CHAT_STATE.messages[AI_CHAT_STATE.messages.length - 1];
+    if (!lastMessage || !lastMessage.error) errors.push('streaming error should render an error message and no proposal.');
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  } finally {
+    project = originalProject;
+    AI_CHAT_STATE.messages = originalMessages;
+    AI_CHAT_STATE.proposals = originalProposals;
+    AI_CHAT_STATE.pendingRawText = originalRawText;
+    AI_CHAT_STATE.pendingRequestId = originalRequestId;
+    AI_CHAT_STATE.pendingStreamMessageId = originalStreamMessageId;
+    AI_CHAT_STATE.pendingStreamFinalText = originalFinalText;
+    aiChatRender();
+  }
+  return { ok: errors.length === 0, errors };
+}
 window.toggleAiChatPanel = toggleAiChatPanel;
 window.aiChatSend = aiChatSend;
 window.aiChatInsertMockProposal = aiChatInsertMockProposal;

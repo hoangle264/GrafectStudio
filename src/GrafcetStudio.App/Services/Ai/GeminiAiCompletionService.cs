@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -25,28 +26,7 @@ public class GeminiAiCompletionService : IAiCompletionService
             return AiCompletionResult.Failure("Gemini API key is not configured on the host.");
         }
 
-        var systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
-        var userPrompt = AiPromptBuilder.BuildUserPrompt(request.Request);
-        var payload = new
-        {
-            systemInstruction = new
-            {
-                parts = new[] { new { text = systemPrompt } }
-            },
-            contents = new[]
-            {
-                new
-                {
-                    role = "user",
-                    parts = new[] { new { text = userPrompt } }
-                }
-            },
-            generationConfig = new
-            {
-                temperature = 0.2,
-                responseMimeType = "application/json"
-            }
-        };
+        var payload = BuildGeminiPayload(request);
 
         var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(_model)}:generateContent?key={Uri.EscapeDataString(_apiKey)}";
         using var content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json");
@@ -66,6 +46,101 @@ public class GeminiAiCompletionService : IAiCompletionService
             : AiCompletionResult.Success(text);
     }
 
+    public async IAsyncEnumerable<AiStreamChunk> StreamAsync(AiCompletionRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            throw new InvalidOperationException("Gemini API key is not configured on the host.");
+        }
+
+        yield return AiStreamChunk.Status("Gemini streaming request started.");
+        var payload = BuildGeminiPayload(request);
+        var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(_model)}:streamGenerateContent?alt=sse&key={Uri.EscapeDataString(_apiKey)}";
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json")
+        };
+
+        using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Gemini streaming request failed with HTTP {(int)response.StatusCode}.");
+        }
+
+        var finalBuilder = new StringBuilder();
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null) break;
+            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+            var data = line[5..].Trim();
+            if (data == "[DONE]") break;
+
+            var parseResult = TryExtractStreamText(data);
+            if (parseResult.Malformed)
+            {
+                yield return AiStreamChunk.Status("Ignored malformed Gemini streaming metadata.");
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(parseResult.Text)) continue;
+            finalBuilder.Append(parseResult.Text);
+            yield return AiStreamChunk.Delta(parseResult.Text);
+        }
+
+        var finalText = finalBuilder.ToString();
+        if (string.IsNullOrWhiteSpace(finalText))
+        {
+            throw new InvalidOperationException("Gemini stream ended without proposal text.");
+        }
+
+        yield return AiStreamChunk.Final(finalText);
+    }
+
+
+    private static object BuildGeminiPayload(AiCompletionRequest request)
+    {
+        var systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
+        var userPrompt = AiPromptBuilder.BuildUserPrompt(request.Request);
+        return new
+        {
+            systemInstruction = new
+            {
+                parts = new[] { new { text = systemPrompt } }
+            },
+            contents = new[]
+            {
+                new
+                {
+                    role = "user",
+                    parts = new[] { new { text = userPrompt } }
+                }
+            },
+            generationConfig = new
+            {
+                temperature = 0.2,
+                responseMimeType = "application/json"
+            }
+        };
+    }
+
+
+    private static (string Text, bool Malformed) TryExtractStreamText(string data)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(data);
+            return (ExtractText(doc.RootElement), false);
+        }
+        catch (JsonException)
+        {
+            return (string.Empty, true);
+        }
+    }
     private static string ExtractText(JsonElement root)
     {
         if (!root.TryGetProperty("candidates", out var candidates) || candidates.ValueKind != JsonValueKind.Array)

@@ -6,15 +6,61 @@ public class MockAiCompletionService : IAiCompletionService
 {
     public Task<AiCompletionResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken = default)
     {
-        var rawResponse = request.FixtureName switch
+        var rawResponse = BuildRawResponse(request);
+        return Task.FromResult(AiCompletionResult.Success(rawResponse));
+    }
+
+    public async IAsyncEnumerable<AiStreamChunk> StreamAsync(AiCompletionRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        yield return AiStreamChunk.Status("Mock streaming request accepted.");
+        await Task.Delay(10, cancellationToken);
+
+        if (request.FixtureName == "stream-timeout")
+        {
+            yield return AiStreamChunk.Status("Mock streaming timeout fixture started.");
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+
+        if (request.FixtureName == "stream-cancel")
+        {
+            yield return AiStreamChunk.Status("Mock streaming cancel fixture started.");
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        if (request.FixtureName == "stream-error")
+        {
+            yield return AiStreamChunk.Status("Mock streaming error fixture started.");
+            throw new InvalidOperationException("Mock streaming service error.");
+        }
+
+        var rawResponse = BuildRawResponse(request);
+        yield return AiStreamChunk.Status("Mock streaming proposal JSON.");
+
+        foreach (var chunk in SplitJson(rawResponse, request.FixtureName == "partial-json" ? 17 : 48))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return AiStreamChunk.Delta(chunk);
+            await Task.Delay(2, cancellationToken);
+        }
+
+        yield return AiStreamChunk.Final(rawResponse);
+    }
+
+    private static IEnumerable<string> SplitJson(string text, int chunkSize)
+    {
+        for (var index = 0; index < text.Length; index += chunkSize)
+        {
+            yield return text.Substring(index, Math.Min(chunkSize, text.Length - index));
+        }
+    }
+
+    private static string BuildRawResponse(AiCompletionRequest request)
+        => request.FixtureName switch
         {
             "malformed-json" => BuildMalformedJsonFixture(),
             "wrong-proposal-shape" => BuildWrongProposalShapeFixture(),
             _ => BuildProposalFixture(request.Request.Intent, request.Request.Id)
         };
-
-        return Task.FromResult(AiCompletionResult.Success(rawResponse));
-    }
 
     private static string BuildMalformedJsonFixture()
         => "{ \"schemaVersion\": \"" + AiContractGuard.SchemaVersion + "\", \"intent\": \"create-variable\", \"data\": { ";

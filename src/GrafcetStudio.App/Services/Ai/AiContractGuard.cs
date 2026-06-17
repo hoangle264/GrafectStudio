@@ -91,6 +91,10 @@ public static class AiContractGuard
         {
             "malformed-json" => "malformed-json",
             "wrong-proposal-shape" => "wrong-proposal-shape",
+            "partial-json" => "partial-json",
+            "stream-timeout" => "stream-timeout",
+            "stream-cancel" => "stream-cancel",
+            "stream-error" => "stream-error",
             _ => null
         };
 

@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioAIBridge {
+namespace GrafcetStudioAIBridge {
   export interface AiBridgeApi {
     readonly version: string;
     readonly modules: readonly string[];
@@ -39,7 +39,7 @@
   ];
 
   export const api: AiBridgeApi = {
-    version: '0.7.0-p7',
+    version: '0.9.0-p9',
     contracts: GrafcetStudioAIContracts.api,
     sanitizer: GrafcetStudioAISanitizer.api,
     contextBuilder: GrafcetStudioAIContextBuilder.api,

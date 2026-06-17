@@ -14,7 +14,7 @@ var GrafcetStudioAIBridge;
         'src/web/js/codegen/unit-config.js'
     ];
     GrafcetStudioAIBridge.api = {
-        version: '0.7.0-p7',
+        version: '0.9.0-p9',
         contracts: GrafcetStudioAIContracts.api,
         sanitizer: GrafcetStudioAISanitizer.api,
         contextBuilder: GrafcetStudioAIContextBuilder.api,

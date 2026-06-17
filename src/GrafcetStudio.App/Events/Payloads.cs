@@ -16,6 +16,7 @@ public class AiRequestPayload
     public string DiagramContext { get; set; } = string.Empty;
     public string RequestJson { get; set; } = string.Empty;
     public string FixtureName { get; set; } = string.Empty;
+    public bool Stream { get; set; }
 }
 
 public class ExportCodePayload
