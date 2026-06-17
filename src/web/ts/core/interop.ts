@@ -1,7 +1,8 @@
 ﻿namespace GrafcetStudioInterop {
-  export type BridgeName = 'codegenPayload' | 'excelImport' | 'store' | 'vars' | 'ioMapping' | 'tree' | 'tables';
+  export type BridgeName = 'ai' | 'codegenPayload' | 'excelImport' | 'store' | 'vars' | 'ioMapping' | 'tree' | 'tables';
 
   export interface BridgeRegistry {
+    ai?: unknown;
     codegenPayload?: unknown;
     excelImport?: unknown;
     store?: unknown;

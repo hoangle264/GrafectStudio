@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudio.App.Events;
+namespace GrafcetStudio.App.Events;
 
 public class GenerateCodePayload
 {
@@ -14,6 +14,8 @@ public class AiRequestPayload
     public string Type { get; set; } = string.Empty;
     public string Prompt { get; set; } = string.Empty;
     public string DiagramContext { get; set; } = string.Empty;
+    public string RequestJson { get; set; } = string.Empty;
+    public string FixtureName { get; set; } = string.Empty;
 }
 
 public class ExportCodePayload
@@ -26,5 +28,3 @@ public class BrowseCodegenPathPayload
 {
     public string Target { get; set; } = string.Empty;
 }
-
-
