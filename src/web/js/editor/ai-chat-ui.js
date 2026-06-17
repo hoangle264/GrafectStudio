@@ -501,3 +501,4 @@ window.aiChatCancelEdit = aiChatCancelEdit;
 window.aiChatSaveEdit = aiChatSaveEdit;
 window.receiveAiChunk = receiveAiChunk;
 window.runAiChatUiValidation = runAiChatUiValidation;
+window.runAiChatStreamingValidation = runAiChatStreamingValidation;

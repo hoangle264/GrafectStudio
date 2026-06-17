@@ -21,6 +21,28 @@ public static class AiContractGuard
         WriteIndented = false
     };
 
+    private static readonly HashSet<string> SensitiveContextKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "apiKey",
+        "apikey",
+        "authorization",
+        "connectionString",
+        "deviceLibraryPath",
+        "filePath",
+        "hostName",
+        "localConfig",
+        "machineName",
+        "outputPath",
+        "password",
+        "path",
+        "secret",
+        "secretToken",
+        "sourcePath",
+        "templatePath",
+        "templateRootPath",
+        "token"
+    };
+
     public static AiRequestSanitizationResult SanitizeRequestJson(string requestJson)
     {
         if (string.IsNullOrWhiteSpace(requestJson))
@@ -116,8 +138,51 @@ public static class AiContractGuard
         if (!source.TryGetProperty(propertyName, out var property)) return;
 
         var node = JsonNode.Parse(property.GetRawText());
-        if (node is not null) output[propertyName] = node;
+        var sanitized = SanitizeContextNode(node);
+        if (sanitized is not null) output[propertyName] = sanitized;
     }
+
+    private static JsonNode? SanitizeContextNode(JsonNode? node)
+    {
+        if (node is JsonObject obj)
+        {
+            var output = new JsonObject();
+            foreach (var property in obj)
+            {
+                if (SensitiveContextKeys.Contains(property.Key)) continue;
+                var child = SanitizeContextNode(property.Value?.DeepClone());
+                if (child is not null) output[property.Key] = child;
+            }
+
+            return output;
+        }
+
+        if (node is JsonArray array)
+        {
+            var output = new JsonArray();
+            foreach (var item in array)
+            {
+                var child = SanitizeContextNode(item?.DeepClone());
+                if (child is not null) output.Add(child);
+            }
+
+            return output;
+        }
+
+        if (node is JsonValue value && value.TryGetValue<string>(out var text))
+        {
+            return LooksSensitiveText(text) ? null : JsonValue.Create(TrimToLimit(text, 1000));
+        }
+
+        return node;
+    }
+
+    private static bool LooksSensitiveText(string value)
+        => value.Contains("C:\\", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("\\\\", StringComparison.Ordinal)
+            || value.Contains("templates\\", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("sk-test-secret", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("AIza", StringComparison.OrdinalIgnoreCase);
 
     private static string GetString(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String

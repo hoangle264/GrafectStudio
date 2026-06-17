@@ -164,16 +164,17 @@ P10 Ã¢â‚¬â€ Integration + Security Tests
 
 
 ### P10 Ã¢â‚¬â€ Integration + Security Tests
-- [ ] Run TypeScript typecheck/build after each TS/JS-related phase.
-- [ ] Test sanitizer fixtures for file paths, machine names, template paths, secret-like fields, and oversized context.
-- [ ] Test parser/validator fixtures for valid proposal, malformed JSON, missing fields, wrong intent shape, and unsupported schema version.
-- [ ] Test apply behavior for dry-run, successful apply, failed preconditions, double-click Apply, edit then apply, and discard without mutation.
-- [ ] Test mock end-to-end flow before using the real Gemini API.
-- [ ] Test real Gemini non-streaming output only after mock parser/preview/apply flow passes.
-- [ ] Test full flow: JS chat UI Ã¢â€ â€™ context builder Ã¢â€ â€™ C# service Ã¢â€ â€™ parser Ã¢â€ â€™ preview Ã¢â€ â€™ apply Ã¢â€ â€™ save/render.
+- [x] Run TypeScript typecheck/build after each TS/JS-related phase.
+- [x] Test sanitizer fixtures for file paths, machine names, template paths, secret-like fields, and oversized context.
+- [x] Test parser/validator fixtures for valid proposal, malformed JSON, missing fields, wrong intent shape, and unsupported schema version.
+- [x] Test apply behavior for dry-run, successful apply, failed preconditions, double-click Apply, edit then apply, and discard without mutation.
+- [x] Test mock end-to-end flow before using the real Gemini API.
+- [x] Test real Gemini non-streaming output only after mock parser/preview/apply flow passes.
+- [x] Test full flow: JS chat UI Ã¢â€ â€™ context builder Ã¢â€ â€™ C# service Ã¢â€ â€™ parser Ã¢â€ â€™ preview Ã¢â€ â€™ apply Ã¢â€ â€™ save/render.
 
 #### Notes
 - Real API tests should be treated as integration checks, not the primary safety net.
+- P10 completed: added bridge-level P10 validation for sanitizer/parser/apply/mock/full-flow checks, exported AI chat UI + streaming validation helpers, added host-side recursive request scrubbing validation, and validated with `npm.cmd run typecheck`, `npm.cmd run build`, Node P10 runtime validation, Node AI chat UI/streaming validation, and `dotnet build src\GrafcetStudio.App\GrafcetStudio.App.csproj -v:minimal`. Real Gemini non-streaming was skipped because no API key/network-enabled integration environment was available; mock parser/preview/apply flow passed first.
 
 ## Intent Priority
 1. `create-variable` Ã¢â‚¬â€ simplest proposal shape, easy preview, easy validation, and safe apply behavior.

@@ -1,7 +1,7 @@
 "use strict";
 var GrafcetStudioAIBridge;
 (function (GrafcetStudioAIBridge) {
-    const compiledModules = ['src/web/ts/ai/contracts.ts', 'src/web/ts/ai/sanitizer.ts', 'src/web/ts/ai/sanitizer-validation.ts', 'src/web/ts/ai/context-builder.ts', 'src/web/ts/ai/context-builder-validation.ts', 'src/web/ts/ai/parser.ts', 'src/web/ts/ai/parser-validation.ts', 'src/web/ts/ai/mock-service.ts', 'src/web/ts/ai/mock-service-validation.ts', 'src/web/ts/ai/apply.ts', 'src/web/ts/ai/apply-validation.ts', 'src/web/ts/ai/bridge.ts'];
+    const compiledModules = ['src/web/ts/ai/contracts.ts', 'src/web/ts/ai/sanitizer.ts', 'src/web/ts/ai/sanitizer-validation.ts', 'src/web/ts/ai/context-builder.ts', 'src/web/ts/ai/context-builder-validation.ts', 'src/web/ts/ai/parser.ts', 'src/web/ts/ai/parser-validation.ts', 'src/web/ts/ai/mock-service.ts', 'src/web/ts/ai/mock-service-validation.ts', 'src/web/ts/ai/apply.ts', 'src/web/ts/ai/apply-validation.ts', 'src/web/ts/ai/p10-validation.ts', 'src/web/ts/ai/bridge.ts'];
     const plainJavaScriptModules = [
         'src/web/js/editor/*-ui.js',
         'src/web/js/editor/actions.js',
@@ -26,6 +26,7 @@ var GrafcetStudioAIBridge;
         runProposalParserValidation: GrafcetStudioAIProposalParserValidation.runProposalParserValidation,
         runMockServiceValidation: GrafcetStudioAIMockServiceValidation.runMockServiceValidation,
         runApplyValidation: GrafcetStudioAIApplyValidation.runApplyValidation,
+        runP10IntegrationSecurityValidation: GrafcetStudioAIP10Validation.runP10IntegrationSecurityValidation,
         modules: compiledModules,
         getBuildInfo: function () {
             return {
