@@ -33,6 +33,17 @@ var GrafcetStudioAIProposalParserValidation;
         unsupportedSchema.schemaVersion = '999.0.0';
         const unsupportedSchemaResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(unsupportedSchema));
         assert(!unsupportedSchemaResult.ok, 'unsupported schema version should fail validation.', errors);
+        const cloneArrayShape = parseObject(GrafcetStudioAIMockService.getFixtureRawText('clone-variable'));
+        cloneArrayShape.data = {
+            sources: [{ label: 'Imported_A' }, { label: 'Imported_B' }],
+            variables: [
+                { label: 'Cloned_A', format: 'bool', address: 'M10', kind: 'primitive' },
+                { label: 'Cloned_B', format: 'bool', address: 'M11', kind: 'primitive' }
+            ]
+        };
+        const cloneArrayShapeResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(cloneArrayShape));
+        assert(cloneArrayShapeResult.ok, 'clone-variable array-shaped AI response should normalize to first source and variable.', errors);
+        assert(!!cloneArrayShapeResult.value && (cloneArrayShapeResult.value.warnings || []).length > 0, 'clone-variable array normalization should add warnings.', errors);
         return {
             ok: errors.length === 0,
             errors,
@@ -41,7 +52,8 @@ var GrafcetStudioAIProposalParserValidation;
             missingFieldsResult,
             wrongIntentShapeResult,
             unknownIntentResult,
-            unsupportedSchemaResult
+            unsupportedSchemaResult,
+            cloneArrayShapeResult
         };
     }
     GrafcetStudioAIProposalParserValidation.runProposalParserValidation = runProposalParserValidation;

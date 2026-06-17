@@ -87,12 +87,44 @@
     return { ok: false, rawText: text, errors: ['AI response does not contain a complete JSON object or array.'] };
   }
 
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function firstRecord(value: unknown): Record<string, unknown> | null {
+    if (isRecord(value)) return value;
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (isRecord(value[index])) return value[index] as Record<string, unknown>;
+      }
+    }
+    return null;
+  }
+
+  function normalizeCloneVariableShape(normalized: GrafcetStudioAIContracts.AiProposal): void {
+    if (normalized.intent !== 'clone-variable' || !isRecord(normalized.data)) return;
+    const data = normalized.data as Record<string, unknown>;
+    const warnings = normalized.warnings || [];
+    const source = firstRecord(data.source) || firstRecord(data.sources);
+    const variable = firstRecord(data.variable) || firstRecord(data.variables);
+    if (source && data.source !== source) {
+      data.source = source;
+      warnings.push('AI returned multiple clone sources; using the first source for this proposal.');
+    }
+    if (variable && data.variable !== variable) {
+      data.variable = variable;
+      warnings.push('AI returned multiple clone variables; using the first variable for this proposal. Ask for one variable at a time to apply more clones.');
+    }
+    normalized.warnings = warnings;
+  }
+
   export function normalizeAiProposal(proposal: GrafcetStudioAIContracts.AiProposal): GrafcetStudioAIContracts.AiProposal {
     const normalized = JSON.parse(JSON.stringify(proposal)) as GrafcetStudioAIContracts.AiProposal;
     normalized.schemaVersion = GrafcetStudioAIContracts.schemaVersion;
     normalized.status = 'validated';
     normalized.warnings = normalized.warnings || [];
     normalized.errors = normalized.errors || [];
+    normalizeCloneVariableShape(normalized);
     return normalized;
   }
 
@@ -112,6 +144,10 @@
         jsonText: extraction.value,
         errors: ['AI response JSON is malformed: ' + (error instanceof Error ? error.message : String(error))]
       };
+    }
+
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      normalizeCloneVariableShape(parsed as GrafcetStudioAIContracts.AiProposal);
     }
 
     const validation = GrafcetStudioAIContracts.validateAiProposal(parsed);

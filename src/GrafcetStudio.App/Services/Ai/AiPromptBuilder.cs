@@ -6,7 +6,7 @@ public static class AiPromptBuilder
     {
         var intentRequirements = intent switch
         {
-            "clone-variable" => "Return data.source and data.variable. The new variable must be safe, deterministic, and must not overwrite existing variables.",
+            "clone-variable" => "Return exactly one data.source object and exactly one data.variable object. Do not return arrays, data.variables, or multiple clones in one proposal. If the user asks for multiple variables, propose the first safe variable and add a warning that additional variables require separate proposals.",
             "map-io" => "Return data.entries only. Each entry must contain physicalIOId, appVariable, status, and optional matchScore.",
             "create-flow" => "Return data.flow only. Keep the flow minimal, with valid ids, steps, transitions, and connections.",
             _ => "Return data.bucket and data.variable only. Use bucket \"user\" unless sanitized context clearly requires another safe bucket."
@@ -18,6 +18,7 @@ public static class AiPromptBuilder
             "Return exactly one JSON object and no markdown, comments, or explanatory text.",
             $"The JSON object must use schemaVersion \"{AiContractGuard.SchemaVersion}\" and intent \"{intent}\".",
             "The JSON object must contain: schemaVersion, id, intent, status, requestId, summary, warnings, data.",
+            "For create-variable and clone-variable, data.variable must be a single object, never an array.",
             "status must be \"draft\". The app will validate and preview before any apply step.",
             "Do not include secrets, local file paths, machine names, API keys, host config, or unsanitized project data.",
             "Do not ask the app to mutate state directly. Produce proposals only.",

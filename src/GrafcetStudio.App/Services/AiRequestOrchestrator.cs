@@ -86,11 +86,24 @@ public class AiRequestOrchestrator
             await _webViewBridgeService.SendAiStreamEventAsync("error", "AI streaming request was canceled or timed out.", done: true);
             await _webViewBridgeService.SendAiStreamEventAsync("end", string.Empty, done: true);
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            await _webViewBridgeService.SendAiStreamEventAsync("error", "AI streaming service failed before producing a validated proposal.", done: true);
+            await _webViewBridgeService.SendAiStreamEventAsync("error", BuildSafeStreamingError(error), done: true);
             await _webViewBridgeService.SendAiStreamEventAsync("end", string.Empty, done: true);
         }
+    }
+
+    private static string BuildSafeStreamingError(Exception error)
+    {
+        var message = error.Message;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "AI streaming service failed before producing a validated proposal.";
+        }
+
+        message = message.Replace(Environment.NewLine, " ").Trim();
+        if (message.Length > 240) message = message[..240] + "...";
+        return "AI streaming service failed: " + message;
     }
 
     private async Task SendErrorProposalAsync(AiRequestPayload payload, IReadOnlyList<string> errors)
