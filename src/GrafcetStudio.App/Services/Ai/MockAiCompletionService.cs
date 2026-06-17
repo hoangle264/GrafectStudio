@@ -1,105 +1,28 @@
-using GrafcetStudio.App.Events;
-using Prism.Events;
-using System;
 using System.Text.Json;
-using System.Threading.Tasks;
 
-namespace GrafcetStudio.App.Services;
+namespace GrafcetStudio.App.Services.Ai;
 
-public class MockAiService
+public class MockAiCompletionService : IAiCompletionService
 {
-    private const string SchemaVersion = "1.0.0";
-    private readonly IWebViewBridgeService _webViewBridgeService;
-
-    public MockAiService(IEventAggregator eventAggregator, IWebViewBridgeService webViewBridgeService)
+    public Task<AiCompletionResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken = default)
     {
-        _webViewBridgeService = webViewBridgeService;
-        eventAggregator.GetEvent<AiRequestedEvent>().Subscribe(async payload => await HandleAiRequestAsync(payload));
-    }
-
-    private async Task HandleAiRequestAsync(AiRequestPayload payload)
-    {
-        var request = TryReadRequest(payload);
         var rawResponse = request.FixtureName switch
         {
             "malformed-json" => BuildMalformedJsonFixture(),
             "wrong-proposal-shape" => BuildWrongProposalShapeFixture(),
-            _ => BuildProposalFixture(request.Intent, request.RequestId)
+            _ => BuildProposalFixture(request.Request.Intent, request.Request.Id)
         };
 
-        await _webViewBridgeService.SendAiChunkAsync(rawResponse);
-        await _webViewBridgeService.SendAiChunkAsync("__STREAM_END__");
-    }
-
-    private static MockRequest TryReadRequest(AiRequestPayload payload)
-    {
-        var request = new MockRequest(
-            NormalizeIntent(payload.Type),
-            string.Empty,
-            NormalizeFixtureName(payload.Type));
-
-        var rawJson = !string.IsNullOrWhiteSpace(payload.RequestJson)
-            ? payload.RequestJson
-            : payload.DiagramContext;
-
-        if (string.IsNullOrWhiteSpace(rawJson)) return request;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(rawJson);
-            var root = doc.RootElement;
-            var intent = GetOptionalString(root, "intent");
-            var requestId = GetOptionalString(root, "id");
-            var fixtureName = GetOptionalString(root, "fixtureName", "mockFixture");
-
-            return new MockRequest(
-                NormalizeIntent(intent, request.Intent),
-                requestId,
-                NormalizeFixtureName(fixtureName, request.FixtureName));
-        }
-        catch (JsonException)
-        {
-            return request;
-        }
-    }
-
-    private static string NormalizeIntent(string? value, string fallback = "create-variable")
-        => value switch
-        {
-            "clone-variable" => "clone-variable",
-            "map-io" => "map-io",
-            "create-flow" => "create-flow",
-            _ => fallback
-        };
-
-    private static string NormalizeFixtureName(string? value, string fallback = "")
-        => value switch
-        {
-            "malformed-json" => "malformed-json",
-            "wrong-proposal-shape" => "wrong-proposal-shape",
-            _ => fallback
-        };
-
-    private static string GetOptionalString(JsonElement element, params string[] propertyNames)
-    {
-        foreach (var propertyName in propertyNames)
-        {
-            if (element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String)
-            {
-                return property.GetString() ?? string.Empty;
-            }
-        }
-
-        return string.Empty;
+        return Task.FromResult(AiCompletionResult.Success(rawResponse));
     }
 
     private static string BuildMalformedJsonFixture()
-        => "{ \"schemaVersion\": \"" + SchemaVersion + "\", \"intent\": \"create-variable\", \"data\": { ";
+        => "{ \"schemaVersion\": \"" + AiContractGuard.SchemaVersion + "\", \"intent\": \"create-variable\", \"data\": { ";
 
     private static string BuildWrongProposalShapeFixture()
         => JsonSerializer.Serialize(new
         {
-            schemaVersion = SchemaVersion,
+            schemaVersion = AiContractGuard.SchemaVersion,
             id = "ai-prop-mock-wrong-shape",
             intent = "create-variable",
             status = "draft",
@@ -181,7 +104,7 @@ public class MockAiService
     private static string SerializeProposal(string id, string intent, string requestId, object data, string summary)
         => JsonSerializer.Serialize(new
         {
-            schemaVersion = SchemaVersion,
+            schemaVersion = AiContractGuard.SchemaVersion,
             id,
             intent,
             status = "draft",
@@ -190,6 +113,4 @@ public class MockAiService
             warnings = new[] { "Mock fixture only; no project mutation has been performed." },
             data
         });
-
-    private sealed record MockRequest(string Intent, string RequestId, string FixtureName);
 }

@@ -139,15 +139,17 @@ P10 Ã¢â‚¬â€ Integration + Security Tests
 - P7 completed: added right-panel AI Preview chat bubbles, variable proposal preview rendering, Apply/Discard/Edit actions with status updates, bridge-backed parser/dry-run/apply calls, guarded Apply state, and in-bubble validation/apply error rendering.
 
 ### P8 Ã¢â‚¬â€ Gemini Non-Streaming
-- [ ] Implement the C# Gemini AI service behind an interface that can also support mock mode.
-- [ ] Store Gemini API keys only in host-side config, environment variables, or a secure user setting.
-- [ ] Build system prompts per intent with explicit JSON output requirements.
-- [ ] Send sanitized `AiRequest` data only.
-- [ ] Receive a full non-streaming response first and pass it through the parser/validator pipeline.
-- [ ] Avoid logging API keys, raw secrets, or full sensitive prompts.
+- [x] Implement the C# Gemini AI service behind an interface that can also support mock mode.
+- [x] Store Gemini API keys only in host-side config, environment variables, or a secure user setting.
+- [x] Build system prompts per intent with explicit JSON output requirements.
+- [x] Send sanitized `AiRequest` data only.
+- [x] Receive a full non-streaming response first and pass it through the parser/validator pipeline.
+- [x] Avoid logging API keys, raw secrets, or full sensitive prompts.
 
 #### Notes
 - Non-streaming is the first real API milestone because it is easier to validate and debug than chunked JSON.
+- P8 completed: added host-side `IAiCompletionService` with mock and Gemini implementations, environment-only Gemini config (`GRAFCETSTUDIO_AI_MODE=gemini`, `GEMINI_API_KEY`/`GRAFCETSTUDIO_GEMINI_API_KEY`, optional `GRAFCETSTUDIO_GEMINI_MODEL`), intent-specific JSON prompts, host-side `AiRequest` sanitization, full non-streaming response handoff to the existing parser/validator/preview path, and no secret/full-prompt logging. Validated C# build, TS typecheck/build, and mock mode; real Gemini request was not run because no API key was present in the environment.
+
 
 ### P9 Ã¢â‚¬â€ Streaming Support
 - [ ] Add streaming only after the non-streaming flow is stable.

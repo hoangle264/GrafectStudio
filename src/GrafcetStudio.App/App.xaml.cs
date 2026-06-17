@@ -1,4 +1,5 @@
 using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Services.Ai;
 using GrafcetStudio.App.Services;
 using GrafcetStudio.CodeGen.Profile;
 using GrafcetStudio.CodeGen.Template;
@@ -6,12 +7,27 @@ using GrafcetStudio.Domain.Resolution;
 using HandlebarsDotNet;
 using Prism.DryIoc;
 using Prism.Ioc;
+using System;
+using System.Net.Http;
+using System.Text.Json;
 using System.Windows;
 
 namespace GrafcetStudio.App;
 
 public partial class App : PrismApplication
 {
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        if (e.Args.Any(arg => string.Equals(arg, "--validate-ai-mock", StringComparison.OrdinalIgnoreCase)))
+        {
+            RunAiMockValidationAsync().GetAwaiter().GetResult();
+            Shutdown(0);
+            return;
+        }
+
+        base.OnStartup(e);
+    }
+
     protected override IContainerExtension CreateContainerExtension() => new DryIocContainerExtension();
 
     protected override Window CreateShell() => Container.Resolve<MainWindow>();
@@ -35,12 +51,54 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ConfigService>();
         containerRegistry.RegisterSingleton<CodeGenerationOrchestrator>();
         containerRegistry.RegisterSingleton<FileIOOrchestrator>();
-        containerRegistry.RegisterSingleton<MockAiService>();
+        RegisterAiServices(containerRegistry);
+        containerRegistry.RegisterSingleton<AiRequestOrchestrator>();
 
         Container.Resolve<CodeGenerationOrchestrator>().Init();
         Container.Resolve<FileIOOrchestrator>().Init();
-        Container.Resolve<MockAiService>();
+        Container.Resolve<AiRequestOrchestrator>();
+    }
+
+    private static async Task RunAiMockValidationAsync()
+    {
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = AiContractGuard.SchemaVersion,
+            id = "ai-req-host-mock-validation",
+            intent = "create-variable",
+            message = "Create a safe mock validation variable.",
+            context = new { variables = new { user = Array.Empty<object>(), imported = Array.Empty<object>() } }
+        });
+
+        var sanitized = AiContractGuard.SanitizeRequestJson(requestJson);
+        if (!sanitized.Ok || sanitized.Request is null)
+        {
+            throw new InvalidOperationException("AI mock validation request failed sanitization: " + string.Join("; ", sanitized.Errors));
+        }
+
+        var result = await new MockAiCompletionService().CompleteAsync(new AiCompletionRequest(sanitized.Request));
+        if (!result.Ok || !result.RawText.Contains("\"intent\":\"create-variable\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("AI mock validation did not produce a create-variable proposal.");
+        }
+
+        Console.WriteLine("AI mock validation passed.");
+    }
+
+    private static void RegisterAiServices(IContainerRegistry containerRegistry)
+    {
+        var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_AI_MODE")?.Trim();
+        var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY")?.Trim()
+            ?? Environment.GetEnvironmentVariable("GRAFCETSTUDIO_GEMINI_API_KEY")?.Trim();
+        var model = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_GEMINI_MODEL")?.Trim();
+
+        if (string.Equals(mode, "gemini", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(apiKey))
+        {
+            containerRegistry.RegisterInstance<IAiCompletionService>(new GeminiAiCompletionService(new HttpClient(), apiKey, model));
+            return;
+        }
+
+        containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
     }
 }
-
 
