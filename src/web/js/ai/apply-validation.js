@@ -52,6 +52,16 @@ var GrafcetStudioAIApplyValidation;
             data: { name, signals }
         };
     }
+    function makeCreateFlowProposal(id, flow) {
+        return {
+            schemaVersion: GrafcetStudioAIContracts.schemaVersion,
+            id,
+            intent: 'create-flow',
+            status: 'validated',
+            summary: 'Apply validation create-flow fixture.',
+            data: { flow }
+        };
+    }
     function makeContext(project, counts) {
         return {
             getProject: function () { return project; },
@@ -150,6 +160,55 @@ var GrafcetStudioAIApplyValidation;
         assert(cloneProject.variables.user.length === beforeDryRunConflict, 'clone-variable dry-run must not mutate project.', errors);
         const cloneDoubleApplyResult = GrafcetStudioAIApply.applyProposal(cloneAllUniqueProposal, { context: cloneContext });
         assert(!cloneDoubleApplyResult.ok, 'clone-variable double apply should fail.', errors);
+        const flowProject = makeProject();
+        const flowCounts = { saveProject: 0, renderTree: 0, renderGlobalVarTable: 0, refresh: 0 };
+        const flowContext = makeContext(flowProject, flowCounts);
+        const flowProposal = makeCreateFlowProposal('ai-prop-flow-1', {
+            id: 'flow-basic-cycle',
+            name: 'Basic Cycle',
+            type: 'Grafcet',
+            mode: 'Auto',
+            steps: [
+                { id: 'step-idle', number: 1, label: 'Idle', initial: true, actions: [] },
+                { id: 'step-run', number: 2, label: 'Run', initial: false, actions: [] }
+            ],
+            transitions: [
+                { id: 'trans-start', label: 'Start', condition: 'StartCommand', fromStepIds: ['step-idle'], toStepIds: ['step-run'] }
+            ],
+            connections: [
+                { from: 'step-idle', to: 'trans-start' },
+                { from: 'trans-start', to: 'step-run' }
+            ]
+        });
+        const flowDryRunSuccess = GrafcetStudioAIApply.dryRunProposal(flowProposal, { context: flowContext });
+        assert(flowDryRunSuccess.ok, 'create-flow dry-run should succeed for a valid flow proposal.', errors);
+        assert(flowProject.diagrams.length === 1, 'create-flow dry-run must not mutate project.', errors);
+        const flowApplySuccess = GrafcetStudioAIApply.applyProposal(flowProposal, { context: flowContext });
+        assert(flowApplySuccess.ok, 'create-flow apply should succeed for a valid flow proposal.', errors);
+        assert(flowProject.diagrams.length === 1, 'create-flow apply should add or resolve one diagram.', errors);
+        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).steps.length === 2, 'create-flow apply should materialize both steps.', errors);
+        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).transitions.length === 1, 'create-flow apply should materialize the transition.', errors);
+        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).connections.length === 2, 'create-flow apply should materialize the connections.', errors);
+        assert(flowProposal.status === 'applied', 'create-flow apply should mark proposal applied.', errors);
+        assert(flowCounts.saveProject === 1 && flowCounts.renderTree === 1 && flowCounts.refresh === 1, 'create-flow apply should trigger persistence/render callbacks.', errors);
+        const flowDuplicateResult = GrafcetStudioAIApply.applyProposal(flowProposal, { context: flowContext });
+        assert(!flowDuplicateResult.ok, 'create-flow double apply should fail.', errors);
+        const flowMissingEndpointResult = GrafcetStudioAIApply.dryRunProposal(makeCreateFlowProposal('ai-prop-flow-missing', {
+            id: 'flow-missing',
+            name: 'Missing Endpoint',
+            steps: [{ id: 'step-a', number: 1, label: 'A', initial: true }],
+            transitions: [{ id: 'trans-a', label: 'A', condition: 'X' }],
+            connections: [{ from: '', to: 'trans-a' }]
+        }), { context: flowContext });
+        assert(!flowMissingEndpointResult.ok, 'create-flow dry-run should fail when from/to is missing.', errors);
+        const flowUnknownEndpointResult = GrafcetStudioAIApply.dryRunProposal(makeCreateFlowProposal('ai-prop-flow-unknown', {
+            id: 'flow-unknown',
+            name: 'Unknown Endpoint',
+            steps: [{ id: 'step-a', number: 1, label: 'A', initial: true }],
+            transitions: [{ id: 'trans-a', label: 'A', condition: 'X' }],
+            connections: [{ from: 'step-a', to: 'missing-node' }]
+        }), { context: flowContext });
+        assert(!flowUnknownEndpointResult.ok, 'create-flow dry-run should fail when a connection endpoint is missing from the proposal.', errors);
         const structureProject = makeProject();
         const structureCounts = { saveProject: 0, renderTree: 0, renderGlobalVarTable: 0, refresh: 0 };
         const structureContext = makeContext(structureProject, structureCounts);
@@ -204,6 +263,11 @@ var GrafcetStudioAIApplyValidation;
             cloneMissingSourceResult,
             cloneDryRunConflictResult,
             cloneDoubleApplyResult,
+            flowDryRunSuccess,
+            flowApplySuccess,
+            flowDuplicateResult,
+            flowMissingEndpointResult,
+            flowUnknownEndpointResult,
             callbackCounts
         };
     }

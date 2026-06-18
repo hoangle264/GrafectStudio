@@ -223,7 +223,7 @@ function renderGlobalVarTable() {
     // col 1: Delete button
     const tdDel=document.createElement('td');
     tdDel.className='vt-rownum';
-    tdDel.innerHTML=`<button onclick="gvtDeleteVar('${entry.source}', '${String(entry.key).replace(/'/g, '\\&#39;')}')" title="Xa" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0 3px;"></button>`;
+    tdDel.innerHTML=`<button onclick="gvtDeleteVar('${entry.source}', '${String(entry.key).replace(/'/g, '\\&#39;')}')" title="Xa" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0 3px;line-height:1;">X</button>`;
     tr.appendChild(tdDel);
 
     // col 2: Label input
@@ -389,3 +389,4 @@ function gvtDeleteVar(source, key) {
   saveProject();
   renderGlobalVarTable();
 }
+

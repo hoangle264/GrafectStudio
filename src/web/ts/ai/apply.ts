@@ -5,6 +5,11 @@
   type ProjectVariable = GrafcetStudioProject.ProjectVariable;
   type AiVariableProposal = GrafcetStudioAIContracts.AiVariableProposal;
   type CreateStructureProposalData = GrafcetStudioAIContracts.CreateStructureProposalData;
+  type DiagramMeta = GrafcetStudioProject.DiagramMeta;
+  type DiagramState = GrafcetStudioProject.DiagramState;
+  type Step = GrafcetStudioProject.Step;
+  type Transition = GrafcetStudioProject.Transition;
+  type Connection = GrafcetStudioProject.Connection;
 
   export interface ApplyContext {
     getProject(): Project;
@@ -27,6 +32,8 @@
   declare function saveProject(): void;
   declare function renderTree(): void;
   declare function renderGlobalVarTable(): void;
+  declare function saveDiagramData(id: string, state?: DiagramState, nextId?: number, nextStepNum?: number, viewX?: number, viewY?: number, viewScale?: number): void;
+  declare function loadDiagramData(id: string): { nextId?: number; nextStepNum?: number; viewX?: number; viewY?: number; viewScale?: number } | null;
   declare function syncVariableSignalAddressesFromDeviceTypes(): boolean;
 
   const appliedProposalIds: Record<string, true> = Object.create(null);
@@ -206,6 +213,45 @@
     return errors.length ? fail(proposal.id, true, unique(errors)) : success(proposal.id, true, data.entries.map(function(e) { return e.physicalIOId; }), [], false);
   }
   function connectionEndpoint(connection: GrafcetStudioProject.Connection, key: 'from' | 'to'): string { return trimString(key === 'from' ? (connection.from || connection.fromId) : (connection.to || connection.toId)); }
+  function ensureProjectDiagrams(projectState: Project): DiagramMeta[] {
+    if (!Array.isArray(projectState.diagrams)) projectState.diagrams = [];
+    return projectState.diagrams;
+  }
+  function ensureDiagramState(diagram: DiagramMeta): DiagramState {
+    const holder = diagram as unknown as { state?: DiagramState };
+    if (!holder.state || typeof holder.state !== 'object') holder.state = { steps: [], transitions: [], connections: [] };
+    if (!Array.isArray(holder.state.steps)) holder.state.steps = [];
+    if (!Array.isArray(holder.state.transitions)) holder.state.transitions = [];
+    if (!Array.isArray(holder.state.connections)) holder.state.connections = [];
+    return holder.state;
+  }
+  function syncDiagramStorage(diagramId: string, state: DiagramState): void {
+    if (typeof saveDiagramData !== 'function') return;
+    const existing = typeof loadDiagramData === 'function' ? loadDiagramData(diagramId) : null;
+    saveDiagramData(
+      diagramId,
+      state,
+      existing && typeof existing.nextId === 'number' ? existing.nextId : 1,
+      existing && typeof existing.nextStepNum === 'number' ? existing.nextStepNum : 1,
+      existing && typeof existing.viewX === 'number' ? existing.viewX : 60,
+      existing && typeof existing.viewY === 'number' ? existing.viewY : 40,
+      existing && typeof existing.viewScale === 'number' ? existing.viewScale : 1
+    );
+  }
+  function resolveFlowTarget(projectState: Project, proposal: AiProposal, flow: GrafcetStudioAIContracts.AiFlowProposal): DiagramMeta {
+    const flowId = trimString(flow.id);
+    const flowName = trimString(flow.name);
+    const diagrams = ensureProjectDiagrams(projectState);
+    const existing = diagrams.find(function(diagram) { return !!diagram && ((flowId && diagram.id === flowId) || (flowName && trimString(diagram.name).toLowerCase() === flowName.toLowerCase())); });
+    if (existing) return existing;
+    const diagramId = flowId || ('ai-flow-' + sanitizeIdPart(proposal.id));
+    const diagram: DiagramMeta = { id: diagramId, name: flowName || diagramId, mode: flow.mode || 'Manual', diagramType: 'Grafcet' };
+    diagrams.push(diagram);
+    return diagram;
+  }
+  function cloneStep(step: Step): Step { return JSON.parse(JSON.stringify(step)) as Step; }
+  function cloneTransition(transition: Transition): Transition { return JSON.parse(JSON.stringify(transition)) as Transition; }
+  function cloneConnection(connection: Connection): Connection { return JSON.parse(JSON.stringify(connection)) as Connection; }
 
   const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
   const allowedStructureVarTypes: readonly string[] = ['Input', 'Output', 'Var'];
@@ -245,21 +291,100 @@
     });
     return signals;
   }
+  function getFlowNodeY(index: number): number { return 120 + (index * 140); }
+
+  function normalizeFlowAction(action: GrafcetStudioProject.StepAction): GrafcetStudioProject.StepAction | null {
+    const raw = action as Record<string, unknown>;
+    let variable = trimString(raw.variable);
+    if (!variable && typeof raw.expression === 'string') variable = raw.expression.split('=')[0].trim();
+    if (!variable) return null;
+    return Object.assign({}, action, { variable, qualifier: trimString(raw.qualifier) || 'N' });
+  }
+
+  function materializeFlowLayout(state: DiagramState, flow: GrafcetStudioAIContracts.AiFlowProposal): void {
+    const orderedNodes: Array<{ kind: "step" | "transition"; node: GrafcetStudioProject.Step | GrafcetStudioProject.Transition }> = [];
+    (Array.isArray(flow.steps) ? flow.steps : []).forEach(function(step) { orderedNodes.push({ kind: "step", node: step }); });
+    (Array.isArray(flow.transitions) ? flow.transitions : []).forEach(function(transition) { orderedNodes.push({ kind: "transition", node: transition }); });
+    orderedNodes.sort(function(a, b) {
+      if (a.kind !== b.kind) return a.kind === "step" ? -1 : 1;
+      return trimString((a.node as { id?: unknown }).id).localeCompare(trimString((b.node as { id?: unknown }).id));
+    });
+    let nextStepNumber = state.steps.reduce(function(max, step) { return Math.max(max, Number(step.number) || 0); }, 0);
+    let stepIndex = 0;
+    orderedNodes.forEach(function(item, index) {
+      const node = item.node as { x?: number; y?: number };
+      if (typeof node.x !== 'number' || !Number.isFinite(node.x)) node.x = 160;
+      if (typeof node.y !== 'number' || !Number.isFinite(node.y)) node.y = getFlowNodeY(index);
+      if (item.kind === 'step') {
+        const step = item.node as GrafcetStudioProject.Step;
+        if (!Number.isFinite(Number(step.number)) || Number(step.number) < 1) step.number = ++nextStepNumber;
+        if (state.steps.length === 0 && stepIndex === 0 && typeof step.initial !== 'boolean') step.initial = true;
+        step.actions = Array.isArray(step.actions) ? step.actions.map(normalizeFlowAction).filter(function(action): action is GrafcetStudioProject.StepAction { return action !== null; }) : [];
+        stepIndex += 1;
+      }
+    });
+    const baseState = state as DiagramState & { parallels?: unknown[]; vars?: unknown[] };
+    if (!Array.isArray(baseState.parallels)) baseState.parallels = [];
+    if (!Array.isArray(baseState.vars)) baseState.vars = [];
+  }
 
   function validateCreateFlowPreconditions(proposal: AiProposal): ApplyResult {
     const data = proposal.data as GrafcetStudioAIContracts.CreateFlowProposalData;
     const flow = data.flow;
     const errors: string[] = [];
+    const warnings: string[] = [];
     const ids: Record<string, true> = Object.create(null);
-    (flow.steps || []).forEach(function(step) { if (ids[step.id]) errors.push('Flow proposal contains duplicate node id: ' + step.id + '.'); ids[step.id] = true; });
-    (flow.transitions || []).forEach(function(transition) { if (ids[transition.id]) errors.push('Flow proposal contains duplicate node id: ' + transition.id + '.'); ids[transition.id] = true; });
+    (flow.steps || []).forEach(function(step, index) {
+      const stepId = trimString(step.id);
+      if (!stepId) errors.push('Flow step ' + index + ' requires a non-empty id.');
+      if (stepId && ids[stepId]) errors.push('Flow proposal contains duplicate node id: ' + stepId + '.');
+      if (stepId) ids[stepId] = true;
+    });
+    (flow.transitions || []).forEach(function(transition, index) {
+      const transitionId = trimString(transition.id);
+      if (!transitionId) errors.push('Flow transition ' + index + ' requires a non-empty id.');
+      if (transitionId && ids[transitionId]) errors.push('Flow proposal contains duplicate node id: ' + transitionId + '.');
+      if (transitionId) ids[transitionId] = true;
+    });
     ((flow.connections || []) as GrafcetStudioProject.Connection[]).forEach(function(connection, index) {
       const from = connectionEndpoint(connection, 'from');
       const to = connectionEndpoint(connection, 'to');
-      if (!ids[from]) errors.push('Flow connection ' + index + ' references missing from id: ' + from + '.');
-      if (!ids[to]) errors.push('Flow connection ' + index + ' references missing to id: ' + to + '.');
+      if (!from || !to) errors.push('Flow connection ' + index + ' requires non-empty from/to endpoints.');
+      if (from && !ids[from]) errors.push('Flow connection ' + index + ' references missing from id: ' + from + '.');
+      if (to && !ids[to]) errors.push('Flow connection ' + index + ' references missing to id: ' + to + '.');
     });
-    return errors.length ? fail(proposal.id, true, unique(errors)) : success(proposal.id, true, Object.keys(ids), [], false);
+    if (!errors.length) {
+      const nodeCount = (flow.steps || []).length + (flow.transitions || []).length;
+      if (Object.keys(ids).length !== nodeCount) warnings.push('Flow proposal contains duplicate ids; proposal should use unique node ids only.');
+    }
+    return errors.length ? fail(proposal.id, true, unique(errors), warnings) : success(proposal.id, true, Object.keys(ids), warnings, false);
+  }
+
+  function applyCreateFlow(proposal: AiProposal, context: ApplyContext, preflight: ApplyResult): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as GrafcetStudioAIContracts.CreateFlowProposalData;
+    const flow = data.flow;
+    const warnings = preflight.warnings.slice();
+    const target = resolveFlowTarget(projectState, proposal, flow);
+    const state = ensureDiagramState(target);
+    if (state.steps.length || state.transitions.length || state.connections.length) warnings.push('Flow target already had diagram state; appending proposal nodes to existing state.');
+    materializeFlowLayout(state, flow);
+    const steps = (flow.steps || []).map(cloneStep);
+    const transitions = (flow.transitions || []).map(cloneTransition);
+    const connections = (flow.connections || []).map(cloneConnection);
+    state.steps = state.steps.concat(steps);
+    state.transitions = state.transitions.concat(transitions);
+    state.connections = state.connections.concat(connections);
+    syncDiagramStorage(target.id, state);
+    if (flow.name) target.name = flow.name;
+    if (flow.type) target.diagramType = flow.type;
+    if (flow.mode) target.mode = flow.mode;
+    proposal.status = 'applied';
+    appliedProposalIds[proposal.id] = true;
+    if (context.saveProject) context.saveProject();
+    if (context.renderTree) context.renderTree();
+    if (context.refresh) context.refresh();
+    return success(proposal.id, false, preflight.affectedIds.length ? preflight.affectedIds : (steps as Step[]).map(function(step) { return step.id; }).concat((transitions as Transition[]).map(function(transition) { return transition.id; })), warnings, true);
   }
 
   function validateCreateStructurePreconditions(proposal: AiProposal, context: ApplyContext): ApplyResult {
@@ -373,7 +498,7 @@
       case 'create-variable': return applyCreateVariable(base.proposal, context, preflight);
       case 'clone-variable': return applyCloneVariable(base.proposal, context, preflight);
       case 'map-io': return fail(base.proposal.id, false, ['Apply is not implemented for map-io yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
-      case 'create-flow': return fail(base.proposal.id, false, ['Apply is not implemented for create-flow yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
+      case 'create-flow': return applyCreateFlow(base.proposal, context, preflight);
       case 'create-structure': return applyCreateStructure(base.proposal, context, preflight);
       default: return fail(base.proposal.id, false, ['Unsupported proposal intent.']);
     }
@@ -382,3 +507,9 @@
   export function resetAppliedProposalTracking(): void { Object.keys(appliedProposalIds).forEach(function(id) { delete appliedProposalIds[id]; }); }
   export const api: ApplyLayerApi = { dryRunProposal, applyProposal, hasAppliedProposal, resetAppliedProposalTracking };
 }
+
+
+
+
+
+

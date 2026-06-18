@@ -1,14 +1,14 @@
-"use strict";
+﻿"use strict";
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  PROJECT MANAGEMENT
 //  loadProject / saveProject / saveDiagramData / loadDiagramData /
-//  deleteDiagramData / flushState → moved to src/js/modules/store.js
-// ═══════════════════════════════════════════════════════════
+//  deleteDiagramData / flushState â†’ moved to src/js/modules/store.js
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  VIRTUAL TAB: GLOBAL VARIABLES  (__vars__)
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const VARS_TAB_ID = '__vars__';
 const IO_MAPPING_TAB_ID = '__io_mapping__';
 const STRUCT_TAB_PREFIX = '__struct__:';
@@ -126,7 +126,7 @@ function addDiagram(isFirst=false, unitId=null, mode='Auto') {
   saveProject(); renderTree(); openTab(id);
 }
 
-// deleteDiagramData → moved to src/js/modules/store.js
+// deleteDiagramData â†’ moved to src/js/modules/store.js
 
 function openTab(id) {
   if(id === VARS_TAB_ID) { openVarsTab(); return; }
@@ -143,6 +143,12 @@ function openTab(id) {
   const data = loadDiagramData(id);
   if (data) {
     state = data.state;
+    if (!state || typeof state !== "object") state = {steps:[],transitions:[],parallels:[],connections:[],vars:[]};
+    if (!Array.isArray(state.steps)) state.steps = [];
+    if (!Array.isArray(state.transitions)) state.transitions = [];
+    if (!Array.isArray(state.parallels)) state.parallels = [];
+    if (!Array.isArray(state.connections)) state.connections = [];
+    if (!Array.isArray(state.vars)) state.vars = [];
     nextId = data.nextId || 1;
     nextStepNum = Math.max(1, data.nextStepNum || 1);
     viewX = data.viewX ?? 60;
@@ -174,12 +180,12 @@ function closeTab(id, e) {
   } else renderTabs();
 }
 
-// flushState → moved to src/js/modules/store.js
+// flushState â†’ moved to src/js/modules/store.js
 
 function saveDiagram() {
   if (!activeDiagramId) return;
   flushState();
-  toast('✓ Saved');
+  toast('âœ“ Saved');
 }
 
 function markModified(id, yes=true) {
@@ -190,9 +196,9 @@ function markModified(id, yes=true) {
   if (ti) ti.classList.toggle('modified', yes);
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  RENAME
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function renameProject() {
   renameMode='project';
   document.getElementById('modal-input').value = project.name;
@@ -218,7 +224,7 @@ function confirmRename() {
   closeModal('modal-rename');
 }
 function showModal(id) { document.getElementById(id).classList.add('show'); setTimeout(()=>document.getElementById('modal-input').focus(),50); }
-// closeModal → moved to src/js/modules/utils.js
+// closeModal â†’ moved to src/js/modules/utils.js
 document.addEventListener('keydown', e=>{ if(e.key==='Enter'&&document.getElementById('modal-rename').classList.contains('show')) confirmRename(); });
 
 function newProject() {
@@ -235,15 +241,15 @@ function newProject() {
   showModal('modal-rename');
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  SNAP & COORDINATES
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function snap(v) { return snapOn ? Math.round(v/GRID)*GRID : Math.round(v); }
 function toggleSnap() { snapOn=!snapOn; document.getElementById('tb-snap').classList.toggle('active',snapOn); }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  VIEWPORT
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function applyView() {
   document.getElementById('vp').setAttribute('transform',`translate(${viewX},${viewY}) scale(${viewScale})`);
   document.getElementById('s-zoom').textContent = Math.round(viewScale*100)+'%';
@@ -296,4 +302,5 @@ function onWheel(e){
   applyView();
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+

@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const AI_CHAT_STATE = {
   messages: [],
@@ -115,16 +115,38 @@ function aiChatFailStream(text) {
   aiChatResetPendingStream();
   aiChatRender();
 }
+function aiChatReloadActiveCanvasFromStorage() {
+  if (!activeDiagramId || activeDiagramId === VARS_TAB_ID || activeDiagramId === IO_MAPPING_TAB_ID || String(activeDiagramId).indexOf("__struct__:") === 0) return false;
+  if (typeof loadDiagramData !== "function") return false;
+  const data = loadDiagramData(activeDiagramId);
+  if (!data) return false;
+  state = data.state || { steps: [], transitions: [], parallels: [], connections: [], vars: [] };
+  if (!Array.isArray(state.steps)) state.steps = [];
+  if (!Array.isArray(state.transitions)) state.transitions = [];
+  if (!Array.isArray(state.parallels)) state.parallels = [];
+  if (!Array.isArray(state.connections)) state.connections = [];
+  if (!Array.isArray(state.vars)) state.vars = [];
+  nextId = data.nextId || 1;
+  nextStepNum = Math.max(1, data.nextStepNum || 1);
+  viewX = data.viewX ?? 60;
+  viewY = data.viewY ?? 40;
+  viewScale = data.viewScale ?? 1;
+  if (typeof render === "function") render();
+  if (typeof applyView === "function") applyView();
+  return true;
+}
+
 function aiChatMakeApplyContext() {
   return {
     getProject: function() { return project; },
-    saveProject: typeof saveProject === 'function' ? saveProject : undefined,
-    renderTree: typeof renderTree === 'function' ? renderTree : undefined,
-    renderGlobalVarTable: typeof renderGlobalVarTable === 'function' ? renderGlobalVarTable : undefined,
+    saveProject: typeof saveProject === "function" ? saveProject : undefined,
+    renderTree: typeof renderTree === "function" ? renderTree : undefined,
+    renderGlobalVarTable: typeof renderGlobalVarTable === "function" ? renderGlobalVarTable : undefined,
     refresh: function() {
       if (typeof syncStructDataFromProjectData === 'function') syncStructDataFromProjectData();
       if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function') syncVariableSignalAddressesFromDeviceTypes();
       if (activeDiagramId === VARS_TAB_ID && typeof renderGlobalVarTable === 'function') renderGlobalVarTable();
+      aiChatReloadActiveCanvasFromStorage();
     }
   };
 }
@@ -520,3 +542,5 @@ window.aiChatSaveEdit = aiChatSaveEdit;
 window.receiveAiChunk = receiveAiChunk;
 window.runAiChatUiValidation = runAiChatUiValidation;
 window.runAiChatStreamingValidation = runAiChatStreamingValidation;
+
+

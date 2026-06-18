@@ -71,7 +71,7 @@ var GrafcetStudioAIMockService;
             intent: 'create-flow',
             status: 'draft',
             summary: 'Mock proposal creates a minimal two-step flow skeleton.',
-            warnings: ['Mock fixture only; diagram graph insertion is deferred to the apply layer.'],
+            warnings: ['Mock fixture only; diagram graph insertion is handled by the apply layer.'],
             data: {
                 flow: {
                     id: 'mock-flow-basic-cycle',

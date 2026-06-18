@@ -245,6 +245,7 @@
     if (!isRecord(raw)) return null;
     const result: Record<string, unknown> = {};
     assignString(result, 'variable', raw.variable);
+    if (!result.variable && isString(raw.expression)) result.variable = safeString(raw.expression).split('=')[0].trim();
     assignNullableString(result, 'address', raw.address);
     assignString(result, 'qualifier', raw.qualifier);
     if (isFiniteNumber(raw.time) || isString(raw.time)) {
@@ -473,5 +474,6 @@
     sanitizeExistingStructures
   };
 }
+
 
 

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -51,7 +51,7 @@ public class GeminiAiCompletionService : IAiCompletionService
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var text = ExtractText(doc.RootElement);
-            GeminiDebugLogger.LogResponse("generateContent", apiVersion, (int)response.StatusCode, "OK textLength=" + text.Length);
+            GeminiDebugLogger.LogResponse("generateContent", apiVersion, (int)response.StatusCode, "OK textLength=" + text.Length + " rawText=" + GeminiDebugLogger.Truncate(text, 4000));
 
             return string.IsNullOrWhiteSpace(text)
                 ? AiCompletionResult.Failure("Gemini response did not include proposal text.")
@@ -118,7 +118,7 @@ public class GeminiAiCompletionService : IAiCompletionService
             }
 
             var finalText = finalBuilder.ToString();
-            GeminiDebugLogger.LogResponse("streamGenerateContent", apiVersion, (int)response.StatusCode, "OK textLength=" + finalText.Length);
+            GeminiDebugLogger.LogResponse("streamGenerateContent", apiVersion, (int)response.StatusCode, "OK textLength=" + finalText.Length + " rawText=" + GeminiDebugLogger.Truncate(finalText, 4000));
             if (string.IsNullOrWhiteSpace(finalText))
             {
                 throw new InvalidOperationException("Gemini stream ended without proposal text.");
@@ -309,6 +309,13 @@ internal static class GeminiDebugLogger
         {
             return payload.Length > 4000 ? payload[..4000] + "...<truncated>" : payload;
         }
+    }
+
+    public static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || maxLength <= 0) return string.Empty;
+        if (value.Length <= maxLength) return value;
+        return value[..maxLength] + "...";
     }
 
     private static void ScrubNode(JsonNode node)
