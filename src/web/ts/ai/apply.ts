@@ -64,11 +64,9 @@
     values.forEach(function(value) { if (!seen[value]) { seen[value] = true; out.push(value); } });
     return out;
   }
-  function toProjectVariable(proposal: AiProposal): ProjectVariable {
-    const data = proposal.data as GrafcetStudioAIContracts.CreateVariableProposalData;
-    const variable = data.variable;
+  function toProjectVariable(proposalId: string, variable: AiVariableProposal): ProjectVariable {
     const out: ProjectVariable = {
-      id: makeVariableId(proposal.id, variable.label),
+      id: makeVariableId(proposalId, variable.label),
       label: trimString(variable.label),
       format: trimString(variable.format),
       dataType: variable.dataType ? trimString(variable.dataType) : trimString(variable.format),
@@ -123,14 +121,75 @@
     if (trimString(variable.source) && trimString(variable.source).toLowerCase() !== 'manual') warnings.push('create-variable source is preserved, but no source file import is performed.');
     return errors.length ? fail(proposal.id, true, unique(errors), warnings, [candidateId]) : success(proposal.id, true, [candidateId], warnings, false);
   }
-  function validateCloneVariablePreconditions(proposal: AiProposal, context: ApplyContext): ApplyResult {
-    const projectState = context.getProject();
-    const data = proposal.data as GrafcetStudioAIContracts.CloneVariableProposalData;
+  interface CloneCandidateAnalysis { affectedIds: string[]; warnings: string[]; acceptedVariables: AiVariableProposal[]; }
+
+  function hasCloneSource(projectState: Project, data: GrafcetStudioAIContracts.CloneVariableProposalData): boolean {
     const sourceId = trimString(data.source && data.source.id);
     const sourceLabel = trimString(data.source && data.source.label).toLowerCase();
     let found = false;
-    forEachVariable(projectState, function(existing) { if ((sourceId && existing.id === sourceId) || (sourceLabel && trimString(existing.label).toLowerCase() === sourceLabel)) found = true; });
-    return found ? success(proposal.id, true, [], [], false) : fail(proposal.id, true, ['Source variable for clone-variable proposal was not found.']);
+    forEachVariable(projectState, function(existing) {
+      if ((sourceId && existing.id === sourceId) || (sourceLabel && trimString(existing.label).toLowerCase() === sourceLabel)) found = true;
+    });
+    return found;
+  }
+
+  function collectExistingAddressMap(projectState: Project): Record<string, true> {
+    const addresses: Record<string, true> = Object.create(null);
+    forEachVariable(projectState, function(existing) { flattenAddresses(existing).forEach(function(address) { addresses[address] = true; }); });
+    return addresses;
+  }
+
+  function collectExistingLabelMap(projectState: Project): Record<string, true> {
+    const labels: Record<string, true> = Object.create(null);
+    forEachVariable(projectState, function(existing) { const label = trimString(existing.label).toLowerCase(); if (label) labels[label] = true; });
+    return labels;
+  }
+
+  function analyzeCloneVariables(proposal: AiProposal, projectState: Project): CloneCandidateAnalysis {
+    const data = proposal.data as GrafcetStudioAIContracts.CloneVariableProposalData;
+    const warnings: string[] = [];
+    const affectedIds: string[] = [];
+    const acceptedVariables: AiVariableProposal[] = [];
+    const labels = collectExistingLabelMap(projectState);
+    const addresses = collectExistingAddressMap(projectState);
+    data.variables.forEach(function(variable, index) {
+      const label = trimString(variable.label);
+      const labelKey = label.toLowerCase();
+      const displayName = label || 'variable #' + (index + 1);
+      const candidateAddresses = flattenAddresses(variable);
+      const localAddressSeen: Record<string, true> = Object.create(null);
+      const conflicts: string[] = [];
+      if (!labelKey) conflicts.push('empty label');
+      else if (labels[labelKey]) conflicts.push('duplicate label');
+      candidateAddresses.forEach(function(address) {
+        if (localAddressSeen[address]) conflicts.push('duplicate address inside proposed variable: ' + address);
+        if (addresses[address]) conflicts.push('duplicate address: ' + address);
+        localAddressSeen[address] = true;
+      });
+      if (conflicts.length) {
+        warnings.push('Skipped clone variable "' + displayName + '" because of ' + unique(conflicts).join(', ') + '.');
+        return;
+      }
+      if (labelKey) labels[labelKey] = true;
+      candidateAddresses.forEach(function(address) { addresses[address] = true; });
+      acceptedVariables.push(variable);
+      affectedIds.push(makeVariableId(proposal.id, variable.label));
+    });
+    return { affectedIds, warnings, acceptedVariables };
+  }
+
+  function validateCloneVariablePreconditions(proposal: AiProposal, context: ApplyContext): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as GrafcetStudioAIContracts.CloneVariableProposalData;
+    const errors: string[] = [];
+    if (!projectState || typeof projectState !== 'object') errors.push('Project state is not available.');
+    if (!Array.isArray(data.variables) || data.variables.length === 0) errors.push('Clone-variable proposal requires at least one variable.');
+    if (!errors.length && !hasCloneSource(projectState, data)) errors.push('Source variable for clone-variable proposal was not found.');
+    if (errors.length) return fail(proposal.id, true, unique(errors));
+    const analysis = analyzeCloneVariables(proposal, projectState);
+    return analysis.affectedIds.length
+      ? success(proposal.id, true, analysis.affectedIds, analysis.warnings, false)
+      : fail(proposal.id, true, ['No clone variables can be applied.'], analysis.warnings);
   }
   function validateMapIOPreconditions(proposal: AiProposal, context: ApplyContext): ApplyResult {
     const projectState = context.getProject();
@@ -251,7 +310,7 @@
     const projectState = context.getProject();
     const data = proposal.data as GrafcetStudioAIContracts.CreateVariableProposalData;
     const bucket = normalizeBucket(data.bucket);
-    const variable = toProjectVariable(proposal);
+    const variable = toProjectVariable(proposal.id, data.variable);
     ensureProjectVariables(projectState)[bucket].push(variable);
     proposal.status = 'applied';
     appliedProposalIds[proposal.id] = true;
@@ -260,6 +319,28 @@
     if (context.renderGlobalVarTable) context.renderGlobalVarTable();
     if (context.refresh) context.refresh();
     return success(proposal.id, false, preflight.affectedIds.length ? preflight.affectedIds : [variable.id || variable.label], preflight.warnings, true);
+  }
+
+  function applyCloneVariable(proposal: AiProposal, context: ApplyContext, _preflight: ApplyResult): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as GrafcetStudioAIContracts.CloneVariableProposalData;
+    if (!hasCloneSource(projectState, data)) return fail(proposal.id, false, ['Source variable for clone-variable proposal was not found.']);
+    const analysis = analyzeCloneVariables(proposal, projectState);
+    if (!analysis.acceptedVariables.length) return fail(proposal.id, false, ['No clone variables were applied.'], analysis.warnings);
+    const userVariables = ensureProjectVariables(projectState).user;
+    const affectedIds: string[] = [];
+    analysis.acceptedVariables.forEach(function(variable) {
+      const projectVariable = toProjectVariable(proposal.id, variable);
+      userVariables.push(projectVariable);
+      affectedIds.push(projectVariable.id || projectVariable.label);
+    });
+    proposal.status = 'applied';
+    appliedProposalIds[proposal.id] = true;
+    if (context.saveProject) context.saveProject();
+    if (context.renderTree) context.renderTree();
+    if (context.renderGlobalVarTable) context.renderGlobalVarTable();
+    if (context.refresh) context.refresh();
+    return success(proposal.id, false, affectedIds, analysis.warnings, true);
   }
 
   function applyCreateStructure(proposal: AiProposal, context: ApplyContext, preflight: ApplyResult): ApplyResult {
@@ -290,7 +371,7 @@
     if (!preflight.ok) return { ok: false, proposalId: base.proposal.id, dryRun: false, affectedIds: preflight.affectedIds, warnings: preflight.warnings, errors: preflight.errors, changed: false };
     switch (base.proposal.intent) {
       case 'create-variable': return applyCreateVariable(base.proposal, context, preflight);
-      case 'clone-variable': return fail(base.proposal.id, false, ['Apply is not implemented for clone-variable yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
+      case 'clone-variable': return applyCloneVariable(base.proposal, context, preflight);
       case 'map-io': return fail(base.proposal.id, false, ['Apply is not implemented for map-io yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
       case 'create-flow': return fail(base.proposal.id, false, ['Apply is not implemented for create-flow yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
       case 'create-structure': return applyCreateStructure(base.proposal, context, preflight);

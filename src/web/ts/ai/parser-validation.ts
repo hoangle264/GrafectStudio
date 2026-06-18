@@ -9,6 +9,9 @@ namespace GrafcetStudioAIProposalParserValidation {
     unknownIntentResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
     unsupportedSchemaResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
     cloneArrayShapeResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
+    cloneLegacySingularResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
+    cloneSingleVariableResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
+    cloneSourcesArrayResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
     createStructureResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
   }
 
@@ -56,15 +59,36 @@ namespace GrafcetStudioAIProposalParserValidation {
 
     const cloneArrayShape = parseObject(GrafcetStudioAIMockService.getFixtureRawText('clone-variable')) as Record<string, unknown>;
     cloneArrayShape.data = {
-      sources: [{ label: 'Imported_A' }, { label: 'Imported_B' }],
+      source: { label: 'Imported_A' },
       variables: [
         { label: 'Cloned_A', format: 'bool', address: 'M10', kind: 'primitive' },
-        { label: 'Cloned_B', format: 'bool', address: 'M11', kind: 'primitive' }
+        { label: 'Cloned_B', format: 'bool', address: 'M11', kind: 'primitive' },
+        { label: 'Cloned_C', format: 'bool', address: 'M12', kind: 'primitive' }
       ]
     };
     const cloneArrayShapeResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(cloneArrayShape));
-    assert(cloneArrayShapeResult.ok, 'clone-variable array-shaped AI response should normalize to first source and variable.', errors);
-    assert(!!cloneArrayShapeResult.value && (cloneArrayShapeResult.value.warnings || []).length > 0, 'clone-variable array normalization should add warnings.', errors);
+    assert(cloneArrayShapeResult.ok, 'clone-variable variables array with 3 items should parse.', errors);
+    assert(!!cloneArrayShapeResult.value && (cloneArrayShapeResult.value.data as GrafcetStudioAIContracts.CloneVariableProposalData).variables.length === 3, 'clone-variable variables array should preserve all items.', errors);
+    assert(!!cloneArrayShapeResult.value && !(cloneArrayShapeResult.value.warnings || []).some(function(w) { return w.indexOf('clone is most useful') >= 0; }), 'clone-variable 3 item array should not add single-variable warning.', errors);
+
+    const cloneLegacySingular = parseObject(GrafcetStudioAIMockService.getFixtureRawText('clone-variable')) as Record<string, unknown>;
+    cloneLegacySingular.data = { source: { label: 'Imported_A' }, variable: { label: 'Cloned_A', format: 'bool', address: 'M10', kind: 'primitive' } };
+    const cloneLegacySingularResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(cloneLegacySingular));
+    assert(cloneLegacySingularResult.ok, 'clone-variable legacy singular variable should normalize.', errors);
+    assert(!!cloneLegacySingularResult.value && (cloneLegacySingularResult.value.data as GrafcetStudioAIContracts.CloneVariableProposalData).variables.length === 1, 'legacy singular variable should become variables[0].', errors);
+    assert(!!cloneLegacySingularResult.value && (cloneLegacySingularResult.value.warnings || []).some(function(w) { return w.indexOf('clone is most useful') >= 0; }), 'legacy singular variable should warn.', errors);
+
+    const cloneSingleVariable = parseObject(GrafcetStudioAIMockService.getFixtureRawText('clone-variable')) as Record<string, unknown>;
+    cloneSingleVariable.data = { source: { label: 'Imported_A' }, variables: [{ label: 'Cloned_A', format: 'bool', address: 'M10', kind: 'primitive' }] };
+    const cloneSingleVariableResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(cloneSingleVariable));
+    assert(cloneSingleVariableResult.ok, 'clone-variable variables array with one item should parse.', errors);
+    assert(!!cloneSingleVariableResult.value && (cloneSingleVariableResult.value.warnings || []).some(function(w) { return w.indexOf('clone is most useful') >= 0; }), 'one variable array should warn.', errors);
+
+    const cloneSourcesArray = parseObject(GrafcetStudioAIMockService.getFixtureRawText('clone-variable')) as Record<string, unknown>;
+    cloneSourcesArray.data = { sources: [{ label: 'Imported_A' }, { label: 'Imported_B' }], variables: [{ label: 'Cloned_A', format: 'bool', address: 'M10', kind: 'primitive' }, { label: 'Cloned_B', format: 'bool', address: 'M11', kind: 'primitive' }] };
+    const cloneSourcesArrayResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(JSON.stringify(cloneSourcesArray));
+    assert(cloneSourcesArrayResult.ok, 'clone-variable sources array should normalize to first source.', errors);
+    assert(!!cloneSourcesArrayResult.value && (cloneSourcesArrayResult.value.warnings || []).some(function(w) { return w.indexOf('multiple clone sources') >= 0; }), 'sources array normalization should warn.', errors);
 
 
     const createStructureResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(GrafcetStudioAIMockService.getFixtureRawText('create-structure'));
@@ -81,6 +105,9 @@ namespace GrafcetStudioAIProposalParserValidation {
       unknownIntentResult,
       unsupportedSchemaResult,
       cloneArrayShapeResult,
+      cloneLegacySingularResult,
+      cloneSingleVariableResult,
+      cloneSourcesArrayResult,
       createStructureResult
     };
   }

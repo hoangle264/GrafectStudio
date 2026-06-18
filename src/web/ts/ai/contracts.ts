@@ -53,7 +53,7 @@
       id?: string;
       label?: string;
     };
-    variable: AiVariableProposal;
+    variables: AiVariableProposal[];
   }
 
   export interface MapIOProposalData {
@@ -283,7 +283,8 @@
       case 'clone-variable':
         if (!isRecord(value.source)) errors.push('proposal.data.source must be an object.');
         else if (!isOptionalString(value.source.id) || !isOptionalString(value.source.label) || (!value.source.id && !value.source.label)) errors.push('proposal.data.source requires id or label.');
-        validateVariableProposal(value.variable, errors, 'proposal.data.variable');
+        if (!Array.isArray(value.variables) || value.variables.length === 0) errors.push('proposal.data.variables must be a non-empty array.');
+        else value.variables.forEach(function(variable, index) { validateVariableProposal(variable, errors, 'proposal.data.variables[' + index + ']'); });
         break;
       case 'map-io':
         if (!Array.isArray(value.entries)) errors.push('proposal.data.entries must be an array.');

@@ -160,26 +160,44 @@ function aiChatAddProposal(proposal, sourceText) {
   return record;
 }
 
+function aiChatVariableRows(variable, extraRows) {
+  const signalAddresses = variable.signalAddresses ? Object.keys(variable.signalAddresses).map(function(key) {
+    return key + ': ' + variable.signalAddresses[key];
+  }).join(', ') : '';
+  return (extraRows || []).concat([
+    ['Label', variable.label],
+    ['Format', variable.format || variable.dataType],
+    ['Kind', variable.kind],
+    ['Address', variable.address],
+    ['Source', variable.source],
+    ['Signals', signalAddresses],
+    ['Comment', variable.comment]
+  ]);
+}
+
+function aiChatRenderRows(rows) {
+  return '<table class="ai-preview-table"><tbody>' + rows.filter(function(row) { return aiChatText(row[1], ''); }).map(function(row) {
+    return '<tr><td>' + aiChatEscape(row[0]) + '</td><td>' + aiChatEscape(row[1]) + '</td></tr>';
+  }).join('') + '</tbody></table>';
+}
+
 function aiChatRenderPreview(proposal) {
   const data = proposal && proposal.data ? proposal.data : {};
-  if (proposal.intent === 'create-variable' || proposal.intent === 'clone-variable') {
-    const variable = data.variable || {};
-    const signalAddresses = variable.signalAddresses ? Object.keys(variable.signalAddresses).map(function(key) {
-      return key + ': ' + variable.signalAddresses[key];
-    }).join(', ') : '';
-    const rows = [
-      ['Label', variable.label],
-      ['Format', variable.format || variable.dataType],
-      ['Kind', variable.kind],
-      ['Address', variable.address],
-      ['Bucket', data.bucket || 'user'],
-      ['Source', variable.source],
-      ['Signals', signalAddresses],
-      ['Comment', variable.comment]
-    ];
-    return '<table class="ai-preview-table"><tbody>' + rows.filter(function(row) { return aiChatText(row[1], ''); }).map(function(row) {
-      return '<tr><td>' + aiChatEscape(row[0]) + '</td><td>' + aiChatEscape(row[1]) + '</td></tr>';
-    }).join('') + '</tbody></table>';
+  if (proposal.intent === 'create-variable') {
+    return aiChatRenderRows(aiChatVariableRows(data.variable || {}, [['Bucket', data.bucket || 'user']]));
+  }
+  if (proposal.intent === 'clone-variable') {
+    const source = data.source || {};
+    const variables = Array.isArray(data.variables) ? data.variables : [];
+    const sourceRows = aiChatRenderRows([
+      ['Source Label', source.label],
+      ['Source Id', source.id],
+      ['Target Count', variables.length]
+    ]);
+    const variableTables = variables.map(function(variable, index) {
+      return '<div class="ai-proposal-summary">Clone #' + aiChatEscape(index + 1) + '</div>' + aiChatRenderRows(aiChatVariableRows(variable || {}, []));
+    }).join('');
+    return sourceRows + variableTables;
   }
   return '<pre class="ai-preview-json">' + aiChatEscape(JSON.stringify(data, null, 2)) + '</pre>';
 }

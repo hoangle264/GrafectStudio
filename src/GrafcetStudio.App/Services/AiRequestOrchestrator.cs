@@ -137,7 +137,7 @@ public class AiRequestOrchestrator
     private static object BuildErrorProposalData(string intent)
         => intent switch
         {
-            "clone-variable" => (object)new { source = new { label = string.Empty }, variable = EmptyVariable() },
+            "clone-variable" => (object)new { source = new { label = string.Empty }, variables = new[] { EmptyVariable() } },
             "map-io" => (object)new { entries = Array.Empty<object>() },
             "create-flow" => (object)new { flow = new { id = string.Empty, name = string.Empty, type = string.Empty, steps = Array.Empty<object>(), transitions = Array.Empty<object>(), connections = Array.Empty<object>() } },
             _ => (object)new { bucket = "user", variable = EmptyVariable() }

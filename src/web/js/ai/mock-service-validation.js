@@ -26,6 +26,17 @@ var GrafcetStudioAIMockServiceValidation;
         if (!createStructureResult.ok || !createStructureResult.proposal || createStructureResult.proposal.intent !== 'create-structure') {
             errors.push('create-structure mock response must pass AiProposal validation and preserve intent.');
         }
+        const cloneVariableResult = GrafcetStudioAIMockService.generateMockResponse(makeRequest('clone-variable'));
+        const cloneData = cloneVariableResult.proposal && cloneVariableResult.proposal.data;
+        if (!cloneVariableResult.ok || !cloneVariableResult.proposal || cloneVariableResult.proposal.intent !== 'clone-variable') {
+            errors.push('clone-variable mock response must pass AiProposal validation and preserve intent.');
+        }
+        else if (!cloneData || !Array.isArray(cloneData.variables) || cloneData.variables.length < 2) {
+            errors.push('clone-variable fixture must have variables array with at least 2 items.');
+        }
+        else if ('variable' in cloneVariableResult.proposal.data) {
+            errors.push('clone-variable fixture must not use data.variable singular.');
+        }
         const malformedJsonResult = GrafcetStudioAIMockService.generateMockResponse(makeRequest('create-variable'), { fixtureName: 'malformed-json' });
         if (malformedJsonResult.ok)
             errors.push('malformed-json mock response must intentionally fail.');
@@ -37,6 +48,7 @@ var GrafcetStudioAIMockServiceValidation;
             fixtureResult,
             createVariableResult,
             createStructureResult,
+            cloneVariableResult,
             malformedJsonResult,
             wrongShapeResult,
             errors

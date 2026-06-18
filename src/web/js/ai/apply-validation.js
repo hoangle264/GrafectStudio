@@ -32,6 +32,16 @@ var GrafcetStudioAIApplyValidation;
             }
         };
     }
+    function makeCloneVariableProposal(id, sourceLabel, variables) {
+        return {
+            schemaVersion: GrafcetStudioAIContracts.schemaVersion,
+            id,
+            intent: 'clone-variable',
+            status: 'validated',
+            summary: 'Apply validation clone-variable fixture.',
+            data: { source: { label: sourceLabel }, variables }
+        };
+    }
     function makeCreateStructureProposal(id, name, signals) {
         return {
             schemaVersion: GrafcetStudioAIContracts.schemaVersion,
@@ -88,6 +98,58 @@ var GrafcetStudioAIApplyValidation;
         const failedPreconditionResult = GrafcetStudioAIApply.applyProposal(addressDuplicateProposal, { context: context });
         assert(!failedPreconditionResult.ok, 'apply should fail when dry-run precondition detects duplicate address.', errors);
         assert(project.variables.user.length === beforeFailedPrecondition, 'failed precondition apply must not mutate state.', errors);
+        const cloneProject = makeProject();
+        cloneProject.variables.imported.push({ id: 'src-cylinder', label: 'Cylinder', format: 'Cylinder', kind: 'struct', source: 'manual' });
+        cloneProject.variables.user.push({ id: 'existing-clone', label: 'ExistingClone', format: 'BOOL', address: 'MR950', kind: 'primitive' });
+        const cloneCounts = { saveProject: 0, renderTree: 0, renderGlobalVarTable: 0, refresh: 0 };
+        const cloneContext = makeContext(cloneProject, cloneCounts);
+        const cloneAllUniqueProposal = makeCloneVariableProposal('ai-prop-clone-all-unique', 'Cylinder', [
+            { label: 'Cyl_A', format: 'Cylinder', kind: 'struct', source: 'manual' },
+            { label: 'Cyl_B', format: 'Cylinder', kind: 'struct', source: 'manual' },
+            { label: 'Cyl_C', format: 'Cylinder', kind: 'struct', source: 'manual' }
+        ]);
+        const cloneAllUniqueResult = GrafcetStudioAIApply.applyProposal(cloneAllUniqueProposal, { context: cloneContext });
+        assert(cloneAllUniqueResult.ok, 'clone-variable apply should succeed for 3 unique variables.', errors);
+        assert(cloneAllUniqueResult.affectedIds.length === 3, 'clone-variable all unique apply should affect all 3 variables.', errors);
+        assert(cloneProject.variables.user.length === 4, 'clone-variable all unique apply should append 3 user variables.', errors);
+        assert(cloneAllUniqueProposal.status === 'applied', 'clone-variable apply should mark proposal applied.', errors);
+        const clonePartialProposal = makeCloneVariableProposal('ai-prop-clone-partial', 'Cylinder', [
+            { label: 'Cyl_D', format: 'Cylinder', kind: 'struct', source: 'manual' },
+            { label: 'ExistingClone', format: 'BOOL', address: 'MR951', kind: 'primitive', source: 'manual' },
+            { label: 'Cyl_E', format: 'Cylinder', kind: 'struct', source: 'manual' }
+        ]);
+        const clonePartialConflictResult = GrafcetStudioAIApply.applyProposal(clonePartialProposal, { context: cloneContext });
+        assert(clonePartialConflictResult.ok, 'clone-variable should partially apply when one variable conflicts.', errors);
+        assert(clonePartialConflictResult.affectedIds.length === 2 && clonePartialConflictResult.warnings.length >= 1, 'clone-variable partial apply should affect 2 and warn for skipped duplicate.', errors);
+        const cloneInternalProposal = makeCloneVariableProposal('ai-prop-clone-internal', 'Cylinder', [
+            { label: 'Cyl_F', format: 'BOOL', address: 'MR960', kind: 'primitive', source: 'manual' },
+            { label: 'Cyl_F', format: 'BOOL', address: 'MR961', kind: 'primitive', source: 'manual' },
+            { label: 'Cyl_G', format: 'BOOL', address: 'MR960', kind: 'primitive', source: 'manual' }
+        ]);
+        const cloneInternalConflictResult = GrafcetStudioAIApply.applyProposal(cloneInternalProposal, { context: cloneContext });
+        assert(cloneInternalConflictResult.ok, 'clone-variable should apply first valid variable when later variables conflict internally.', errors);
+        assert(cloneInternalConflictResult.affectedIds.length === 1, 'clone-variable internal conflicts should leave only first valid variable affected.', errors);
+        const beforeAllConflict = cloneProject.variables.user.length;
+        const cloneAllConflictProposal = makeCloneVariableProposal('ai-prop-clone-all-conflict', 'Cylinder', [
+            { label: 'ExistingClone', format: 'BOOL', address: 'MR950', kind: 'primitive', source: 'manual' },
+            { label: 'Cyl_A', format: 'Cylinder', kind: 'struct', source: 'manual' }
+        ]);
+        const cloneAllConflictResult = GrafcetStudioAIApply.applyProposal(cloneAllConflictProposal, { context: cloneContext });
+        assert(!cloneAllConflictResult.ok, 'clone-variable should fail when all variables conflict.', errors);
+        assert(cloneProject.variables.user.length === beforeAllConflict, 'clone-variable all-conflict failure must not mutate.', errors);
+        const cloneMissingSourceResult = GrafcetStudioAIApply.applyProposal(makeCloneVariableProposal('ai-prop-clone-missing-source', 'MissingCylinder', [
+            { label: 'Cyl_Missing', format: 'Cylinder', kind: 'struct', source: 'manual' }
+        ]), { context: cloneContext });
+        assert(!cloneMissingSourceResult.ok, 'clone-variable should fail when source is missing.', errors);
+        const beforeDryRunConflict = cloneProject.variables.user.length;
+        const cloneDryRunConflictResult = GrafcetStudioAIApply.dryRunProposal(makeCloneVariableProposal('ai-prop-clone-dry-conflict', 'Cylinder', [
+            { label: 'ExistingClone', format: 'BOOL', address: 'MR950', kind: 'primitive', source: 'manual' },
+            { label: 'Cyl_H', format: 'Cylinder', kind: 'struct', source: 'manual' }
+        ]), { context: cloneContext });
+        assert(cloneDryRunConflictResult.ok && cloneDryRunConflictResult.warnings.length >= 1, 'clone-variable dry-run should warn conflicts while succeeding if one variable remains.', errors);
+        assert(cloneProject.variables.user.length === beforeDryRunConflict, 'clone-variable dry-run must not mutate project.', errors);
+        const cloneDoubleApplyResult = GrafcetStudioAIApply.applyProposal(cloneAllUniqueProposal, { context: cloneContext });
+        assert(!cloneDoubleApplyResult.ok, 'clone-variable double apply should fail.', errors);
         const structureProject = makeProject();
         const structureCounts = { saveProject: 0, renderTree: 0, renderGlobalVarTable: 0, refresh: 0 };
         const structureContext = makeContext(structureProject, structureCounts);
@@ -135,6 +197,13 @@ var GrafcetStudioAIApplyValidation;
             structureDuplicateResult,
             structureApplySuccess,
             structureInvalidSignalsResult,
+            cloneAllUniqueResult,
+            clonePartialConflictResult,
+            cloneInternalConflictResult,
+            cloneAllConflictResult,
+            cloneMissingSourceResult,
+            cloneDryRunConflictResult,
+            cloneDoubleApplyResult,
             callbackCounts
         };
     }
