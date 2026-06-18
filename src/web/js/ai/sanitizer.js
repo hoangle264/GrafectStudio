@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 var GrafcetStudioAISanitizer;
 (function (GrafcetStudioAISanitizer) {
     const scopes = ['variable', 'unit', 'diagram', 'step', 'io', 'structure'];
@@ -229,8 +229,12 @@ var GrafcetStudioAISanitizer;
             return null;
         const result = {};
         assignString(result, 'variable', raw.variable);
-        if (!result.variable && isString(raw.expression))
-            result.variable = safeString(raw.expression).split('=')[0].trim();
+        if (!result.variable && isString(raw.expression)) {
+            const expression = safeString(raw.expression);
+            const variable = expression ? expression.split('=')[0].trim() : undefined;
+            if (variable)
+                result.variable = variable;
+        }
         assignNullableString(result, 'address', raw.address);
         assignString(result, 'qualifier', raw.qualifier);
         if (isFiniteNumber(raw.time) || isString(raw.time)) {
@@ -471,4 +475,3 @@ var GrafcetStudioAISanitizer;
         sanitizeExistingStructures
     };
 })(GrafcetStudioAISanitizer || (GrafcetStudioAISanitizer = {}));
-

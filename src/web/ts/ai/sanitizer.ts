@@ -245,7 +245,11 @@
     if (!isRecord(raw)) return null;
     const result: Record<string, unknown> = {};
     assignString(result, 'variable', raw.variable);
-    if (!result.variable && isString(raw.expression)) result.variable = safeString(raw.expression).split('=')[0].trim();
+    if (!result.variable && isString(raw.expression)) {
+      const expression = safeString(raw.expression);
+      const variable = expression ? expression.split('=')[0].trim() : undefined;
+      if (variable) result.variable = variable;
+    }
     assignNullableString(result, 'address', raw.address);
     assignString(result, 'qualifier', raw.qualifier);
     if (isFiniteNumber(raw.time) || isString(raw.time)) {

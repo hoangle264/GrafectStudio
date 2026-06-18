@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 var GrafcetStudioAIApplyValidation;
 (function (GrafcetStudioAIApplyValidation) {
     function assert(condition, message, errors) {
@@ -186,11 +186,38 @@ var GrafcetStudioAIApplyValidation;
         const flowApplySuccess = GrafcetStudioAIApply.applyProposal(flowProposal, { context: flowContext });
         assert(flowApplySuccess.ok, 'create-flow apply should succeed for a valid flow proposal.', errors);
         assert(flowProject.diagrams.length === 1, 'create-flow apply should add or resolve one diagram.', errors);
-        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).steps.length === 2, 'create-flow apply should materialize both steps.', errors);
-        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).transitions.length === 1, 'create-flow apply should materialize the transition.', errors);
-        assert((flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] }).connections.length === 2, 'create-flow apply should materialize the connections.', errors);
+        const appliedFlowState = flowProject.diagrams[0].state || { steps: [], transitions: [], connections: [] };
+        assert(appliedFlowState.steps.length === 2, 'create-flow apply should materialize both steps.', errors);
+        assert(appliedFlowState.transitions.length === 1, 'create-flow apply should materialize the transition.', errors);
+        assert(appliedFlowState.connections.length === 2, 'create-flow apply should materialize the connections.', errors);
+        assert(appliedFlowState.steps.every(function (step) { return typeof step.x === 'number' && Number.isFinite(step.x) && typeof step.y === 'number' && Number.isFinite(step.y); }), 'create-flow apply should backfill finite step layout coordinates.', errors);
+        assert(appliedFlowState.transitions.every(function (transition) { return typeof transition.x === 'number' && Number.isFinite(transition.x) && typeof transition.y === 'number' && Number.isFinite(transition.y); }), 'create-flow apply should backfill finite transition layout coordinates.', errors);
+        assert(appliedFlowState.steps.find(function (step) { return step.id === 'step-run'; }).y === 400, 'create-flow layout should follow step -> transition -> step connection order.', errors);
+        assert(appliedFlowState.transitions.find(function (transition) { return transition.id === 'trans-start'; }).y === 260, 'create-flow layout should place transition between connected steps.', errors);
         assert(flowProposal.status === 'applied', 'create-flow apply should mark proposal applied.', errors);
         assert(flowCounts.saveProject === 1 && flowCounts.renderTree === 1 && flowCounts.refresh === 1, 'create-flow apply should trigger persistence/render callbacks.', errors);
+        const flowBackfillProject = makeProject();
+        const flowBackfillContext = makeContext(flowBackfillProject, { saveProject: 0, renderTree: 0, renderGlobalVarTable: 0, refresh: 0 });
+        const flowBackfillProposal = makeCreateFlowProposal('ai-prop-flow-backfill', {
+            id: 'flow-backfill',
+            name: 'Backfill Flow',
+            steps: [
+                { id: 'step-1', label: 'Step 1', actions: [{ variable: 'cy14.CoilA', qualifier: 'N', address: '', time: '' }] },
+                { id: 'step-2', label: 'Step 2', actions: [{ expression: 'cy14.CoilB = 1' }] }
+            ],
+            transitions: [{ id: 'trans-1', label: 'Go', condition: 'cy14.SensorA' }],
+            connections: [{ from: 'step-1', to: 'trans-1' }, { from: 'trans-1', to: 'step-2' }]
+        });
+        const flowBackfillResult = GrafcetStudioAIApply.applyProposal(flowBackfillProposal, { context: flowBackfillContext });
+        const flowBackfillState = flowBackfillProject.diagrams[0].state || { steps: [], transitions: [], connections: [] };
+        assert(flowBackfillResult.ok, 'create-flow apply should accept steps missing number/layout.', errors);
+        assert(flowBackfillState.steps[0].number === 1 && flowBackfillState.steps[1].number === 2, 'create-flow apply should backfill sequential step numbers.', errors);
+        assert(flowBackfillState.steps[0].initial === true, 'create-flow apply should mark first step initial when missing and target is empty.', errors);
+        assert(flowBackfillState.steps.every(function (step) { return typeof step.x === 'number' && Number.isFinite(step.x) && typeof step.y === 'number' && Number.isFinite(step.y); }), 'create-flow apply should persist backfilled step coordinates on cloned state nodes.', errors);
+        assert(flowBackfillState.transitions.every(function (transition) { return typeof transition.x === 'number' && Number.isFinite(transition.x) && typeof transition.y === 'number' && Number.isFinite(transition.y); }), 'create-flow apply should persist backfilled transition coordinates on cloned state nodes.', errors);
+        assert(flowBackfillState.steps.find(function (step) { return step.id === 'step-2'; }).y === 400, 'create-flow backfill layout should follow connection order for generated steps.', errors);
+        assert(flowBackfillState.transitions.find(function (transition) { return transition.id === 'trans-1'; }).y === 260, 'create-flow backfill layout should place generated transition between generated steps.', errors);
+        assert(!!flowBackfillState.steps[1].actions && flowBackfillState.steps[1].actions[0].variable === 'cy14.CoilB' && flowBackfillState.steps[1].actions[0].qualifier === 'N', 'create-flow apply should normalize expression actions to UI action schema.', errors);
         const flowDuplicateResult = GrafcetStudioAIApply.applyProposal(flowProposal, { context: flowContext });
         assert(!flowDuplicateResult.ok, 'create-flow double apply should fail.', errors);
         const flowMissingEndpointResult = GrafcetStudioAIApply.dryRunProposal(makeCreateFlowProposal('ai-prop-flow-missing', {

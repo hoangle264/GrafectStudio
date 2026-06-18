@@ -309,17 +309,77 @@ var GrafcetStudioAIApply;
             variable = raw.expression.split('=')[0].trim();
         if (!variable)
             return null;
-        return Object.assign({}, action, { variable, qualifier: trimString(raw.qualifier) || 'N' });
+        return {
+            qualifier: trimString(raw.qualifier) || 'N',
+            variable,
+            address: raw.address == null ? '' : trimString(raw.address),
+            time: raw.time == null ? '' : trimString(raw.time)
+        };
+    }
+    function compareFlowLayoutNodes(a, b) {
+        if (a.kind !== b.kind)
+            return a.kind === "step" ? -1 : 1;
+        return a.id.localeCompare(b.id);
+    }
+    function orderFlowLayoutNodes(flow) {
+        const fallbackNodes = [];
+        const nodeById = Object.create(null);
+        (Array.isArray(flow.steps) ? flow.steps : []).forEach(function (step) {
+            const id = trimString(step.id);
+            if (!id)
+                return;
+            const item = { kind: "step", node: step, id };
+            fallbackNodes.push(item);
+            nodeById[id] = item;
+        });
+        (Array.isArray(flow.transitions) ? flow.transitions : []).forEach(function (transition) {
+            const id = trimString(transition.id);
+            if (!id)
+                return;
+            const item = { kind: "transition", node: transition, id };
+            fallbackNodes.push(item);
+            nodeById[id] = item;
+        });
+        fallbackNodes.sort(compareFlowLayoutNodes);
+        const fallbackIndex = Object.create(null);
+        fallbackNodes.forEach(function (item, index) { fallbackIndex[item.id] = index; });
+        const outgoing = Object.create(null);
+        const incoming = Object.create(null);
+        (Array.isArray(flow.connections) ? flow.connections : []).forEach(function (connection) {
+            const from = connectionEndpoint(connection, 'from');
+            const to = connectionEndpoint(connection, 'to');
+            if (!from || !to || !nodeById[from] || !nodeById[to])
+                return;
+            if (!outgoing[from])
+                outgoing[from] = [];
+            outgoing[from].push(to);
+            incoming[to] = true;
+        });
+        Object.keys(outgoing).forEach(function (id) {
+            outgoing[id].sort(function (a, b) { return (fallbackIndex[a] || 0) - (fallbackIndex[b] || 0); });
+        });
+        const initialStep = (Array.isArray(flow.steps) ? flow.steps : []).find(function (step) { return step.initial === true && !!nodeById[trimString(step.id)]; });
+        const firstRootStep = (Array.isArray(flow.steps) ? flow.steps : []).find(function (step) { const id = trimString(step.id); return !!id && !!nodeById[id] && !incoming[id]; });
+        const firstStep = (Array.isArray(flow.steps) ? flow.steps : []).find(function (step) { return !!nodeById[trimString(step.id)]; });
+        const startId = trimString(initialStep && initialStep.id) || trimString(firstRootStep && firstRootStep.id) || trimString(firstStep && firstStep.id);
+        if (!startId || !nodeById[startId])
+            return fallbackNodes;
+        const orderedNodes = [];
+        const visited = Object.create(null);
+        function visit(id) {
+            if (visited[id] || !nodeById[id])
+                return;
+            visited[id] = true;
+            orderedNodes.push(nodeById[id]);
+            (outgoing[id] || []).forEach(visit);
+        }
+        visit(startId);
+        fallbackNodes.forEach(function (item) { if (!visited[item.id])
+            orderedNodes.push(item); });
+        return orderedNodes.length ? orderedNodes : fallbackNodes;
     }
     function materializeFlowLayout(state, flow) {
-        const orderedNodes = [];
-        (Array.isArray(flow.steps) ? flow.steps : []).forEach(function (step) { orderedNodes.push({ kind: "step", node: step }); });
-        (Array.isArray(flow.transitions) ? flow.transitions : []).forEach(function (transition) { orderedNodes.push({ kind: "transition", node: transition }); });
-        orderedNodes.sort(function (a, b) {
-            if (a.kind !== b.kind)
-                return a.kind === "step" ? -1 : 1;
-            return trimString(a.node.id).localeCompare(trimString(b.node.id));
-        });
+        const orderedNodes = orderFlowLayoutNodes(flow);
         let nextStepNumber = state.steps.reduce(function (max, step) { return Math.max(max, Number(step.number) || 0); }, 0);
         let stepIndex = 0;
         orderedNodes.forEach(function (item, index) {
@@ -570,4 +630,3 @@ var GrafcetStudioAIApply;
     GrafcetStudioAIApply.resetAppliedProposalTracking = resetAppliedProposalTracking;
     GrafcetStudioAIApply.api = { dryRunProposal, applyProposal, hasAppliedProposal, resetAppliedProposalTracking };
 })(GrafcetStudioAIApply || (GrafcetStudioAIApply = {}));
-
