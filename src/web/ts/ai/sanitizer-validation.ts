@@ -37,6 +37,7 @@
         variables: { imported: [rawVariable], user: [] },
         units: [{ id: 'unit-1', name: 'Station 1', localConfig: { path: 'C:\\tmp\\unit.json' }, secretToken: 'token-abc' }],
         diagrams: [{ id: 'diag-1', name: 'Main', mode: 'Main', unitId: 'unit-1', machine: 'BUILD-SERVER-01', filePath: '\\\\BUILD-SERVER\\share\\main.gf' }],
+        devices: [{ id: 'dev-1', name: 'ServoAxis', categoryId: 'cat-motion', signals: [{ id: 'Enable', name: 'Enable', dataType: 'Bool' }] }],
         ioMapping: {
           physicalIOs: [{ id: 'io-1', deviceTag: 'StartPB', plcAddress: 'X0', direction: 'Input', password: 'pw' }],
           entries: [{ physicalIOId: 'io-1', appVariable: 'MotorStart', status: 'mapped', matchScore: 0.95, apiKey: 'sk-test-secret' }],
@@ -75,6 +76,22 @@
     assert(!!mapIoOnly.variables, 'map-io context should keep variable scope when requested.', errors);
     assert(!!mapIoOnly.ioMapping, 'map-io context should keep io scope when requested.', errors);
     assert(!mapIoOnly.unit && !mapIoOnly.diagram && !mapIoOnly.steps, 'map-io context should not include scopes outside the selected intent.', errors);
+
+
+    const structureOnly = GrafcetStudioAISanitizer.sanitizeAiContext(raw, {
+      intent: 'create-structure',
+      scopes: ['structure']
+    });
+    assert(!!structureOnly.existingStructures && structureOnly.existingStructures[0] === 'ServoAxis', 'create-structure context should include existing structure names.', errors);
+    assert(!containsForbiddenText(structureOnly), 'structure context must not contain forbidden text.', errors);
+    assert(JSON.stringify(structureOnly).indexOf('Enable') < 0 && JSON.stringify(structureOnly).indexOf('cat-motion') < 0 && JSON.stringify(structureOnly).indexOf('dev-1') < 0, 'structure sanitizer must expose only structure names, not signals or internal fields.', errors);
+
+    const fallbackStructures = GrafcetStudioAISanitizer.sanitizeScope('structure', { devices: [{ name: 'ValveBlock' }, { name: '' }, { name: 123 }] }) as string[];
+    assert(Array.isArray(fallbackStructures) && fallbackStructures.length === 1 && fallbackStructures[0] === 'ValveBlock', 'structure scope should fallback to raw.devices and include safe names only.', errors);
+
+    const manyDevices = { project: { devices: Array.from({ length: 60 }, function(_, index) { return { name: 'Struct' + index, signals: [{ name: 'Hidden' }] }; }) } };
+    const limitedStructures = GrafcetStudioAISanitizer.sanitizeScope('structure', manyDevices) as string[];
+    assert(limitedStructures.length === 50, 'structure sanitizer must limit existingStructures to 50 names.', errors);
 
     return { ok: errors.length === 0, errors, sanitized };
   }

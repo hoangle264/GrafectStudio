@@ -45,7 +45,8 @@ namespace GrafcetStudioAIContextBuilder {
     'create-variable': ['variable', 'unit', 'diagram'],
     'clone-variable': ['variable', 'unit', 'diagram'],
     'map-io': ['variable', 'io'],
-    'create-flow': ['variable', 'unit', 'diagram', 'step', 'io']
+    'create-flow': ['variable', 'unit', 'diagram', 'step', 'io'],
+    'create-structure': ['structure']
   };
 
   function isRecord(value: unknown): value is Record<string, unknown> {
@@ -109,6 +110,7 @@ namespace GrafcetStudioAIContextBuilder {
     const text = message.toLowerCase();
     if (/\b(clone|duplicate|copy|nhân bản|sao ch[eé]p)\b/.test(text)) return 'clone-variable';
     if (/\b(map|mapping|io|i\/o|input|output|gán io|ánh xạ)\b/.test(text)) return 'map-io';
+    if (/\b(struct|structure|device type)\b/.test(text)) return 'create-structure';
     if (/\b(flow|grafcet|step|transition|sequence|trình tự|bước)\b/.test(text)) return 'create-flow';
     if (/\b(variable|var|biến|tag|address|địa chỉ)\b/.test(text)) return 'create-variable';
     return null;
@@ -120,7 +122,7 @@ namespace GrafcetStudioAIContextBuilder {
       return input.selectedIntent;
     }
     if (input.selectedIntent !== undefined && input.selectedIntent !== null && input.selectedIntent !== '') {
-      errors.push('selectedIntent must be one of: create-variable, clone-variable, map-io, create-flow.');
+      errors.push('selectedIntent must be one of: create-variable, clone-variable, map-io, create-flow, create-structure.');
       return null;
     }
     if (input.allowAutoDetect && detected) {
@@ -157,6 +159,7 @@ namespace GrafcetStudioAIContextBuilder {
     if (context.transitions) result.transitions = shrinkTopLevelArray(result, 'transitions', context.transitions, maxContextChars);
     if (context.connections) result.connections = shrinkTopLevelArray(result, 'connections', context.connections, maxContextChars);
     if (context.flows) result.flows = shrinkTopLevelArray(result, 'flows', context.flows, maxContextChars);
+    if (context.existingStructures) result.existingStructures = shrinkTopLevelArray(result, 'existingStructures', context.existingStructures, maxContextChars);
 
     if (measureContext(result) > maxContextChars) return null;
     warnings.push('context exceeded maxContextChars and was reduced to fit the budget.');

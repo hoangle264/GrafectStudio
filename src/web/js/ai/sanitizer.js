@@ -1,13 +1,14 @@
 "use strict";
 var GrafcetStudioAISanitizer;
 (function (GrafcetStudioAISanitizer) {
-    const scopes = ['variable', 'unit', 'diagram', 'step', 'io'];
+    const scopes = ['variable', 'unit', 'diagram', 'step', 'io', 'structure'];
     const defaultMaxItems = 200;
     const intentScopeMap = {
         'create-variable': ['variable', 'unit', 'diagram'],
         'clone-variable': ['variable', 'unit', 'diagram'],
         'map-io': ['variable', 'io'],
-        'create-flow': ['variable', 'unit', 'diagram', 'step', 'io']
+        'create-flow': ['variable', 'unit', 'diagram', 'step', 'io'],
+        'create-structure': ['structure']
     };
     function isRecord(value) {
         return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -360,6 +361,22 @@ var GrafcetStudioAISanitizer;
         };
     }
     GrafcetStudioAISanitizer.sanitizeIoMapping = sanitizeIoMapping;
+    function sanitizeExistingStructures(raw) {
+        const root = rootRecord(raw);
+        const project = getRecordField(root, 'project');
+        const source = project && Array.isArray(project.devices) ? project.devices : (Array.isArray(root.devices) ? root.devices : []);
+        const result = [];
+        for (let index = 0; index < source.length && result.length < 50; index++) {
+            const item = source[index];
+            if (!isRecord(item))
+                continue;
+            const name = safeString(item.name);
+            if (name !== undefined)
+                result.push(name);
+        }
+        return result;
+    }
+    GrafcetStudioAISanitizer.sanitizeExistingStructures = sanitizeExistingStructures;
     function isAllowedForIntent(scope, intent) {
         if (!GrafcetStudioAIContracts.isAiIntent(intent))
             return true;
@@ -383,6 +400,7 @@ var GrafcetStudioAISanitizer;
                     flows: take(parts.flows, maxItems).map(sanitizeFlow).filter(function (item) { return item !== null; })
                 };
             case 'io': return sanitizeIoMapping(raw, maxItems);
+            case 'structure': return sanitizeExistingStructures(raw);
             default: return undefined;
         }
     }
@@ -431,6 +449,11 @@ var GrafcetStudioAISanitizer;
             if (ioMapping.physicalIOs.length || ioMapping.entries.length)
                 result.ioMapping = ioMapping;
         }
+        if (hasScope(options, 'structure')) {
+            const existingStructures = sanitizeExistingStructures(raw);
+            if (existingStructures.length)
+                result.existingStructures = existingStructures;
+        }
         return result;
     }
     GrafcetStudioAISanitizer.sanitizeAiContext = sanitizeAiContext;
@@ -442,6 +465,7 @@ var GrafcetStudioAISanitizer;
         sanitizeUnit,
         sanitizeDiagram,
         sanitizeStep,
-        sanitizeIoMapping
+        sanitizeIoMapping,
+        sanitizeExistingStructures
     };
 })(GrafcetStudioAISanitizer || (GrafcetStudioAISanitizer = {}));

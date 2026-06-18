@@ -3,6 +3,7 @@ namespace GrafcetStudioAIMockServiceValidation {
     ok: boolean;
     fixtureResult: GrafcetStudioAIMockService.MockFixtureValidationResult;
     createVariableResult: GrafcetStudioAIMockService.MockAiResponse;
+    createStructureResult: GrafcetStudioAIMockService.MockAiResponse;
     malformedJsonResult: GrafcetStudioAIMockService.MockAiResponse;
     wrongShapeResult: GrafcetStudioAIMockService.MockAiResponse;
     errors: string[];
@@ -31,6 +32,11 @@ namespace GrafcetStudioAIMockServiceValidation {
       errors.push('create-variable mock response must pass AiProposal validation and preserve intent.');
     }
 
+    const createStructureResult = GrafcetStudioAIMockService.generateMockResponse(makeRequest('create-structure'));
+    if (!createStructureResult.ok || !createStructureResult.proposal || createStructureResult.proposal.intent !== 'create-structure') {
+      errors.push('create-structure mock response must pass AiProposal validation and preserve intent.');
+    }
+
     const malformedJsonResult = GrafcetStudioAIMockService.generateMockResponse(makeRequest('create-variable'), { fixtureName: 'malformed-json' });
     if (malformedJsonResult.ok) errors.push('malformed-json mock response must intentionally fail.');
 
@@ -41,6 +47,7 @@ namespace GrafcetStudioAIMockServiceValidation {
       ok: errors.length === 0,
       fixtureResult,
       createVariableResult,
+      createStructureResult,
       malformedJsonResult,
       wrongShapeResult,
       errors

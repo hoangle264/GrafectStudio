@@ -107,6 +107,17 @@ public class MockAiCompletionService : IAiCompletionService
                     new { physicalIOId = "mock-io-start-button", appVariable = "Mock_StartCommand", status = "mapped", matchScore = 0.95 }
                 }
             }, "Mock proposal maps one physical IO point to an application variable."),
+
+            "create-structure" => SerializeProposal("ai-prop-mock-create-structure", intent, requestId, new
+            {
+                name = "ServoAxis",
+                signals = new[]
+                {
+                    new { name = "Enable", dataType = "Bool", varType = "Output", comment = "Enable servo axis" },
+                    new { name = "Ready", dataType = "Bool", varType = "Input", comment = "Servo ready signal" },
+                    new { name = "Fault", dataType = "Bool", varType = "Input", comment = "Servo fault signal" }
+                }
+            }, "Mock proposal creates a ServoAxis struct with Enable and Ready signals."),
             "create-flow" => SerializeProposal("ai-prop-mock-create-flow", intent, requestId, new
             {
                 flow = new

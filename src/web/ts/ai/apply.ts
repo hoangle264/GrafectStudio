@@ -4,6 +4,7 @@
   type Project = GrafcetStudioProject.Project;
   type ProjectVariable = GrafcetStudioProject.ProjectVariable;
   type AiVariableProposal = GrafcetStudioAIContracts.AiVariableProposal;
+  type CreateStructureProposalData = GrafcetStudioAIContracts.CreateStructureProposalData;
 
   export interface ApplyContext {
     getProject(): Project;
@@ -11,6 +12,7 @@
     renderTree?: () => void;
     renderGlobalVarTable?: () => void;
     refresh?: () => void;
+    syncVariableSignalAddressesFromDeviceTypes?: () => boolean;
   }
 
   export interface ApplyOptions { dryRun?: boolean; context?: ApplyContext; }
@@ -25,6 +27,7 @@
   declare function saveProject(): void;
   declare function renderTree(): void;
   declare function renderGlobalVarTable(): void;
+  declare function syncVariableSignalAddressesFromDeviceTypes(): boolean;
 
   const appliedProposalIds: Record<string, true> = Object.create(null);
 
@@ -40,7 +43,8 @@
       getProject: function() { return project; },
       saveProject: typeof saveProject === 'function' ? saveProject : undefined,
       renderTree: typeof renderTree === 'function' ? renderTree : undefined,
-      renderGlobalVarTable: typeof renderGlobalVarTable === 'function' ? renderGlobalVarTable : undefined
+      renderGlobalVarTable: typeof renderGlobalVarTable === 'function' ? renderGlobalVarTable : undefined,
+      syncVariableSignalAddressesFromDeviceTypes: typeof syncVariableSignalAddressesFromDeviceTypes === 'function' ? syncVariableSignalAddressesFromDeviceTypes : undefined
     };
   }
   function resolveContext(options?: ApplyOptions): ApplyContext | null { return options && options.context ? options.context : getDefaultContext(); }
@@ -143,6 +147,46 @@
     return errors.length ? fail(proposal.id, true, unique(errors)) : success(proposal.id, true, data.entries.map(function(e) { return e.physicalIOId; }), [], false);
   }
   function connectionEndpoint(connection: GrafcetStudioProject.Connection, key: 'from' | 'to'): string { return trimString(key === 'from' ? (connection.from || connection.fromId) : (connection.to || connection.toId)); }
+
+  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
+  const allowedStructureVarTypes: readonly string[] = ['Input', 'Output', 'Var'];
+  function normalizeStructureName(name: unknown): string { return typeof name === 'string' ? name.trim() : ''; }
+  function makeSignalIdFromName(name: string): string {
+    if (typeof GrafcetStudioTree !== 'undefined' && GrafcetStudioTree.makeSignalIdFromName) return GrafcetStudioTree.makeSignalIdFromName(name);
+    return name.trim().replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+  function ensureProjectDevices(projectState: Project): GrafcetStudioProject.DeviceType[] {
+    if (!Array.isArray(projectState.devices)) projectState.devices = [];
+    return projectState.devices;
+  }
+  function hasStructureWithName(projectState: Project, name: string): boolean {
+    const normalized = name.trim().toLowerCase();
+    return Array.isArray(projectState.devices) && projectState.devices.some(function(device) {
+      return !!device && typeof device.name === 'string' && device.name.trim().toLowerCase() === normalized;
+    });
+  }
+  function resolveStructureSignals(data: CreateStructureProposalData, warnings: string[], errors?: string[]): GrafcetStudioProject.DeviceSignal[] {
+    const used: Record<string, true> = Object.create(null);
+    const signals: GrafcetStudioProject.DeviceSignal[] = [];
+    (Array.isArray(data.signals) ? data.signals : []).forEach(function(signal, index) {
+      const name = normalizeStructureName(signal && signal.name);
+      if (!name) { warnings.push('Signal ' + index + ' was skipped because name is empty.'); return; }
+      if (allowedStructureDataTypes.indexOf(signal.dataType) < 0) { if (errors) errors.push('Signal ' + index + ' has invalid dataType: ' + signal.dataType + '.'); return; }
+      if (allowedStructureVarTypes.indexOf(signal.varType) < 0) { if (errors) errors.push('Signal ' + index + ' has invalid varType: ' + signal.varType + '.'); return; }
+      const id = makeSignalIdFromName(name);
+      if (!id) { warnings.push('Signal "' + name + '" was skipped because it cannot create a valid id.'); return; }
+      const key = id.toLowerCase();
+      if (used[key]) { warnings.push('Signal "' + name + '" was skipped because id "' + id + '" is duplicated.'); return; }
+      used[key] = true;
+      const out: GrafcetStudioProject.DeviceSignal = { id, name, dataType: signal.dataType, varType: signal.varType, address: '' };
+      const comment = normalizeStructureName(signal.comment);
+      if (comment) out.comment = comment;
+      else out.comment = '';
+      signals.push(out);
+    });
+    return signals;
+  }
+
   function validateCreateFlowPreconditions(proposal: AiProposal): ApplyResult {
     const data = proposal.data as GrafcetStudioAIContracts.CreateFlowProposalData;
     const flow = data.flow;
@@ -158,6 +202,22 @@
     });
     return errors.length ? fail(proposal.id, true, unique(errors)) : success(proposal.id, true, Object.keys(ids), [], false);
   }
+
+  function validateCreateStructurePreconditions(proposal: AiProposal, context: ApplyContext): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as CreateStructureProposalData;
+    const name = normalizeStructureName(data.name);
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    if (!projectState || typeof projectState !== 'object') errors.push('Project state is not available.');
+    else if (!Array.isArray(projectState.devices)) errors.push('Project devices collection is not available.');
+    if (!name) errors.push('Structure name is required.');
+    if (projectState && name && hasStructureWithName(projectState, name)) errors.push('Structure name already exists');
+    const signals = resolveStructureSignals(data, warnings, errors);
+    if (!signals.length) errors.push('At least one valid signal is required.');
+    return errors.length ? fail(proposal.id, true, unique(errors), warnings) : success(proposal.id, true, [name], warnings, false);
+  }
+
   function validateProposalForApply(proposal: unknown, dryRun: boolean, context: ApplyContext | null): { proposal?: AiProposal; result?: ApplyResult } {
     const validation = GrafcetStudioAIContracts.validateAiProposal(proposal);
     const proposalId = validation.value ? validation.value.id : (proposal && typeof proposal === 'object' && 'id' in proposal ? String((proposal as { id?: unknown }).id || '') : 'unknown');
@@ -177,6 +237,7 @@
       case 'clone-variable': return validateCloneVariablePreconditions(base.proposal, context);
       case 'map-io': return validateMapIOPreconditions(base.proposal, context);
       case 'create-flow': return validateCreateFlowPreconditions(base.proposal);
+      case 'create-structure': return validateCreateStructurePreconditions(base.proposal, context);
       default: return fail(base.proposal.id, true, ['Unsupported proposal intent.']);
     }
   }
@@ -200,6 +261,26 @@
     if (context.refresh) context.refresh();
     return success(proposal.id, false, preflight.affectedIds.length ? preflight.affectedIds : [variable.id || variable.label], preflight.warnings, true);
   }
+
+  function applyCreateStructure(proposal: AiProposal, context: ApplyContext, preflight: ApplyResult): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as CreateStructureProposalData;
+    const name = normalizeStructureName(data.name);
+    const warnings = preflight.warnings.slice();
+    if (hasStructureWithName(projectState, name)) return fail(proposal.id, false, ['Structure name already exists'], warnings);
+    const signals = resolveStructureSignals(data, warnings);
+    if (!signals.length) return fail(proposal.id, false, ['At least one valid signal is required.'], warnings);
+    const device: GrafcetStudioProject.DeviceType = { id: 'dev-ai-' + Date.now(), name, categoryId: 'cat-other', open: true, signals };
+    ensureProjectDevices(projectState).push(device);
+    if (context.syncVariableSignalAddressesFromDeviceTypes) context.syncVariableSignalAddressesFromDeviceTypes();
+    proposal.status = 'applied';
+    appliedProposalIds[proposal.id] = true;
+    if (context.saveProject) context.saveProject();
+    if (context.renderTree) context.renderTree();
+    if (context.refresh) context.refresh();
+    return success(proposal.id, false, [device.id], warnings, true);
+  }
+
   export function applyProposal(proposal: unknown, options?: ApplyOptions): ApplyResult {
     if (options && options.dryRun) return dryRunProposal(proposal, options);
     const context = resolveContext(options);
@@ -212,6 +293,7 @@
       case 'clone-variable': return fail(base.proposal.id, false, ['Apply is not implemented for clone-variable yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
       case 'map-io': return fail(base.proposal.id, false, ['Apply is not implemented for map-io yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
       case 'create-flow': return fail(base.proposal.id, false, ['Apply is not implemented for create-flow yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
+      case 'create-structure': return applyCreateStructure(base.proposal, context, preflight);
       default: return fail(base.proposal.id, false, ['Unsupported proposal intent.']);
     }
   }

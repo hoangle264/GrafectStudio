@@ -2,7 +2,7 @@
 var GrafcetStudioAIContracts;
 (function (GrafcetStudioAIContracts) {
     GrafcetStudioAIContracts.schemaVersion = '1.0.0';
-    const intents = ['create-variable', 'clone-variable', 'map-io', 'create-flow'];
+    const intents = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
     const proposalStatuses = ['draft', 'validated', 'applied', 'discarded', 'invalid'];
     function isRecord(value) {
         return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -143,6 +143,36 @@ var GrafcetStudioAIContracts;
         }
         return errors.length === 0;
     }
+    const allowedStructureDataTypes = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
+    const allowedStructureVarTypes = ['Input', 'Output', 'Var'];
+    function validateSignalProposal(value, errors, path) {
+        if (!isRecord(value)) {
+            errors.push(path + ' must be an object.');
+            return false;
+        }
+        if (!isString(value.name) || !value.name.trim())
+            errors.push(path + '.name must be a non-empty string.');
+        if (!isString(value.dataType) || allowedStructureDataTypes.indexOf(value.dataType) < 0)
+            errors.push(path + '.dataType must be one of: ' + allowedStructureDataTypes.join(', ') + '.');
+        if (!isString(value.varType) || allowedStructureVarTypes.indexOf(value.varType) < 0)
+            errors.push(path + '.varType must be one of: ' + allowedStructureVarTypes.join(', ') + '.');
+        if (value.comment != null && !isString(value.comment))
+            errors.push(path + '.comment must be a string when provided.');
+        return errors.length === 0;
+    }
+    function validateCreateStructureProposal(value, errors, path) {
+        if (!isRecord(value)) {
+            errors.push(path + ' must be an object.');
+            return false;
+        }
+        if (!isString(value.name) || !value.name.trim())
+            errors.push(path + '.name must be a non-empty string.');
+        if (!Array.isArray(value.signals) || value.signals.length === 0)
+            errors.push(path + '.signals must be a non-empty array.');
+        else
+            value.signals.forEach(function (signal, index) { validateSignalProposal(signal, errors, path + '.signals[' + index + ']'); });
+        return errors.length === 0;
+    }
     function validateProposalData(intent, value, errors) {
         if (!isRecord(value)) {
             errors.push('proposal.data must be an object.');
@@ -169,6 +199,9 @@ var GrafcetStudioAIContracts;
                 break;
             case 'create-flow':
                 validateFlowProposal(value.flow, errors, 'proposal.data.flow');
+                break;
+            case 'create-structure':
+                validateCreateStructureProposal(value, errors, 'proposal.data');
                 break;
             default:
                 errors.push('proposal.intent is not supported.');

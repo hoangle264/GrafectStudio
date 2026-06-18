@@ -9,6 +9,7 @@ namespace GrafcetStudioAIProposalParserValidation {
     unknownIntentResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
     unsupportedSchemaResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
     cloneArrayShapeResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
+    createStructureResult: GrafcetStudioAIProposalParser.AiProposalParseResult;
   }
 
   function assert(condition: boolean, message: string, errors: string[]): void {
@@ -65,6 +66,11 @@ namespace GrafcetStudioAIProposalParserValidation {
     assert(cloneArrayShapeResult.ok, 'clone-variable array-shaped AI response should normalize to first source and variable.', errors);
     assert(!!cloneArrayShapeResult.value && (cloneArrayShapeResult.value.warnings || []).length > 0, 'clone-variable array normalization should add warnings.', errors);
 
+
+    const createStructureResult = GrafcetStudioAIProposalParser.parseAiProposalResponse(GrafcetStudioAIMockService.getFixtureRawText('create-structure'));
+    assert(createStructureResult.ok, 'create-structure fixture should parse and validate.', errors);
+    assert(!!createStructureResult.value && createStructureResult.value.intent === 'create-structure', 'create-structure fixture should preserve proposal intent.', errors);
+
     return {
       ok: errors.length === 0,
       errors,
@@ -74,7 +80,8 @@ namespace GrafcetStudioAIProposalParserValidation {
       wrongIntentShapeResult,
       unknownIntentResult,
       unsupportedSchemaResult,
-      cloneArrayShapeResult
+      cloneArrayShapeResult,
+      createStructureResult
     };
   }
 }

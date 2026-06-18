@@ -22,6 +22,7 @@
         machineName: 'BUILD-SERVER-01',
         templateRootPath: 'C:\\Users\\Nitro\\templates',
         rawSecret: 'sk-test-secret-123',
+        devices: [{ name: 'ServoAxis', signals: [{ name: 'HiddenSignal' }] }],
         variables: {
           imported: [{ id: 'v1', label: 'StartPB', format: 'BOOL', address: 'X0', apiKey: 'sk-test-secret' }],
           user: [{ id: 'v2', label: 'MotorRun', format: 'BOOL', address: 'Y0' }]
@@ -47,6 +48,20 @@
     assert(!!validResult.request && !!validResult.request.context.variables, 'context should include sanitized variables for create-variable.', errors);
     assert(!!validResult.request && !validResult.request.context.ioMapping, 'context should omit disallowed scope for create-variable.', errors);
     assert(!containsForbiddenText(validResult.request), 'AiRequest must not contain path-like or secret-like raw fields.', errors);
+
+
+    const structureResult = GrafcetStudioAIContextBuilder.buildAiRequest({
+      message: 'Create a structure for servo axis',
+      selectedIntent: 'create-structure',
+      scope: ['structure', 'variable'],
+      rawProject: raw,
+      budget: { maxItems: 10, maxContextChars: 3000 }
+    });
+    assert(structureResult.ok, 'create-structure context builder input should produce an AiRequest.', errors);
+    assert(!!structureResult.request && structureResult.request.intent === 'create-structure', 'create-structure selectedIntent must drive the request intent.', errors);
+    assert(!!structureResult.request && !!structureResult.request.context.existingStructures, 'create-structure context should include existingStructures.', errors);
+    assert(!!structureResult.request && !structureResult.request.context.variables && !structureResult.request.context.units && !structureResult.request.context.diagrams && !structureResult.request.context.ioMapping, 'create-structure context should omit unrelated scopes.', errors);
+    assert(!!structureResult.request && JSON.stringify(structureResult.request).indexOf('HiddenSignal') < 0, 'create-structure context must not expose existing structure signals.', errors);
 
     const invalidResult = GrafcetStudioAIContextBuilder.buildAiRequest({
       message: '   ',

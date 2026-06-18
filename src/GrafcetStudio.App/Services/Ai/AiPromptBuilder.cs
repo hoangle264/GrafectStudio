@@ -9,6 +9,7 @@ public static class AiPromptBuilder
             "clone-variable" => "Return exactly one data.source object and exactly one data.variable object. Do not return arrays, data.variables, or multiple clones in one proposal. If the user asks for multiple variables, propose the first safe variable and add a warning that additional variables require separate proposals.",
             "map-io" => "Return data.entries only. Each entry must contain physicalIOId, appVariable, status, and optional matchScore.",
             "create-flow" => "Return data.flow only. Keep the flow minimal, with valid ids, steps, transitions, and connections.",
+            "create-structure" => "Return data.name (string) and data.signals (array of objects with name, dataType, varType, comment). dataType must be one of: Bool, Int, Real, Word, DWord, Time. varType must be one of: Input, Output, Var. Do not include id, categoryId, address, deviceId, or internal metadata. Do not propose a structure name already listed in existingStructures.",
             _ => "Return data.bucket and data.variable only. Use bucket \"user\" unless sanitized context clearly requires another safe bucket."
         };
 

@@ -1,9 +1,9 @@
 "use strict";
 var GrafcetStudioAIMockService;
 (function (GrafcetStudioAIMockService) {
-    const validFixtureNames = ['create-variable', 'clone-variable', 'map-io', 'create-flow'];
+    const validFixtureNames = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
     const errorFixtureNames = ['malformed-json', 'wrong-proposal-shape'];
-    const allFixtureNames = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'malformed-json', 'wrong-proposal-shape'];
+    const allFixtureNames = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure', 'malformed-json', 'wrong-proposal-shape'];
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
     }
@@ -94,6 +94,22 @@ var GrafcetStudioAIMockService;
                         { from: 'mock-trans-start', to: 'mock-step-run' }
                     ]
                 }
+            }
+        },
+        'create-structure': {
+            schemaVersion: GrafcetStudioAIContracts.schemaVersion,
+            id: 'ai-prop-mock-create-structure',
+            intent: 'create-structure',
+            status: 'draft',
+            summary: 'Mock proposal creates a ServoAxis struct with Enable and Ready signals.',
+            warnings: ['Mock fixture only; no project mutation has been performed.'],
+            data: {
+                name: 'ServoAxis',
+                signals: [
+                    { name: 'Enable', dataType: 'Bool', varType: 'Output', comment: 'Enable servo axis' },
+                    { name: 'Ready', dataType: 'Bool', varType: 'Input', comment: 'Servo ready signal' },
+                    { name: 'Fault', dataType: 'Bool', varType: 'Input', comment: 'Servo fault signal' }
+                ]
             }
         }
     };
