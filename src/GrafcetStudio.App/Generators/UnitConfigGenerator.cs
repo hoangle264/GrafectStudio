@@ -12,7 +12,7 @@ using System.Text.Json;
 
 namespace GrafcetStudio.App.Generators;
 
-public class UnitConfigGenerator : ICodeGenerator
+public class UnitConfigGenerator : LegacyCodeGeneratorBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly string[] SectionTemplateOrder =
@@ -40,8 +40,9 @@ public class UnitConfigGenerator : ICodeGenerator
         _sequenceResolver = sequenceResolver;
     }
 
-    public string Platform => "unit-config";
-    public string Generate(CodegenPayload payload)
+    public override string Platform => "unit-config";
+    public string GenerateUnitContent(CodegenPayload payload) => GenerateLegacy(payload);
+    protected override string GenerateLegacy(CodegenPayload payload)
     {
          var context = BuildContext(payload);
         RegisterPartials();
@@ -644,11 +645,3 @@ public class UnitConfigGenerator : ICodeGenerator
         _ => "uc.deviceGeneric"
     };
 }
-
-
-
-
-
-
-
-

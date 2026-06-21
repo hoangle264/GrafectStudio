@@ -32,6 +32,7 @@ public static class TemplateLoader
         }
 
         LoadStandardTemplates(rootPath, result);
+        LoadBaseTemplates(rootPath, result, GetProfileName(templateRootPath));
         LoadDevicePartials(rootPath, result);
         LoadCustomDevicePartials(rootPath, result);
 
@@ -59,6 +60,42 @@ public static class TemplateLoader
         foreach (var item in mapping)
         {
             LoadMappedTemplate(Path.Combine(rootPath, item.Filename), item.Id, item.Filename, item.IsPartial, result);
+        }
+    }
+
+    private static void LoadBaseTemplates(string rootPath, TemplateLoadResult result, string profile)
+    {
+        LoadTemplateSet(Path.Combine(rootPath, "simple"), "simple", result);
+        if (string.Equals(profile, "packml", StringComparison.OrdinalIgnoreCase))
+        {
+            LoadTemplateSet(Path.Combine(rootPath, "packml"), "packml", result);
+        }
+    }
+
+    private static string GetProfileName(string templateRootPath)
+    {
+        try
+        {
+            var profileFile = Path.Combine(Path.GetFullPath(templateRootPath.Trim()), "profile.txt");
+            if (!File.Exists(profileFile)) return "simple";
+            var profile = File.ReadAllText(profileFile).Trim();
+            return string.IsNullOrWhiteSpace(profile) ? "simple" : profile;
+        }
+        catch
+        {
+            return "simple";
+        }
+    }
+
+    private static void LoadTemplateSet(string folderPath, string prefix, TemplateLoadResult result)
+    {
+        if (!Directory.Exists(folderPath)) return;
+
+        foreach (var file in Directory.EnumerateFiles(folderPath, "*.hbs", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            var id = $"{prefix}.{name}";
+            LoadMappedTemplate(file, id, Path.GetFileName(file), false, result);
         }
     }
 

@@ -5,11 +5,11 @@ using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Generators;
 
-public class TwinCatStGenerator : ICodeGenerator
+public class TwinCatStGenerator : LegacyCodeGeneratorBase
 {
-    public string Platform => "twincat-st";
+    public override string Platform => "twincat-st";
 
-    public string Generate(CodegenPayload payload)
+    protected override string GenerateLegacy(CodegenPayload payload)
     {
         var seq = SequenceBuilder.Build(payload);
         var sb = new StringBuilder();

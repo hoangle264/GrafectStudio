@@ -1,5 +1,6 @@
 using GrafcetStudio.App.Events;
 using GrafcetStudio.App.Services;
+using GrafcetStudio.Domain.Models;
 using Microsoft.Web.WebView2.Core;
 using Prism.Events;
 using Prism.Ioc;
@@ -29,7 +30,7 @@ public partial class MainWindow : Window
 
         var bridge = ((App)System.Windows.Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
-        webView.CoreWebView2.OpenDevToolsWindow();//test
+      //  webView.CoreWebView2.OpenDevToolsWindow();//test
         webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
 
         var webPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web"));
@@ -138,7 +139,9 @@ public partial class MainWindow : Window
             {
                 var message = new ExportCodePayload
                 {
-                    Code = payload.GetProperty("code").GetString() ?? string.Empty,
+                    Files = payload.TryGetProperty("files", out var filesElement) && filesElement.ValueKind == JsonValueKind.Array
+                        ? JsonSerializer.Deserialize<List<CodegenFile>>(filesElement.GetRawText()) ?? new List<CodegenFile>()
+                        : new List<CodegenFile>(),
                     Platform = payload.GetProperty("platform").GetString() ?? string.Empty
                 };
                 _eventAggregator.GetEvent<ExportCodeRequestedEvent>().Publish(message);

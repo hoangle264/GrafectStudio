@@ -252,6 +252,9 @@ var GrafcetStudioCodegenPayload;
                 id: diagram.id || diagramId,
                 name: diagram.name || diagramId,
                 mode: diagram.mode || '',
+                controlState: diagram.controlState || diagram.mode || 'Auto',
+                category: diagram.category || 'normal',
+                orchestratorConfig: diagram.category === 'orchestrator' ? (diagram.orchestratorConfig || { elements: [] }) : undefined,
                 unitId: diagram.unitId || '',
                 unit: diagram.unit || '',
                 addressMode: diagram.addressMode || 'bool',
@@ -292,7 +295,11 @@ var GrafcetStudioCodegenPayload;
                 id: flow.diagram && flow.diagram.id,
                 name: flow.diagram && flow.diagram.name,
                 type: normalizeFlowType(flow.diagram && flow.diagram.mode),
-                mode: flow.diagram && flow.diagram.mode,
+                controlState: flow.diagram && (flow.diagram.controlState || flow.diagram.mode),
+                category: flow.diagram && (flow.diagram.category || 'normal'),
+                orchestratorConfig: flow.diagram && flow.diagram.category === 'orchestrator'
+                    ? (flow.diagram.orchestratorConfig || { elements: [] })
+                    : undefined,
                 diagram: flow.diagram,
                 steps: flow.steps,
                 transitions: flow.transitions
@@ -338,3 +345,4 @@ var GrafcetStudioCodegenPayload;
     };
 })(GrafcetStudioCodegenPayload || (GrafcetStudioCodegenPayload = {}));
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
+

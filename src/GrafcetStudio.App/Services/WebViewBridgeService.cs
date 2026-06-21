@@ -1,3 +1,4 @@
+using GrafcetStudio.Domain.Models;
 using Microsoft.Web.WebView2.Wpf;
 using System;
 using System.Text.Json;
@@ -14,9 +15,10 @@ public class WebViewBridgeService : IWebViewBridgeService
         _webView = webView;
     }
 
-    public async Task SendGeneratedCodeAsync(string code)
+    public async Task SendGeneratedCodeAsync(CodegenOutput output)
     {
-        await ExecuteAsync($"receiveGeneratedCode({JsonSerializer.Serialize(code)});");
+        var payload = JsonSerializer.Serialize(output);
+        await ExecuteAsync($"receiveGeneratedCode({payload});");
     }
 
     public async Task SendAiChunkAsync(string chunk)

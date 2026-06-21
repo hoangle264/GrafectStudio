@@ -1,3 +1,5 @@
+using GrafcetStudio.Domain.Models;
+
 namespace GrafcetStudio.App.Events;
 
 public class GenerateCodePayload
@@ -21,7 +23,7 @@ public class AiRequestPayload
 
 public class ExportCodePayload
 {
-    public string Code { get; set; } = string.Empty;
+    public List<CodegenFile> Files { get; set; } = new();
     public string Platform { get; set; } = string.Empty;
 }
 

@@ -1,10 +1,11 @@
-﻿using GrafcetStudio.CodeGen.Profile;
+using GrafcetStudio.CodeGen.Profile;
 using GrafcetStudio.Domain.Models;
 using System;
+using System.Linq;
 
 namespace GrafcetStudio.App.Generators;
 
-public class ProfiledMnemonicGenerator : ICodeGenerator
+public class ProfiledMnemonicGenerator : LegacyCodeGeneratorBase
 {
     private readonly string _platform;
     private readonly KeyenceMnemonicGenerator _baseGenerator = new();
@@ -14,11 +15,11 @@ public class ProfiledMnemonicGenerator : ICodeGenerator
         _platform = platform;
     }
 
-    public string Platform => _platform;
+    public override string Platform => _platform;
 
-    public string Generate(CodegenPayload payload)
+    protected override string GenerateLegacy(CodegenPayload payload)
     {
-        var code = _baseGenerator.Generate(payload);
+        var code = _baseGenerator.GenerateFiles(payload).First().Content;
         var profile = ProfileRegistry.Get(_platform);
         return string.Equals(profile.Id, KeyenceMnemonicGenerator.DefaultPlatform, StringComparison.OrdinalIgnoreCase)
             ? code

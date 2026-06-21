@@ -1,4 +1,4 @@
-function makeDiagItem(d) {
+﻿function makeDiagItem(d) {
   const item = document.createElement('div');
   item.className = 'tree-item' + (d.id===activeDiagramId?' active':'');
   item.dataset.id = d.id; item.dataset.type = 'diagram';
@@ -90,6 +90,8 @@ let diagPropsId = null;
 const MODE_CFG = {
   Auto:   {color:'#39d353', bg:'rgba(57,211,83,.12)'},
   Origin: {color:'#f5a623', bg:'rgba(245,166,35,.12)'},
+  Manual: {color:'#4fa3e3', bg:'rgba(79,163,227,.12)'},
+  Error:  {color:'#e35a4f', bg:'rgba(227,90,79,.12)'} 
 };
 
 function openDiagPropsPanel(id) {
@@ -114,8 +116,10 @@ function openDiagPropsPanel(id) {
 
   if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(d, true);
 
-  // Mode chips - only Auto and Origin
+  dpSetControlState(d.controlState || d.mode || 'Auto');
   dpSetMode(d.mode||'Auto');
+  dpSetOrchestrator(!!(d.category === 'orchestrator'));
+  dpRenderOrchestratorElements(d.orchestratorConfig);
   // Type chips
   dpSetType(d.diagramType||'Main');
   dpSetAddressMode(d.addressMode||'bool');
@@ -217,6 +221,38 @@ function dpValidateAddressConfig(config) {
   return true;
 }
 
+function dpSetControlState(value) {
+  const select = document.getElementById('dp-control-state');
+  if (select) select.value = value || 'Auto';
+}
+function dpGetCurrentControlState() {
+  const select = document.getElementById('dp-control-state');
+  return select ? (select.value || 'Auto') : 'Auto';
+}
+function dpSetOrchestrator(enabled) {
+  const toggle = document.getElementById('dp-orchestrator-toggle');
+  if (toggle) toggle.checked = !!enabled;
+  dpUpdateOrchestratorUi();
+}
+function dpIsOrchestrator() {
+  const toggle = document.getElementById('dp-orchestrator-toggle');
+  return !!(toggle && toggle.checked);
+}
+function dpUpdateOrchestratorUi() {
+  const area = document.getElementById('dp-orchestrator-area');
+  if (area) area.style.display = dpIsOrchestrator() ? 'block' : 'none';
+}
+function dpBuildOrchestratorConfig() {
+  const text = document.getElementById('dp-orchestrator-elements')?.value || '';
+  const elements = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(type => ({ type, config: {} }));
+  return { elements };
+}
+function dpRenderOrchestratorElements(config) {
+  const area = document.getElementById('dp-orchestrator-elements');
+  if (!area) return;
+  const elements = (config && Array.isArray(config.elements)) ? config.elements : [];
+  area.value = elements.map(el => el && el.type ? el.type : '').filter(Boolean).join('\n');
+}
 function dpUpdateBadge(mode) {
   const cfg = MODE_CFG[mode]||{color:'var(--text2)',bg:'var(--s3)'};
   const badge = document.getElementById('dp-mode-badge');
@@ -236,6 +272,7 @@ function dpGetCurrentType() {
 function dpLiveUpdate() {
   const mode = dpGetCurrentMode();
   dpUpdateBadge(mode);
+  dpUpdateOrchestratorUi();
   // Build preview
   const machine = document.getElementById('dp-machine').value||'Machine';
   const unitSel = document.getElementById('dp-unit');
@@ -244,7 +281,7 @@ function dpLiveUpdate() {
   const name = document.getElementById('dp-name').value||'GRAFCET';
   const desc = document.getElementById('dp-desc').value;
   const address = dpReadAddressConfig();
-  const fake = {machine, unit:unitName, mode, diagramType:type, name, description:desc, ...address};
+  const fake = {machine, unit:unitName, mode, controlState: dpGetCurrentControlState(), category: dpIsOrchestrator() ? 'orchestrator' : 'normal', orchestratorConfig: dpBuildOrchestratorConfig(), diagramType:type, name, description:desc, ...address};
   dpUpdateCodePreview(fake);
 }
 function dpUpdateCodePreview(d) {
@@ -274,6 +311,9 @@ function saveDiagPropsPanel() {
   d.unitId = unitSel.value||null;
   d.unit = unitSel.value ? (project.units.find(u=>u.id===unitSel.value)?.name||'') : '';
   d.mode = dpGetCurrentMode();
+  d.controlState = dpGetCurrentControlState();
+  d.category = dpIsOrchestrator() ? 'orchestrator' : 'normal';
+  d.orchestratorConfig = dpIsOrchestrator() ? dpBuildOrchestratorConfig() : undefined;
   d.diagramType = dpGetCurrentType();
   const address = dpReadAddressConfig();
   if (!dpValidateAddressConfig(address)) return;
@@ -343,3 +383,4 @@ function tctxDup(){
   toast('Duplicated');
 }
 function tctxDel(){ hideTreeCtx(); if(!treeCtxTarget) return; if(treeCtxTarget.type==='diagram') removeDiagram(treeCtxTarget.id); }
+

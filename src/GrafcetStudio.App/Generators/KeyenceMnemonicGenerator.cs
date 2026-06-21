@@ -7,13 +7,13 @@ using System.Text;
 
 namespace GrafcetStudio.App.Generators;
 
-public class KeyenceMnemonicGenerator : ICodeGenerator
+public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
 {
     public const string DefaultPlatform = "kv-5500";
 
-    public string Platform => DefaultPlatform;
+    public override string Platform => DefaultPlatform;
 
-    public string Generate(CodegenPayload payload)
+    protected override string GenerateLegacy(CodegenPayload payload)
     {
         var seq = SequenceBuilder.Build(payload);
         var sb = new StringBuilder();

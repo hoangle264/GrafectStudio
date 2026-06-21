@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Generators;
+﻿using GrafcetStudio.App.Generators;
 using GrafcetStudio.App.Services.Ai;
 using GrafcetStudio.App.Services;
 using GrafcetStudio.CodeGen.Profile;
@@ -54,7 +54,12 @@ public partial class App : PrismApplication
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Siemens.Id));
         containerRegistry.RegisterSingleton<ICodeGenerator, RuntimePlanGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
-        containerRegistry.RegisterSingleton<ICodeGenerator, UnitConfigGenerator>();
+        containerRegistry.RegisterSingleton<UnitConfigGenerator>();
+        containerRegistry.RegisterSingleton<ISystemControlGenerator, SystemControlGenerator>();
+        containerRegistry.RegisterSingleton<ICodeGenerator, MultiFileGenerator>();
+        containerRegistry.RegisterSingleton<IMapIOGenerator, MapIOGenerator>();
+        containerRegistry.RegisterSingleton<IErrorGenerator, ErrorGenerator>();
+        containerRegistry.RegisterSingleton<IDeviceManagerGenerator, DeviceManagerGenerator>();
         containerRegistry.RegisterSingleton<ICodeGeneratorService, CodeGeneratorService>();
         containerRegistry.RegisterInstance<IHandlebars>(Handlebars.Create());
         containerRegistry.RegisterSingleton<TemplateManager>();
@@ -157,4 +162,6 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
     }
 }
+
+
 

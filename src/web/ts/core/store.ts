@@ -1,14 +1,14 @@
-﻿// ═══════════════════════════════════════════════════════════════════
-//  store.js — Grafcet Studio
+// -------------------------------------------------------------------
+//  store.js � Grafcet Studio
 //  Project state singleton + localStorage persistence.
 //  Must be loaded BEFORE grafcet-studio-v2.js and grafcet-codegen.js.
 //
 //  NOTE: saveDiagramData / flushState reference runtime globals
 //  (state, nextId, nextStepNum, viewX, viewY, viewScale) that are
-//  declared in grafcet-studio-v2.js. This is intentional — those are
+//  declared in grafcet-studio-v2.js. This is intentional � those are
 //  diagram-render globals and belong with the canvas layer. They are
 //  only accessed at call-time (not parse-time), so load order is safe.
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 
 type StoreProject = GrafcetStudioProject.Project;
 type StoreDiagramMeta = GrafcetStudioProject.DiagramMeta;
@@ -32,7 +32,7 @@ declare function addDiagram(skipOpen?: boolean): void;
 declare function addStandardDeviceTemplates(): void;
 declare function markModified(id: string, modified: boolean): void;
 
-// ── Project state ───────────────────────────────────────────────
+// -- Project state -----------------------------------------------
 let project: StoreProject = {
   id: 'proj-1',
   name: 'My Project',
@@ -166,6 +166,22 @@ namespace GrafcetStudioStoreHelpers {
     let changed = false;
     (context.getProject().diagrams || []).forEach(function(diag) {
       changed = ensureFlowAddressConfig(context, diag, true) || changed;
+    });
+    return changed;
+  }
+
+  export function migrateFlowControlState(context: StoreContext): boolean {
+    let changed = false;
+    (context.getProject().diagrams || []).forEach(function(diag) {
+      if (!diag) return;
+      if (!diag.controlState) {
+        diag.controlState = diag.mode || 'Auto';
+        changed = true;
+      }
+      if (!diag.category) {
+        diag.category = 'normal';
+        changed = true;
+      }
     });
     return changed;
   }
@@ -331,6 +347,7 @@ namespace GrafcetStudioStoreHelpers {
     findNextAvailableBaseMr(context: StoreContext, unitId?: string | null, excludeDiagId?: string): number;
     ensureFlowAddressConfig(context: StoreContext, diag: DiagramMeta | null | undefined, assignUniqueBase: boolean): boolean;
     migrateFlowAddressConfigs(context: StoreContext): boolean;
+    migrateFlowControlState(context: StoreContext): boolean;
   }
 
   export const api: StoreHelperApi = {
@@ -343,7 +360,8 @@ namespace GrafcetStudioStoreHelpers {
     ensureProjectIOMapping,
     findNextAvailableBaseMr,
     ensureFlowAddressConfig,
-    migrateFlowAddressConfigs
+    migrateFlowAddressConfigs,
+    migrateFlowControlState,
   };
 }
 
@@ -358,7 +376,7 @@ function getStoreContext(): GrafcetStudioStoreHelpers.StoreContext {
   };
 }
 
-// ── Flow address configuration wrappers ─────────────────────────
+// -- Flow address configuration wrappers -------------------------
 function findNextAvailableBaseMr(unitId?: string | null, excludeDiagId?: string): number {
   return GrafcetStudioStoreHelpers.findNextAvailableBaseMr(getStoreContext(), unitId, excludeDiagId);
 }
@@ -371,7 +389,11 @@ function migrateFlowAddressConfigs(): boolean {
   return GrafcetStudioStoreHelpers.migrateFlowAddressConfigs(getStoreContext());
 }
 
-// ── Persistence wrappers ────────────────────────────────────────
+function migrateFlowControlState(): boolean {
+  return GrafcetStudioStoreHelpers.migrateFlowControlState(getStoreContext());
+}
+
+// -- Persistence wrappers ----------------------------------------
 function saveProject(): void {
   GrafcetStudioStorePersistence.saveProject(project);
 }
@@ -395,7 +417,7 @@ function deleteDiagramData(id: string): void {
   GrafcetStudioStorePersistence.deleteDiagramData(id);
 }
 
-// ── Store helper wrappers ───────────────────────────────────────
+// -- Store helper wrappers ---------------------------------------
 function syncStructDataFromProjectData(): boolean {
   return GrafcetStudioStoreHelpers.syncStructData(getStoreContext());
 }
@@ -428,7 +450,7 @@ function upsertProjectVariable(bucket: string, variableDef: Partial<StoreProject
   return GrafcetStudioStoreHelpers.upsertProjectVariable(getStoreContext(), bucket, variableDef);
 }
 
-// ── Project load ────────────────────────────────────────────────
+// -- Project load ------------------------------------------------
 function loadProject(): void {
   try {
     const raw = localStorage.getItem('gf2-project');
@@ -440,6 +462,7 @@ function loadProject(): void {
       projectChanged = syncStructDataFromProjectData() || projectChanged;
       projectChanged = syncVariableSignalAddressesFromDeviceTypes() || projectChanged;
       projectChanged = migrateFlowAddressConfigs() || projectChanged;
+      projectChanged = migrateFlowControlState() || projectChanged;
       if (projectChanged) saveProject();
       const lastId = localStorage.getItem('gf2-active');
       if (lastId && project.diagrams.find(function(diagram) { return diagram.id === lastId; })) {
@@ -451,13 +474,13 @@ function loadProject(): void {
       }
     } else {
       addDiagram(true);
-      // Auto-seed standard device templates cho project mới
+      // Auto-seed standard device templates cho project m?i
       addStandardDeviceTemplates();
     }
   } catch (e) { addDiagram(true); }
 }
 
-// ── Flush active diagram to localStorage ────────────────────────
+// -- Flush active diagram to localStorage ------------------------
 function flushState(): void {
   if (!activeDiagramId || activeDiagramId === '__vars__' || activeDiagramId === '__io_mapping__' || String(activeDiagramId).startsWith('__struct__:')) return;
   saveDiagramData(activeDiagramId);

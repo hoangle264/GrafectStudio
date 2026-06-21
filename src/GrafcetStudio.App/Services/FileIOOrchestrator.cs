@@ -54,7 +54,7 @@ public class FileIOOrchestrator
     {
         try
         {
-            await _files.ExportCodeAsync(payload.Code, payload.Platform);
+            await _files.ExportCodeAsync(payload.Files, payload.Platform);
         }
         catch (Exception ex)
         {

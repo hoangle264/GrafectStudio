@@ -4,6 +4,8 @@ namespace GrafcetStudioProject {
   export interface JsonObject { [key: string]: JsonValue | undefined; }
 
   export type DiagramMode = 'Main' | 'Sub' | 'Error' | 'Manual' | 'Drivers' | string;
+  export type FlowCategory = 'normal' | 'orchestrator';
+
   export type DiagramType = 'Grafcet' | 'Driver' | string;
   export type AddressMode = 'bool' | 'word' | string;
   export type BoolAddressMode = 'linear' | 'block' | string;
@@ -41,6 +43,9 @@ namespace GrafcetStudioProject {
     id: string;
     name: string;
     mode: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
     diagramType?: DiagramType;
@@ -180,6 +185,9 @@ namespace GrafcetStudioProject {
     name?: string;
     type?: string;
     mode?: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
     diagram?: DiagramInfo;
     steps: Step[];
     transitions: Transition[];
@@ -190,6 +198,9 @@ namespace GrafcetStudioProject {
     id?: string;
     name?: string;
     mode?: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
     addressMode?: AddressMode;
@@ -198,6 +209,19 @@ namespace GrafcetStudioProject {
     activeWord?: string;
     completeWord?: string;
     [key: string]: unknown;
+  }
+
+  export interface OrchestratorConfig {
+    elements: Array<{ type: string; config: JsonValue }>;
+  }
+
+  export interface CodegenFile {
+    path: string;
+    content: string;
+  }
+
+  export interface CodegenOutput {
+    files: CodegenFile[];
   }
 
   export interface AppConfig {
@@ -307,3 +331,4 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 }
+

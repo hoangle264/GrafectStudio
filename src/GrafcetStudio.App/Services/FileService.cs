@@ -1,11 +1,13 @@
 using Microsoft.Win32;
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using Forms = System.Windows.Forms;
+using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.App.Services;
 
@@ -37,9 +39,11 @@ public class FileService : IFileService
         return await File.ReadAllTextAsync(path, Utf8NoBom);
     }
 
-    public async Task ExportCodeAsync(string code, string platform)
+    public async Task ExportCodeAsync(IReadOnlyList<CodegenFile> files, string platform)
     {
-        var (ext, filter) = MapPlatform(platform);
+        if (files is null || files.Count == 0) return;
+
+        var (ext, filter) = files.Count == 1 ? MapSingleFile(files[0].Path) : (".zip", "ZIP Archive|*.zip");
         string? path = null;
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
@@ -47,8 +51,23 @@ public class FileService : IFileService
             if (dlg.ShowDialog() == true) path = dlg.FileName;
         });
         if (string.IsNullOrWhiteSpace(path)) return;
-        await File.WriteAllTextAsync(path, code, Utf8NoBom);
-    }
+
+        if (files.Count == 1)
+        {
+            await File.WriteAllTextAsync(path, files[0].Content ?? string.Empty, Utf8NoBom);
+            return;
+        }
+
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        foreach (var file in files)
+        {
+            var entryName = NormalizeExportPath(file.Path, platform);
+            var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+            await using var stream = entry.Open();
+            await using var writer = new StreamWriter(stream, Utf8NoBom);
+            await writer.WriteAsync(file.Content ?? string.Empty);
+        }
+   }
 
     public Task<string?> BrowseDeviceLibraryPathAsync()
     {
@@ -117,4 +136,21 @@ public class FileService : IFileService
         "twincat-st" => (".st", "Structured Text|*.st"),
         _ => (".txt", "Text File|*.txt")
     };
+
+    private static (string Ext, string Filter) MapSingleFile(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (string.IsNullOrWhiteSpace(ext)) ext = ".txt";
+        return (ext, $"{ext.TrimStart('.').ToUpperInvariant()} File|*{ext}");
+    }
+
+    private static string NormalizeExportPath(string filePath, string platform)
+    {
+        var path = (filePath ?? string.Empty).Replace('\\', '/').TrimStart('/');
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = $"{(platform ?? string.Empty).Trim()}.st";
+        }
+        return path;
+    }
 }

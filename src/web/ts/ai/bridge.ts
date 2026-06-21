@@ -1,4 +1,4 @@
-namespace GrafcetStudioAIBridge {
+﻿namespace GrafcetStudioAIBridge {
   export interface AiBridgeApi {
     readonly version: string;
     readonly modules: readonly string[];
@@ -36,6 +36,7 @@ namespace GrafcetStudioAIBridge {
     'src/web/js/editor/panels.js',
     'src/web/js/editor/project.js',
     'src/web/js/codegen/modal*.js',
+    'src/web/js/codegen/modal-e2e-validation.js',
     'src/web/js/codegen/unit-config.js'
   ];
 
@@ -73,3 +74,4 @@ window.GrafcetStudioAI = GrafcetStudioAIBridge.api;
 interface Window {
   GrafcetStudioAI?: GrafcetStudioAIBridge.AiBridgeApi;
 }
+

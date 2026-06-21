@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Linq;
 
@@ -30,10 +31,24 @@ public class CodegenPayload
     [JsonPropertyName("deviceLibraryPath")]
     public string DeviceLibraryPath { get; set; } = string.Empty;
 
+    [JsonPropertyName("templateProfile")]
+    public string TemplateProfile { get; set; } = "simple";
+
     public void EnrichVariables()
     {
         // Signal IDs are stable keys from the web model; keep them unchanged for resolution.
     }
+}
+
+public class CodegenFile
+{
+    [JsonPropertyName("path")] public string Path { get; set; } = string.Empty;
+    [JsonPropertyName("content")] public string Content { get; set; } = string.Empty;
+}
+
+public class CodegenOutput
+{
+    [JsonPropertyName("files")] public List<CodegenFile> Files { get; set; } = new();
 }
 
 public class ProjectInfo
@@ -48,6 +63,9 @@ public class DiagramInfo
     [JsonPropertyName("id")] public string? Id { get; set; }
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("controlState")] public string? ControlState { get; set; }
+    [JsonPropertyName("category")] public string? Category { get; set; }
+    [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
     [JsonPropertyName("unitId")] public string? UnitId { get; set; }
     [JsonPropertyName("unit")] public string? Unit { get; set; }
     [JsonPropertyName("addressMode")] public string? AddressMode { get; set; }
@@ -55,6 +73,17 @@ public class DiagramInfo
     [JsonPropertyName("baseMr")] public int? BaseMr { get; set; }
     [JsonPropertyName("activeWord")] public string? ActiveWord { get; set; }
     [JsonPropertyName("completeWord")] public string? CompleteWord { get; set; }
+}
+
+public class OrchestratorConfig
+{
+    [JsonPropertyName("elements")] public List<OrchestratorElement> Elements { get; set; } = new();
+}
+
+public class OrchestratorElement
+{
+    [JsonPropertyName("type")] public string? Type { get; set; }
+    [JsonPropertyName("config")] public JsonElement? Config { get; set; }
 }
 
 public class UnitInfo
@@ -70,8 +99,10 @@ public class FlowInfo
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("type")] public string? Type { get; set; }
     [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("controlState")] public string? ControlState { get; set; }
+    [JsonPropertyName("category")] public string? Category { get; set; }
+    [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
     [JsonPropertyName("diagram")] public DiagramInfo? Diagram { get; set; }
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
 }
-

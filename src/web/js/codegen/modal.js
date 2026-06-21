@@ -110,20 +110,15 @@ function showGenerateCodeModal() {
           </div>
         </div>
 
-        <!-- Code preview -->
-        <div style="flex:1;overflow:auto;padding:0;">
-          <pre id="cg-preview"
-            style="margin:0;padding:14px 18px;font-family:'JetBrains Mono',monospace;
-            font-size:11px;line-height:1.7;color:var(--text2);background:var(--bg);
-            min-height:300px;white-space:pre;tab-size:4;"></pre>
-        </div>
+        <!-- Multi-file export preview -->
+        <div id="cg-files" style="flex:1;overflow:auto;padding:12px 14px;background:var(--bg);"></div>
 
         <!-- Footer actions -->
         <div style="padding:10px 20px;border-top:1px solid var(--border);
           display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
           <span id="cg-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
-          <button class="btn" onclick="cgCopyCode()">Copy</button>
-          <button class="btn a" onclick="cgDownloadCode()">Download</button>
+          <button class="btn" onclick="cgCopyAllFiles()">Copy all</button>
+          <button class="btn a" onclick="cgDownloadAllFiles()">Download ZIP</button>
         </div>
       </div>`;
 
@@ -133,3 +128,104 @@ function showGenerateCodeModal() {
   cgUpdateAssetPathStatus();
   cgUpdatePreview();
 }
+
+
+function cgRenderGeneratedFiles(files) {
+  const root = document.getElementById('cg-files');
+  if (!root) return;
+  if (!window.GrafcetStudio) window.GrafcetStudio = {};
+  window.GrafcetStudio.codegenLastFiles = Array.isArray(files) ? files : [];
+  window.GrafcetStudio.codegenSelectedFileIndex = 0;
+
+  if (!files || !files.length) {
+    root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">No files generated yet.</div>';
+    return;
+  }
+
+  const options = files.map((file, index) => {
+    const path = file && file.path ? String(file.path) : 'file.st';
+    return `<option value="${index}">${esc2(path)}</option>`;
+  }).join('');
+
+  root.innerHTML = `
+    <div style="display:flex;flex-direction:column;height:100%;gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:10px;color:var(--text3);letter-spacing:1px;">FILE</label>
+        <select id="cg-file-select"
+          onchange="cgShowGeneratedFile(this.value)"
+          style="min-width:260px;background:var(--s1);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 8px;border-radius:3px;outline:none;">
+          ${options}
+        </select>
+        <span style="flex:1;"></span>
+        <button class="btn" onclick="cgCopySelectedFile()">Copy file</button>
+        <button class="btn" onclick="cgDownloadSelectedFile()">Download file</button>
+      </div>
+      <div id="cg-file-meta" style="font-size:10px;color:var(--text3);"></div>
+      <pre id="cg-file-preview" style="margin:0;flex:1;padding:12px;border:1px solid var(--border);background:var(--s1);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:var(--text2);white-space:pre;overflow:auto;tab-size:4;"></pre>
+    </div>`;
+
+  cgShowGeneratedFile(0);
+}
+
+function cgShowGeneratedFile(index) {
+  const files = (window.GrafcetStudio && window.GrafcetStudio.codegenLastFiles) || [];
+  const safeIndex = Math.max(0, Math.min(files.length - 1, Number(index) || 0));
+  const file = files[safeIndex];
+  const preview = document.getElementById('cg-file-preview');
+  const meta = document.getElementById('cg-file-meta');
+  const select = document.getElementById('cg-file-select');
+  if (!file || !preview) return;
+  if (window.GrafcetStudio) window.GrafcetStudio.codegenSelectedFileIndex = safeIndex;
+  if (select) select.value = String(safeIndex);
+  preview.textContent = file.content || '';
+  if (meta) meta.textContent = (file.path || 'file.st') + ' - ' + String((file.content || '').length) + ' chars';
+}
+
+function cgCopySelectedFile() {
+  const files = (window.GrafcetStudio && window.GrafcetStudio.codegenLastFiles) || [];
+  const index = (window.GrafcetStudio && window.GrafcetStudio.codegenSelectedFileIndex) || 0;
+  const file = files[index];
+  if (!file) return;
+  cgCopyCode(file.content || '');
+}
+
+function cgDownloadSelectedFile() {
+  const files = (window.GrafcetStudio && window.GrafcetStudio.codegenLastFiles) || [];
+  const index = (window.GrafcetStudio && window.GrafcetStudio.codegenSelectedFileIndex) || 0;
+  const file = files[index];
+  if (!file) return;
+  cgDownloadTextFile(cgSafeFilename(file.path || 'export.st'), file.content || '');
+}
+
+function cgCopyAllFiles() {
+  const files = (window.GrafcetStudio && window.GrafcetStudio.codegenLastFiles) || [];
+  const text = files.map(file => `// FILE: ${file.path || 'file.st'}\n${file.content || ''}`).join('\\n\\n');
+  if (!text) return;
+  cgCopyCode(text);
+}
+
+function cgDownloadAllFiles() {
+  const files = (window.GrafcetStudio && window.GrafcetStudio.codegenLastFiles) || [];
+  const platform = cgResolveHostPlatform(document.getElementById('cg-target')?.value || 'unit-config');
+  console.log(files);
+  console.log(platform);
+  if (!files.length) return;
+  if (!cgExportViaHost(files, platform)) {
+    toast('Host export is unavailable');
+  }
+}
+
+function cgDownloadTextFile(filename, content) {
+  const blob = new Blob([content || ''], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename || 'export.st';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function cgSafeFilename(path) {
+  const safe = String(path || 'export.st').replace(/[\\\\/:*?"<>|]+/g, '_').trim();
+  return safe || 'export.st';
+}
+

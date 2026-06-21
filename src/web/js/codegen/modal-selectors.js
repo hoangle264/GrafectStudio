@@ -1,4 +1,4 @@
-//  Build unit selector cho Unit Config mode
+﻿//  Build unit selector cho Unit Config mode
 
 // Build unit radio list 
 function cgBuildUnitList() {
@@ -50,9 +50,9 @@ function cgBuildUnitList() {
 //  Called when user selects a unit radio button 
 function cgOnUnitSelect(unitId) {
   cgBuildDiagForUnit(unitId);
-  const pre = document.getElementById('cg-preview');
+  const root = document.getElementById('cg-files');
   const stat = document.getElementById('cg-stat');
-  if (pre) pre.textContent = '; Unit selected. Click Send selected to generate payload.';
+  if (root) root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">Unit selected. Click Send selected to generate payload.</div>';
   if (stat) stat.textContent = 'Unit selected';
 }
 
@@ -92,7 +92,8 @@ function cgSelectAll(val) {
 //  Live preview 
 function cgUpdatePreview() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
-  const platform = cgResolveHostPlatform(target);
+  const unitId = cgGetDefaultUnitId();
+  const selectedDiagramIds = cgGetSelectedDiagramIds();
 
   // All codegen targets use a single selected Unit Config payload.
   const baseMRWrap  = document.getElementById('cg-base-mr-wrap');
@@ -100,11 +101,11 @@ function cgUpdatePreview() {
   if (baseMRWrap) baseMRWrap.style.display = 'none';
   if (unitWrap)   unitWrap.style.display   = '';
 
-  const pre  = document.getElementById('cg-preview');
+  const root = document.getElementById('cg-files');
   const stat = document.getElementById('cg-stat');
-  if (!pre) return;
+  if (!root) return;
 
-  pre.textContent = '; Select a unit above to generate payload.';
+  root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">Select a unit above to generate payload.</div>';
   if (stat) stat.textContent = 'Waiting for unit selection';
 }
 
@@ -128,3 +129,6 @@ function cgGetSelectedDiagramIds() {
     document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')
   ).map(c => c.value);
 }
+
+
+
