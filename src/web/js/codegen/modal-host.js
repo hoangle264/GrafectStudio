@@ -38,6 +38,9 @@ function cgBuildCSharpFlow(diagId) {
 function cgBuildCSharpUnitPayload(platform, unitId) {
   return cgGetPayloadApi().buildCSharpUnitPayload(cgBuildPayloadContext(), platform, unitId);
 }
+function cgBuildCSharpProjectPayload(platform) {
+  return cgGetPayloadApi().buildCSharpProjectPayload(cgBuildPayloadContext(), platform);
+}
 function cgGenerateSelectedUnit() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
@@ -50,6 +53,11 @@ function cgGenerateSelectedUnit() {
     return false;
   }
   return cgGenerateViaHost(platform, unitId);
+}
+function cgGenerateAllUnits() {
+  const target = document.getElementById('cg-target')?.value || 'unit-config';
+  const platform = cgResolveHostPlatform(target);
+  return cgGenerateViaHost(platform, '__all__');
 }
 function cgGenerateViaHost(platform, diagId) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {

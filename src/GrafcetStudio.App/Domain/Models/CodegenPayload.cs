@@ -19,6 +19,9 @@ public class CodegenPayload
     [JsonPropertyName("unit")]
     public UnitInfo? Unit { get; set; }
 
+    [JsonPropertyName("units")]
+    public List<UnitInfo> Units { get; set; } = new();
+
     [JsonPropertyName("flows")]
     public List<FlowInfo> Flows { get; set; } = new();
 

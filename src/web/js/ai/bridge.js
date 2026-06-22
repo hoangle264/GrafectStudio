@@ -11,6 +11,7 @@ var GrafcetStudioAIBridge;
         'src/web/js/editor/panels.js',
         'src/web/js/editor/project.js',
         'src/web/js/codegen/modal*.js',
+        'src/web/js/codegen/modal-e2e-validation.js',
         'src/web/js/codegen/unit-config.js'
     ];
     GrafcetStudioAIBridge.api = {

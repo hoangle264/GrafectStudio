@@ -1,16 +1,16 @@
 "use strict";
-// ═══════════════════════════════════════════════════════════════════
-//  store.js — Grafcet Studio
+// -------------------------------------------------------------------
+//  store.js � Grafcet Studio
 //  Project state singleton + localStorage persistence.
 //  Must be loaded BEFORE grafcet-studio-v2.js and grafcet-codegen.js.
 //
 //  NOTE: saveDiagramData / flushState reference runtime globals
 //  (state, nextId, nextStepNum, viewX, viewY, viewScale) that are
-//  declared in grafcet-studio-v2.js. This is intentional — those are
+//  declared in grafcet-studio-v2.js. This is intentional � those are
 //  diagram-render globals and belong with the canvas layer. They are
 //  only accessed at call-time (not parse-time), so load order is safe.
-// ═══════════════════════════════════════════════════════════════════
-// ── Project state ───────────────────────────────────────────────
+// -------------------------------------------------------------------
+// -- Project state -----------------------------------------------
 let project = {
     id: 'proj-1',
     name: 'My Project',
@@ -134,6 +134,23 @@ var GrafcetStudioStoreHelpers;
         return changed;
     }
     GrafcetStudioStoreHelpers.migrateFlowAddressConfigs = migrateFlowAddressConfigs;
+    function migrateFlowControlState(context) {
+        let changed = false;
+        (context.getProject().diagrams || []).forEach(function (diag) {
+            if (!diag)
+                return;
+            if (!diag.controlState) {
+                diag.controlState = diag.mode || 'Auto';
+                changed = true;
+            }
+            if (!diag.category) {
+                diag.category = 'normal';
+                changed = true;
+            }
+        });
+        return changed;
+    }
+    GrafcetStudioStoreHelpers.migrateFlowControlState = migrateFlowControlState;
     function ensureStructDataType(context, name, signals, categoryId) {
         const currentProject = context.getProject();
         if (!name)
@@ -304,7 +321,8 @@ var GrafcetStudioStoreHelpers;
         ensureProjectIOMapping,
         findNextAvailableBaseMr,
         ensureFlowAddressConfig,
-        migrateFlowAddressConfigs
+        migrateFlowAddressConfigs,
+        migrateFlowControlState,
     };
 })(GrafcetStudioStoreHelpers || (GrafcetStudioStoreHelpers = {}));
 GrafcetStudioInterop.registerBridge('store', GrafcetStudioStoreHelpers.api);
@@ -316,7 +334,7 @@ function getStoreContext() {
         unitStructSignals: PROJECT_UNIT_STRUCT_SIGNALS
     };
 }
-// ── Flow address configuration wrappers ─────────────────────────
+// -- Flow address configuration wrappers -------------------------
 function findNextAvailableBaseMr(unitId, excludeDiagId) {
     return GrafcetStudioStoreHelpers.findNextAvailableBaseMr(getStoreContext(), unitId, excludeDiagId);
 }
@@ -326,7 +344,10 @@ function ensureFlowAddressConfig(diag, assignUniqueBase) {
 function migrateFlowAddressConfigs() {
     return GrafcetStudioStoreHelpers.migrateFlowAddressConfigs(getStoreContext());
 }
-// ── Persistence wrappers ────────────────────────────────────────
+function migrateFlowControlState() {
+    return GrafcetStudioStoreHelpers.migrateFlowControlState(getStoreContext());
+}
+// -- Persistence wrappers ----------------------------------------
 function saveProject() {
     GrafcetStudioStorePersistence.saveProject(project);
 }
@@ -346,7 +367,7 @@ function loadDiagramData(id) {
 function deleteDiagramData(id) {
     GrafcetStudioStorePersistence.deleteDiagramData(id);
 }
-// ── Store helper wrappers ───────────────────────────────────────
+// -- Store helper wrappers ---------------------------------------
 function syncStructDataFromProjectData() {
     return GrafcetStudioStoreHelpers.syncStructData(getStoreContext());
 }
@@ -371,7 +392,7 @@ function normalizeVariableRecord(v, bucket) {
 function upsertProjectVariable(bucket, variableDef) {
     return GrafcetStudioStoreHelpers.upsertProjectVariable(getStoreContext(), bucket, variableDef);
 }
-// ── Project load ────────────────────────────────────────────────
+// -- Project load ------------------------------------------------
 function loadProject() {
     try {
         const raw = localStorage.getItem('gf2-project');
@@ -383,6 +404,7 @@ function loadProject() {
             projectChanged = syncStructDataFromProjectData() || projectChanged;
             projectChanged = syncVariableSignalAddressesFromDeviceTypes() || projectChanged;
             projectChanged = migrateFlowAddressConfigs() || projectChanged;
+            projectChanged = migrateFlowControlState() || projectChanged;
             if (projectChanged)
                 saveProject();
             const lastId = localStorage.getItem('gf2-active');
@@ -398,7 +420,7 @@ function loadProject() {
         }
         else {
             addDiagram(true);
-            // Auto-seed standard device templates cho project mới
+            // Auto-seed standard device templates cho project m?i
             addStandardDeviceTemplates();
         }
     }
@@ -406,7 +428,7 @@ function loadProject() {
         addDiagram(true);
     }
 }
-// ── Flush active diagram to localStorage ────────────────────────
+// -- Flush active diagram to localStorage ------------------------
 function flushState() {
     if (!activeDiagramId || activeDiagramId === '__vars__' || activeDiagramId === '__io_mapping__' || String(activeDiagramId).startsWith('__struct__:'))
         return;

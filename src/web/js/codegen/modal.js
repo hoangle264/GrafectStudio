@@ -66,7 +66,7 @@ function showGenerateCodeModal() {
 
         <!-- Unit + Diagram selector hidden for unit-config -->
         <div id="cg-unit-wrap" style="flex:1;min-width:220px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:8px;">UNIT <button class="btn" onclick="cgGenerateSelectedUnit()" style="padding:2px 8px;font-size:9px;">Send selected</button></div>
+          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:8px;">UNIT <button class="btn" onclick="cgGenerateSelectedUnit()" style="padding:2px 8px;font-size:9px;">Send selected</button><button class="btn" onclick="cgGenerateAllUnits()" style="padding:2px 8px;font-size:9px;">Send all</button></div>
           <div id="cg-unit-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
           <div id="cg-unit-diag-section" style="display:none;">
             <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">

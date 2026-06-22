@@ -1,5 +1,8 @@
 ﻿using GrafcetStudio.App.Generators;
 using GrafcetStudio.CodeGen.Runtime.Models;
+using GrafcetStudio.CodeGen.Template;
+using GrafcetStudio.Domain.Resolution;
+using HandlebarsDotNet;
 using GrafcetStudio.Domain.Models;
 using Xunit;
 
@@ -96,6 +99,69 @@ public class GeneratorSmokeTests
         Assert.Single(payloadB.Flows);
         Assert.Equal("Auto", payloadA.Flows[0].ControlState);
         Assert.Equal("Manual", payloadB.Flows[0].ControlState);
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_AllUnits_IncludesUnitsAndFlowsAcrossProject()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta { Id = "diag-a", Name = "Unit A", Mode = "Main", ControlState = "Auto", UnitId = "unit-a", Unit = "Unit A" },
+            new DiagramMeta { Id = "diag-b", Name = "Unit B", Mode = "Manual", ControlState = "Manual", UnitId = "unit-b", Unit = "Unit B" }
+        }, new[]
+        {
+            new Unit { Id = "unit-a", Name = "Unit A" },
+            new Unit { Id = "unit-b", Name = "Unit B" }
+        }));
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "__all__");
+
+        Assert.Equal(2, payload.Units.Count);
+        Assert.Equal(2, payload.Flows.Count);
+        Assert.Contains(payload.Flows, flow => flow.Diagram?.UnitId == "unit-a");
+        Assert.Contains(payload.Flows, flow => flow.Diagram?.UnitId == "unit-b");
+    }
+
+    [Fact]
+    public void MultiFileGenerator_ProjectScopedPayload_EmitsOneUnitFilePerUnit()
+    {
+        var generator = new MultiFileGenerator(
+            new UnitConfigGenerator(new TemplateManager(Handlebars.Create()), new SequenceResolver()),
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator());
+
+        var payload = BuildPayload();
+        payload.Unit = null;
+        payload.Units = new List<UnitInfo>
+        {
+            new() { Id = "unit-a", Name = "Unit A", Label = "Unit A" },
+            new() { Id = "unit-b", Name = "Unit B", Label = "Unit B" }
+        };
+        payload.Flows = new List<FlowInfo>
+        {
+            new()
+            {
+                Id = "flow-a",
+                Name = "Flow A",
+                Diagram = new DiagramInfo { Id = "diag-a", UnitId = "unit-a", Unit = "Unit A", BaseMr = 100 },
+                Steps = new List<Step> { new() { Id = "step-a", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } },
+                Transitions = new List<Transition>()
+            },
+            new()
+            {
+                Id = "flow-b",
+                Name = "Flow B",
+                Diagram = new DiagramInfo { Id = "diag-b", UnitId = "unit-b", Unit = "Unit B", BaseMr = 200 },
+                Steps = new List<Step> { new() { Id = "step-b", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" } },
+                Transitions = new List<Transition>()
+            }
+        };
+
+        var files = generator.GenerateFiles(payload).ToList();
+
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_A.st");
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_B.st");
     }
 
     [Fact]

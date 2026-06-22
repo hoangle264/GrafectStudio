@@ -124,6 +124,10 @@ function cgGetDefaultUnitId() {
   return (project.diagrams || []).some(d => !d.unitId) ? '__none__' : '';
 }
 
+function cgHasUnitsToGenerate() {
+  return !!(((project.units || []).length) || ((project.diagrams || []).length));
+}
+
 function cgGetSelectedDiagramIds() {
   return Array.from(
     document.querySelectorAll('#cg-diag-list input[type=checkbox]:checked')

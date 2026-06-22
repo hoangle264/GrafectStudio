@@ -273,13 +273,25 @@ var GrafcetStudioCodegenPayload;
         const value = String(mode || '').trim().toLowerCase();
         return value === 'origin' ? 'origin' : 'auto';
     }
-    function buildCSharpUnitPayload(context, platform, unitId) {
-        const units = context.project.units || [];
-        const selectedUnit = unitId && unitId !== '__none__'
-            ? units.find(unit => unit.id === unitId)
-            : null;
-        const unitDiagrams = (context.project.diagrams || []).filter(diagram => unitId === '__none__' ? !diagram.unitId : diagram.unitId === unitId);
-        validateUnitAddressConfig(context, unitDiagrams);
+    function buildProjectInfo(context) {
+        return {
+            id: context.project.id || '',
+            name: context.project.name || '',
+            machineName: context.project.machineName || ''
+        };
+    }
+    function buildUnitsInfo(context) {
+        const units = (context.project.units || []).map(unit => ({
+            id: unit.id || '',
+            name: unit.name || unit.id || '',
+            label: unit.name || unit.id || ''
+        }));
+        if ((context.project.diagrams || []).some(diagram => !diagram.unitId)) {
+            units.push({ id: '__none__', name: 'No unit', label: 'No unit' });
+        }
+        return units;
+    }
+    function buildCSharpPayloadCore(context, platform, unit, flowsWithVariables) {
         const allVars = [];
         const seenVars = new Set();
         const addVar = (variable) => {
@@ -288,8 +300,7 @@ var GrafcetStudioCodegenPayload;
             seenVars.add(variable.label);
             allVars.push(variable);
         };
-        const flows = unitDiagrams.map(diagram => {
-            const flow = buildCSharpFlow(context, diagram.id);
+        const flows = flowsWithVariables.map(flow => {
             (flow.variables || []).forEach(addVar);
             return {
                 id: flow.diagram && flow.diagram.id,
@@ -306,32 +317,64 @@ var GrafcetStudioCodegenPayload;
             };
         });
         const assets = context.getAssets();
+        const unitId = unit && unit.id ? unit.id : '';
         return {
             platform,
             deviceLibraryPath: assets.deviceLibraryPath,
             templateRootPath: assets.templateRootPath,
+            templateProfile: assets.templateProfile || 'simple',
             outputPath: assets.outputPath,
-            project: {
-                id: context.project.id || '',
-                name: context.project.name || '',
-                machineName: context.project.machineName || ''
-            },
-            unit: {
-                id: selectedUnit ? selectedUnit.id : (unitId || ''),
-                name: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : ''),
-                label: selectedUnit ? (selectedUnit.name || selectedUnit.id) : (unitId === '__none__' ? 'No unit' : '')
-            },
+            project: buildProjectInfo(context),
+            unit: unit ? {
+                id: unit.id || '',
+                name: unit.name || unit.id || '',
+                label: unit.label || unit.name || unit.id || ''
+            } : undefined,
+            units: buildUnitsInfo(context),
             flows,
             variables: allVars,
             deviceTypes: getCSharpDeviceTypes(context)
         };
     }
+    function buildCSharpUnitPayload(context, platform, unitId) {
+        const units = context.project.units || [];
+        const selectedUnit = unitId && unitId !== '__none__'
+            ? units.find(unit => unit.id === unitId)
+            : null;
+        const unitDiagrams = (context.project.diagrams || []).filter(diagram => unitId === '__none__' ? !diagram.unitId : diagram.unitId === unitId);
+        validateUnitAddressConfig(context, unitDiagrams);
+        const flowResults = unitDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
+        const unit = {
+            id: selectedUnit ? (selectedUnit.id || '') : (unitId || ''),
+            name: selectedUnit ? (selectedUnit.name || selectedUnit.id || '') : (unitId === '__none__' ? 'No unit' : ''),
+            label: selectedUnit ? (selectedUnit.name || selectedUnit.id || '') : (unitId === '__none__' ? 'No unit' : '')
+        };
+        return buildCSharpPayloadCore(context, platform, unit, flowResults);
+    }
     GrafcetStudioCodegenPayload.buildCSharpUnitPayload = buildCSharpUnitPayload;
+    function buildCSharpProjectPayload(context, platform) {
+        const allDiagrams = context.project.diagrams || [];
+        const flowsByUnit = new Map();
+        allDiagrams.forEach(diagram => {
+            const key = diagram.unitId || '__none__';
+            const list = flowsByUnit.get(key) || [];
+            list.push(diagram);
+            flowsByUnit.set(key, list);
+        });
+        flowsByUnit.forEach(unitDiagrams => {
+            validateUnitAddressConfig(context, unitDiagrams);
+        });
+        const flowResults = allDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
+        return buildCSharpPayloadCore(context, platform, null, flowResults);
+    }
+    GrafcetStudioCodegenPayload.buildCSharpProjectPayload = buildCSharpProjectPayload;
     function buildCSharpPayload(context, platform, unitId) {
         if (context.syncVariableSignalAddressesFromDeviceTypes && context.syncVariableSignalAddressesFromDeviceTypes()) {
             if (context.saveProject)
                 context.saveProject();
         }
+        if (unitId === '__all__')
+            return buildCSharpProjectPayload(context, platform);
         const resolvedUnitId = unitId || (context.getDefaultUnitId ? context.getDefaultUnitId() : '') || '';
         return buildCSharpUnitPayload(context, platform, resolvedUnitId);
     }
@@ -340,9 +383,9 @@ var GrafcetStudioCodegenPayload;
         buildCSharpPayload,
         buildCSharpFlow,
         buildCSharpUnitPayload,
+        buildCSharpProjectPayload,
         validateUnitAddressConfig,
         resolveStepAddress
     };
 })(GrafcetStudioCodegenPayload || (GrafcetStudioCodegenPayload = {}));
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
-

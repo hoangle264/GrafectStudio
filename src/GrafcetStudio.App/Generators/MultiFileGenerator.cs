@@ -33,13 +33,16 @@ public sealed class MultiFileGenerator : ICodeGenerator
 
     public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
     {
-        var unitName = SanitizeFileToken(payload.Unit?.Label ?? payload.Unit?.Name ?? payload.Project?.Name ?? "Unit");
-
-        yield return new CodegenFile
+        foreach (var unitPayload in BuildUnitPayloads(payload))
         {
-            Path = $"Units/Unit_{unitName}.st",
-            Content = _unitConfig.GenerateUnitContent(payload)
-        };
+            var unitName = SanitizeFileToken(unitPayload.Unit?.Label ?? unitPayload.Unit?.Name ?? unitPayload.Project?.Name ?? "Unit");
+
+            yield return new CodegenFile
+            {
+                Path = $"Units/Unit_{unitName}.st",
+                Content = _unitConfig.GenerateUnitContent(unitPayload)
+            };
+        }
 
         yield return new CodegenFile
         {
@@ -61,6 +64,47 @@ public sealed class MultiFileGenerator : ICodeGenerator
             Path = "Devices/DeviceManager.st",
             Content = _deviceManagerGenerator.Generate(payload)
         };
+    }
+
+    private static IEnumerable<CodegenPayload> BuildUnitPayloads(CodegenPayload payload)
+    {
+        if (payload.Unit is not null)
+        {
+            yield return payload;
+            yield break;
+        }
+
+        var groupedFlows = (payload.Flows ?? new List<FlowInfo>())
+            .Where(flow => flow?.Diagram is not null)
+            .GroupBy(flow => string.IsNullOrWhiteSpace(flow!.Diagram!.UnitId) ? "__none__" : flow.Diagram.UnitId!, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var group in groupedFlows)
+        {
+            var sample = group.First();
+            var unitId = group.Key;
+            var unit = (payload.Units ?? new List<UnitInfo>()).FirstOrDefault(item => string.Equals(item.Id, unitId, StringComparison.OrdinalIgnoreCase));
+            var resolvedUnit = unit ?? new UnitInfo
+            {
+                Id = unitId,
+                Name = string.Equals(unitId, "__none__", StringComparison.OrdinalIgnoreCase) ? "No unit" : sample.Diagram?.Unit,
+                Label = string.Equals(unitId, "__none__", StringComparison.OrdinalIgnoreCase) ? "No unit" : sample.Diagram?.Unit
+            };
+
+            yield return new CodegenPayload
+            {
+                Platform = payload.Platform,
+                TemplateRootPath = payload.TemplateRootPath,
+                Project = payload.Project,
+                Unit = resolvedUnit,
+                Units = payload.Units,
+                Flows = group.ToList(),
+                Variables = payload.Variables,
+                DeviceTypes = payload.DeviceTypes,
+                DeviceLibraryPath = payload.DeviceLibraryPath,
+                TemplateProfile = payload.TemplateProfile
+            };
+        }
     }
 
     private static string SanitizeFileToken(string value)

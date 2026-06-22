@@ -231,6 +231,7 @@ namespace GrafcetStudioProject {
     outputPath?: string;
     project?: ProjectInfo;
     unit?: UnitInfo;
+    units?: UnitInfo[];
     flows?: FlowInfo[];
     variables?: DeviceVariable[];
     deviceTypes?: DeviceType[];

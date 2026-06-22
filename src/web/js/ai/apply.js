@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 var GrafcetStudioAIApply;
 (function (GrafcetStudioAIApply) {
     const appliedProposalIds = Object.create(null);
