@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using GrafcetStudio.Domain.Enums;
 
 namespace GrafcetStudio.Domain.Models;
@@ -34,6 +34,16 @@ public class ResolvedStep
 
     public string? DoneAddress => Step.DoneAddress;
 
+    public string Kind => Step.Kind;
+
+    public string? MacroFlowId => Step.MacroFlowId;
+
+    public bool IsMacroStepCallPoint => string.Equals(Step.Kind, "macro", System.StringComparison.OrdinalIgnoreCase);
+
+    public MacroBindingContext? MacroBinding { get; init; }
+
+    public string MacroPortName => MacroBinding?.portName ?? string.Empty;
+
     public IList<StepAction> Actions => Step.Actions;
 
     public string? PreviousStepId => PreviousStep?.Id;
@@ -60,3 +70,4 @@ public class ResolvedStep
 
     public string? OutTransitionCondition => OutTransition?.Condition;
 }
+

@@ -104,6 +104,62 @@ var GrafcetStudioCodegenPayload;
         });
     }
     GrafcetStudioCodegenPayload.validateUnitAddressConfig = validateUnitAddressConfig;
+    function getDiagramSteps(context, diagram) {
+        const data = context.loadDiagramData(diagram.id);
+        if (data && data.state && Array.isArray(data.state.steps))
+            return data.state.steps;
+        if (data && Array.isArray(data.steps))
+            return data.steps;
+        return [];
+    }
+    function formatFlowName(diagram) {
+        return (diagram && (diagram.name || diagram.id)) || '';
+    }
+    function validateMacroStepRelations(context, unitDiagrams) {
+        const diagrams = unitDiagrams || [];
+        const diagramById = new Map(diagrams.map(diagram => [diagram.id, diagram]));
+        const callersByTarget = new Map();
+        const warnings = [];
+        diagrams.forEach(callerDiagram => {
+            const callerSteps = getDiagramSteps(context, callerDiagram);
+            callerSteps.forEach(step => {
+                if (!step || (step.kind || 'normal') !== 'macro')
+                    return;
+                const stepName = step.id || step.number || '?';
+                if (!step.macroFlowId)
+                    throw new Error('Step ' + stepName + ' is macro step but macroFlowId is empty.');
+                const targetDiagram = diagramById.get(step.macroFlowId) || (context.project.diagrams || []).find(diagram => diagram.id === step.macroFlowId);
+                if (!targetDiagram)
+                    throw new Error('Step ' + stepName + ' references missing MacroStep flow: ' + step.macroFlowId + '.');
+                if ((targetDiagram.diagramType || 'Macro') !== 'MacroStep')
+                    throw new Error('Step ' + stepName + ' references flow ' + formatFlowName(targetDiagram) + ', but target diagramType is not MacroStep.');
+                if ((targetDiagram.unitId || null) !== (callerDiagram.unitId || null))
+                    throw new Error('Step ' + stepName + ' references MacroStep ' + formatFlowName(targetDiagram) + ' from another unit.');
+                const callers = callersByTarget.get(targetDiagram.id) || [];
+                callers.push({ diagram: callerDiagram, step });
+                callersByTarget.set(targetDiagram.id, callers);
+            });
+        });
+        callersByTarget.forEach((callers, targetId) => {
+            if (callers.length > 1) {
+                const targetDiagram = diagramById.get(targetId) || (context.project.diagrams || []).find(diagram => diagram.id === targetId);
+                throw new Error('MacroStep ' + formatFlowName(targetDiagram) + ' is referenced by multiple macro steps.');
+            }
+        });
+        diagrams
+            .filter(diagram => (diagram.diagramType || 'Macro') === 'MacroStep')
+            .forEach(diagram => {
+                const nestedMacroStep = getDiagramSteps(context, diagram).find(step => step && (step.kind || 'normal') === 'macro');
+                if (nestedMacroStep)
+                    throw new Error('MacroStep ' + formatFlowName(diagram) + ' cannot contain nested macro steps.');
+                if (!callersByTarget.has(diagram.id))
+                    warnings.push('MacroStep ' + formatFlowName(diagram) + ' is not referenced by any Macro Step.');
+            });
+        if (warnings.length && typeof context.onCodegenWarnings === 'function')
+            context.onCodegenWarnings(warnings);
+        return warnings;
+    }
+    GrafcetStudioCodegenPayload.validateMacroStepRelations = validateMacroStepRelations;
     function normalizeCSharpSignal(context, deviceTypeName, signal) {
         const canonicalUnitSignals = new Map((context.projectUnitStructSignals || []).map(item => [item.id, item]));
         const canonical = deviceTypeName === 'Unit Station' ? canonicalUnitSignals.get(signal && signal.id) : null;
@@ -225,6 +281,8 @@ var GrafcetStudioCodegenPayload;
                 number: Number(step.number || 0),
                 label: step.label || '',
                 initial: !!step.initial,
+                kind: step.kind || 'normal',
+                macroFlowId: step.macroFlowId || null,
                 execAddress: address.execAddress,
                 doneAddress: address.doneAddress,
                 actions: (step.actions || []).map(action => ({
@@ -257,6 +315,7 @@ var GrafcetStudioCodegenPayload;
                 orchestratorConfig: diagram.category === 'orchestrator' ? (diagram.orchestratorConfig || { elements: [] }) : undefined,
                 unitId: diagram.unitId || '',
                 unit: diagram.unit || '',
+                diagramType: diagram.diagramType || 'Macro',
                 addressMode: diagram.addressMode || 'bool',
                 boolAddressMode: diagram.boolAddressMode || 'linear',
                 baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : Number(diagram.baseMr),
@@ -308,6 +367,7 @@ var GrafcetStudioCodegenPayload;
                 type: normalizeFlowType(flow.diagram && flow.diagram.mode),
                 controlState: flow.diagram && (flow.diagram.controlState || flow.diagram.mode),
                 category: flow.diagram && (flow.diagram.category || 'normal'),
+                diagramType: flow.diagram && (flow.diagram.diagramType || 'Macro'),
                 orchestratorConfig: flow.diagram && flow.diagram.category === 'orchestrator'
                     ? (flow.diagram.orchestratorConfig || { elements: [] })
                     : undefined,
@@ -343,6 +403,7 @@ var GrafcetStudioCodegenPayload;
             : null;
         const unitDiagrams = (context.project.diagrams || []).filter(diagram => unitId === '__none__' ? !diagram.unitId : diagram.unitId === unitId);
         validateUnitAddressConfig(context, unitDiagrams);
+        validateMacroStepRelations(context, unitDiagrams);
         const flowResults = unitDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
         const unit = {
             id: selectedUnit ? (selectedUnit.id || '') : (unitId || ''),
@@ -363,6 +424,7 @@ var GrafcetStudioCodegenPayload;
         });
         flowsByUnit.forEach(unitDiagrams => {
             validateUnitAddressConfig(context, unitDiagrams);
+            validateMacroStepRelations(context, unitDiagrams);
         });
         const flowResults = allDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
         return buildCSharpPayloadCore(context, platform, null, flowResults);
@@ -389,3 +451,4 @@ var GrafcetStudioCodegenPayload;
     };
 })(GrafcetStudioCodegenPayload || (GrafcetStudioCodegenPayload = {}));
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
+

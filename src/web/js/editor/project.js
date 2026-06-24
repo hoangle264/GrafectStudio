@@ -113,7 +113,7 @@ function addDiagram(isFirst=false, unitId=null, mode='Auto') {
   const name = isFirst ? 'GRAFCET_Main' : `GRAFCET_${mode}`;
   const diagram = {
     id, name, unitId: unitId||null,
-    mode: mode||'Auto', diagramType:'Main',
+    mode: mode||'Auto', diagramType:'Macro',
     machine: project.machineName||project.name||'Machine',
     unit: unit, description:'',
     addressMode:'bool',

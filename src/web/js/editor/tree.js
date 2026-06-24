@@ -70,7 +70,7 @@ var GrafcetStudioTree;
             name: 'GRAFCET_' + resolvedMode,
             unitId: (unitId || null),
             mode: resolvedMode,
-            diagramType: 'Main',
+            diagramType: 'Macro',
             machine: context.project.machineName || context.project.name || 'Machine',
             unit,
             description: '',

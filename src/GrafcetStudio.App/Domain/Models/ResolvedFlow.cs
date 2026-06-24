@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace GrafcetStudio.Domain.Models;
 
@@ -14,6 +14,8 @@ public class ResolvedFlow
     public string? mode { get; init; }
 
     public string normalizedType { get; init; } = string.Empty;
+
+    public string diagramType { get; init; } = "Macro";
 
     public DiagramInfo? diagram { get; init; }
 
@@ -32,4 +34,12 @@ public class ResolvedFlow
     public IList<Step> rawSteps { get; init; } = new List<Step>();
 
     public IList<Transition> transitions { get; init; } = new List<Transition>();
+
+    public IList<MacroBindingContext> macroBindings { get; init; } = new List<MacroBindingContext>();
+
+    public IList<MacroBindingContext> callerMacroBindings { get; init; } = new List<MacroBindingContext>();
+
+    public IList<MacroBindingContext> calleeMacroBindings { get; init; } = new List<MacroBindingContext>();
 }
+
+

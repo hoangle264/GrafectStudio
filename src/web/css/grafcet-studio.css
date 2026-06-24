@@ -800,10 +800,12 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 /* ─── SVG Elements ─── */
 .gf-step{cursor:move;}
 .gf-step .s-body{fill:var(--s2);stroke:var(--blue);stroke-width:1.5px;}
+.gf-step .s-body.macro{stroke:var(--cyan);stroke-dasharray:6 3;fill:rgba(34,211,238,.08);}
 .gf-step .s-body.sel{stroke:var(--amber);stroke-width:2px;filter:drop-shadow(0 0 8px rgba(245,166,35,.4));}
 .gf-step .s-init{fill:none;stroke:var(--amber);stroke-width:1px;}
 .gf-step .s-num{fill:var(--blue);font-size:12px;font-family:'Share Tech Mono',monospace;font-weight:bold;}
 .gf-step .s-lbl{fill:var(--text);font-size:10px;font-family:'Share Tech Mono',monospace;}
+.gf-step .s-kind{fill:var(--cyan);font-size:7px;font-family:'Share Tech Mono',monospace;letter-spacing:.6px;}
 .gf-step .s-divider{stroke:#2a3a55;stroke-width:1px;}
 .gf-step .s-act-box{fill:#0c1420;stroke:var(--blue);stroke-width:1px;}
 .gf-step .s-act-txt{fill:#6a9fc0;font-size:9px;font-family:'Share Tech Mono',monospace;}

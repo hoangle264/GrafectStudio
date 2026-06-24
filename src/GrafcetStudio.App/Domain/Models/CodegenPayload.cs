@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Linq;
@@ -66,6 +66,7 @@ public class DiagramInfo
     [JsonPropertyName("id")] public string? Id { get; set; }
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("diagramType")] public string? DiagramType { get; set; } = "Macro";
     [JsonPropertyName("controlState")] public string? ControlState { get; set; }
     [JsonPropertyName("category")] public string? Category { get; set; }
     [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
@@ -102,6 +103,7 @@ public class FlowInfo
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("type")] public string? Type { get; set; }
     [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("diagramType")] public string? DiagramType { get; set; } = "Macro";
     [JsonPropertyName("controlState")] public string? ControlState { get; set; }
     [JsonPropertyName("category")] public string? Category { get; set; }
     [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
@@ -109,3 +111,4 @@ public class FlowInfo
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
 }
+

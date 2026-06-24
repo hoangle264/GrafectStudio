@@ -13,7 +13,8 @@ function cgBuildPayloadContext() {
     saveProject: typeof saveProject === 'function' ? saveProject : undefined,
     getDefaultUnitId: cgGetDefaultUnitId,
     unitSignals: typeof GVT_UNIT_SIGNALS !== 'undefined' ? GVT_UNIT_SIGNALS : [],
-    projectUnitStructSignals: typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined' ? PROJECT_UNIT_STRUCT_SIGNALS : []
+    projectUnitStructSignals: typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined' ? PROJECT_UNIT_STRUCT_SIGNALS : [],
+    onCodegenWarnings: function(warnings) { if (typeof toast === 'function' && warnings && warnings.length) toast('Warning: ' + warnings.join('; ')); }
   };
 }
 
@@ -131,3 +132,4 @@ function cgUCHighlight(pre, profile) {
     .replace(/\bMR\d+\b/g, '<span style="color:#4ade80">$&</span>')
     .replace(/\bLR\d+\b/g, '<span style="color:#f472b6">$&</span>');
 }
+

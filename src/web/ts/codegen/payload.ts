@@ -273,6 +273,8 @@ namespace GrafcetStudioCodegenPayload {
         number: Number(step.number || 0),
         label: step.label || '',
         initial: !!step.initial,
+        kind: step.kind || 'normal',
+        macroFlowId: step.macroFlowId || null,
         execAddress: address.execAddress,
         doneAddress: address.doneAddress,
         actions: (step.actions || []).map(action => ({
@@ -306,6 +308,7 @@ namespace GrafcetStudioCodegenPayload {
         orchestratorConfig: diagram.category === 'orchestrator' ? (diagram.orchestratorConfig || { elements: [] }) : undefined,
         unitId: diagram.unitId || '',
         unit: diagram.unit || '',
+        diagramType: diagram.diagramType || 'Macro',
         addressMode: diagram.addressMode || 'bool',
         boolAddressMode: diagram.boolAddressMode || 'linear',
         baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : Number(diagram.baseMr),
@@ -367,6 +370,7 @@ namespace GrafcetStudioCodegenPayload {
         type: normalizeFlowType(flow.diagram && flow.diagram.mode),
         controlState: flow.diagram && (flow.diagram.controlState || flow.diagram.mode),
         category: flow.diagram && (flow.diagram.category || 'normal'),
+        diagramType: flow.diagram && (flow.diagram.diagramType || 'Macro'),
         orchestratorConfig: flow.diagram && flow.diagram.category === 'orchestrator'
           ? (flow.diagram.orchestratorConfig || { elements: [] })
           : undefined,
@@ -465,4 +469,5 @@ namespace GrafcetStudioCodegenPayload {
 }
 
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
+
 

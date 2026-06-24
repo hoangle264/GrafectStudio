@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Generators;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
 using GrafcetStudio.Domain.Resolution;
@@ -190,6 +190,43 @@ public class GeneratorSmokeTests
         Assert.NotNull(payload.Flows[0].OrchestratorConfig);
     }
 
+
+    [Fact]
+    public void BuildCSharpPayload_IncludesMacroPayloadFields()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-macro",
+                Name = "Pick",
+                DiagramType = "Macro",
+                UnitId = "unit-1",
+                Unit = "Main"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-macro"] = new()
+                {
+                    new() { Id = "s10", Number = 10, Kind = "macro", MacroFlowId = "diag-macro-step" }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        var step = Assert.Single(flow.Steps);
+
+        Assert.Equal("Macro", flow.DiagramType);
+        Assert.Equal("Macro", flow.Diagram?.DiagramType);
+        Assert.Equal("unit-1", flow.Diagram?.UnitId);
+        Assert.Equal("Main", flow.Diagram?.Unit);
+        Assert.Equal("macro", step.Kind);
+        Assert.Equal("diag-macro-step", step.MacroFlowId);
+    }
+
     [Fact]
     public void BuildCSharpPayload_ResolvesAllDeviceTypes()
     {
@@ -215,6 +252,61 @@ public class GeneratorSmokeTests
         Assert.Equal(2, payload.DeviceTypes.Count);
     }
 
+
+    [Fact]
+    public void UnitConfigGenerator_OneMacroCallsOneMacroStep_GeneratesMacroPort()
+    {
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(BuildMacroPayload());
+
+        Assert.Contains("Clamp_Port", output);
+        Assert.Contains("macroBindings", output);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepCalledTwice_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[0].Steps.Add(new Step { Id = "s20", Label = "S20", Number = 20, Kind = "macro", MacroFlowId = "flow-step", ExecAddress = "@MR104", DoneAddress = "@MR105" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("referenced by multiple macro steps", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepFromAnotherUnit_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[1].Diagram!.UnitId = "unit-b";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("from another unit", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepContainsMacroStep_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[1].Steps.Add(new Step { Id = "nested", Label = "Nested", Number = 99, Kind = "macro", MacroFlowId = "other" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("cannot contain nested macro steps", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_OldProjectDefaultsToMacroNormal_Generates()
+    {
+        var payload = BuildPayload();
+        payload.Flows[0].Id = "old-flow";
+        payload.Flows[0].Name = "Old";
+        payload.Flows[0].DiagramType = null;
+        payload.Flows[0].Diagram = new DiagramInfo { Id = "old-diag", UnitId = "unit-1", Unit = "Main", BaseMr = 100 };
+        payload.Flows[0].Steps = new List<Step> { new() { Id = "old-s1", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } };
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("old-flow", output);
+        Assert.DoesNotContain("cannot contain nested macro steps", output);
+    }
     private static CodegenPayload BuildPayload()
         => new()
         {
@@ -252,6 +344,45 @@ public class GeneratorSmokeTests
             IOMapping = new IOMapping { PhysicalIOs = new List<PhysicalIO>(), Entries = new List<IOMappingEntry>() }
         };
 
+
+    private static UnitConfigGenerator BuildUnitConfigGenerator()
+        => new(new TemplateManager(Handlebars.Create()), new SequenceResolver());
+
+    private static CodegenPayload BuildMacroPayload()
+        => new()
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-a", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>(),
+            DeviceTypes = new List<DeviceType>(),
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-macro",
+                    Name = "Pick",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-macro", UnitId = "unit-a", Unit = "Main", BaseMr = 100 },
+                    Steps = new List<Step>
+                    {
+                        new() { Id = "s10", Label = "S10", Number = 10, Kind = "macro", MacroFlowId = "flow-step", ExecAddress = "@MR100", DoneAddress = "@MR101" }
+                    },
+                    Transitions = new List<Transition>()
+                },
+                new()
+                {
+                    Id = "flow-step",
+                    Name = "Clamp",
+                    DiagramType = "MacroStep",
+                    Diagram = new DiagramInfo { Id = "diag-step", UnitId = "unit-a", Unit = "Main", BaseMr = 200 },
+                    Steps = new List<Step>
+                    {
+                        new() { Id = "s1", Label = "S1", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" }
+                    },
+                    Transitions = new List<Transition>()
+                }
+            }
+        };
     private sealed class TestPayloadContext : GrafcetStudioCodegenPayload.PayloadContext
     {
         public TestPayloadContext(Project project)
@@ -261,6 +392,7 @@ public class GeneratorSmokeTests
 
         public Project Project { get; }
         public ProjectVariables? ProjectVariables { get; set; }
+        public Dictionary<string, List<Step>> StepsByDiagram { get; set; } = new();
 
         public CodegenAssets GetAssets() => new()
         {
@@ -274,7 +406,7 @@ public class GeneratorSmokeTests
         {
             State = new DiagramState
             {
-                Steps = new List<Step> { new() { Id = diagramId + "-s1", Number = 1 } },
+                Steps = StepsByDiagram.TryGetValue(diagramId, out var steps) ? steps : new List<Step> { new() { Id = diagramId + "-s1", Number = 1 } },
                 Transitions = new List<Transition>(),
                 Connections = new List<Connection>(),
                 Variables = new List<DeviceVariable>()
@@ -310,3 +442,4 @@ public class GeneratorSmokeTests
         GrafcetStudioProject.DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
     }
 }
+

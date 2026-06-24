@@ -17,7 +17,7 @@ function handleImport(e) {
         const name='Imported: '+file.name.replace(/\.(grafcet|json)$/,'');
         project.diagrams.push({
           id, name, unitId:null,
-          mode:'Auto', diagramType:'Main',
+          mode:'Auto', diagramType:'Macro',
           machine:project.machineName||'', unit:'', description:'',
           addressMode:'bool', boolAddressMode:'linear',
           baseMr: typeof findNextAvailableBaseMr === 'function' ? findNextAvailableBaseMr(null, id) : 100
@@ -117,7 +117,7 @@ function handleImport(e) {
             name: d.name||'Diagram',
             unitId: d.unitId||null,
             mode: d.mode||'Auto',
-            diagramType: d.diagramType||'Main',
+            diagramType: d.diagramType||'Macro',
             machine: d.machine||raw.project?.machineName||'',
             unit: d.unit||'',
             description: d.description||'',
@@ -161,7 +161,7 @@ function exportProject() {
     name: d.name,
     unitId: d.unitId||null,
     mode: d.mode||'Auto',
-    diagramType: d.diagramType||'Main',
+    diagramType: d.diagramType||'Macro',
     machine: d.machine||project.machineName||'',
     unit: d.unit||'',
     description: d.description||'',

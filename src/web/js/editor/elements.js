@@ -3,10 +3,14 @@
 // ═══════════════════════════════════════════════════════════
 //  ELEMENT CREATION
 // ═══════════════════════════════════════════════════════════
-function addStep(x,y,init=false){
+function addStep(x,y,init=false, kind='normal', macroFlowId=null){
   const id='S'+(nextId++);
-  state.steps.push({id,x:snap(x-SW/2),y:snap(y-SH/2),number:Math.max(1, nextStepNum++),label:'',actions:[],initial:init});
+  const isMacro = kind === 'macro';
+  state.steps.push({id,x:snap(x-SW/2),y:snap(y-SH/2),number:Math.max(1, nextStepNum++),label:isMacro?'Macro Step':'',actions:[],initial:init,kind:isMacro?'macro':'normal',macroFlowId:isMacro?null:macroFlowId});
   afterChange(); return id;
+}
+function addMacroStep(x,y){
+  return addStep(x, y, false, 'macro', null);
 }
 function addTransition(x,y){
   const id='T'+(nextId++);
@@ -64,6 +68,7 @@ function updateProps() {
       document.getElementById('px-num').value=s.number;
       document.getElementById('px-lbl').value=s.label||'';
       document.getElementById('px-init').checked=s.initial||false;
+      renderMacroStepEditor(s);
       renderActEditor(s);
       return;
     }
@@ -99,6 +104,59 @@ function updateAlignBtns() {
       btn.disabled = needsMulti ? !multi : !anyEl;
     }
   });
+}
+function getEligibleMacroStepFlows(step) {
+  const currentDiagram = (project.diagrams||[]).find(d => d.id === activeDiagramId);
+  if(!currentDiagram) return [];
+
+  const currentUnitId = currentDiagram.unitId || null;
+  const boundFlowIds = new Set();
+
+  (project.diagrams || [])
+    .filter(d => (d.unitId || null) === currentUnitId)
+    .forEach(diagram => {
+      const diagramState = diagram.id === activeDiagramId ? state : loadDiagramData(diagram.id);
+      const steps = diagramState && Array.isArray(diagramState.steps)
+        ? diagramState.steps
+        : (diagramState && diagramState.state && Array.isArray(diagramState.state.steps) ? diagramState.state.steps : []);
+
+      steps.forEach(candidateStep => {
+        if(!candidateStep || candidateStep.kind !== 'macro' || !candidateStep.macroFlowId) return;
+        const isCurrentStep = diagram.id === activeDiagramId && candidateStep.id === step.id;
+        if(!isCurrentStep) boundFlowIds.add(candidateStep.macroFlowId);
+      });
+    });
+
+  return (project.diagrams || [])
+    .filter(diagram => (diagram.unitId || null) === currentUnitId)
+    .filter(diagram => (diagram.diagramType || 'Macro') === 'MacroStep')
+    .filter(diagram => diagram.id === step.macroFlowId || !boundFlowIds.has(diagram.id));
+}
+
+function renderMacroStepEditor(step) {
+  const group = document.getElementById('px-macro-flow-group');
+  const select = document.getElementById('px-macro-flow');
+  if(!group || !select) return;
+
+  if(!step || step.kind !== 'macro') {
+    group.style.display = 'none';
+    select.innerHTML = '';
+    return;
+  }
+
+  group.style.display = 'block';
+  const flows = getEligibleMacroStepFlows(step);
+  select.innerHTML = '<option value="">- none -</option>' + flows.map(diagram =>
+    `<option value="${esc2(diagram.id)}" ${diagram.id === step.macroFlowId ? 'selected' : ''}>${esc2(diagram.name || diagram.id)}</option>`
+  ).join('');
+}
+
+function setMacroFlowId(val) {
+  const id=[...selIds][0]; if(!id) return;
+  const s=state.steps.find(x=>x.id===id);
+  if(!s || s.kind !== 'macro') return;
+  s.macroFlowId = val || null;
+  afterChange();
 }
 function setProp(prop, val) {
   const id=[...selIds][0]; if(!id) return;
@@ -174,4 +232,5 @@ function alignSel(mode) {
   }
   afterChange();
 }
+
 

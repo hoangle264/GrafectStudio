@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioTree {
+namespace GrafcetStudioTree {
   type Project = GrafcetStudioProject.Project;
   type Unit = GrafcetStudioProject.Unit;
   type DiagramMeta = GrafcetStudioProject.DiagramMeta;
@@ -113,7 +113,7 @@
       name: 'GRAFCET_' + resolvedMode,
       unitId: (unitId || null) as unknown as string | undefined,
       mode: resolvedMode,
-      diagramType: 'Main',
+      diagramType: 'Macro',
       machine: context.project.machineName || context.project.name || 'Machine',
       unit,
       description: '',
@@ -258,5 +258,6 @@
 }
 
 GrafcetStudioInterop.registerBridge('tree', GrafcetStudioTree.api);
+
 
 

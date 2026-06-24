@@ -105,15 +105,29 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
                 : payload.Project?.Name ?? "Unit";
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
-        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library)).ToList();
+        ValidateMacroStepRules(flows);
+        var macroBindings = BuildMacroBindings(flows);
+        var macroPorts = macroBindings
+            .Select(binding => new
+            {
+                binding.unitId,
+                binding.callerFlowId,
+                binding.callerStepId,
+                binding.calleeFlowId,
+                binding.portName
+            })
+            .ToList();
+        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library, macroBindings)).ToList();
         var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
         var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
         var unitVariable = FindUnitVariable(payload.Variables, unitLabel);
         var unitAddresses = unitVariable?.SignalAddresses ?? new Dictionary<string, string>();
         var deviceOutputGroups = BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes, unitAddresses);
         var unitStepRange = BuildUnitStepAddressRange(resolvedFlows);
-        var autoFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
-        var originFlows = resolvedFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
+        var macroFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "Macro", StringComparison.OrdinalIgnoreCase)).ToList();
+        var macroStepFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)).ToList();
+        var autoFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
+        var originFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
 
         var deviceTypesByName = payload.DeviceTypes.ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
         var devices = payload.Variables.Select(variable =>
@@ -157,6 +171,10 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
             devices,
             autoFlows,
             originFlows,
+            macroFlows,
+            macroStepFlows,
+            macroBindings,
+            macroPorts,
             //outputBindings,
             deviceOutputGroups,
             warnings = Array.Empty<string>()
@@ -166,15 +184,18 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
 
 
 
-    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables, DeviceLibraryRoot library)
+    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables, DeviceLibraryRoot library, IList<MacroBindingContext> macroBindings)
     {
         var state = flow.ToDiagramState(variables);
         var sequence = _sequenceResolver.Resolve(state);
+        var callerBindings = macroBindings.Where(binding => string.Equals(binding.callerFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
+        var calleeBindings = macroBindings.Where(binding => string.Equals(binding.calleeFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
         var resolvedSteps = sequence.Select((entry, index) => new ResolvedStep
         {
             Index = index,
             IsFirst = index == 0,
             Step = EnrichStepActions(entry.Step, variables, library),
+            MacroBinding = callerBindings.FirstOrDefault(binding => string.Equals(binding.callerStepId, entry.Step.Id, StringComparison.OrdinalIgnoreCase)),
             PreviousStep = index > 0 ? sequence[index - 1].Step : null,
             NextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null,
             InTransition = entry.InTransition,
@@ -190,13 +211,17 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
             type = flow.Type,
             mode = flow.Mode,
             normalizedType = NormalizeFlowType(flow),
+            diagramType = NormalizeDiagramType(flow),
             diagram = flow.Diagram,
             stepMinAddress = flowStepRange.MinAddress,
             stepMaxAddress = flowStepRange.MaxAddress,
             sequenceEnd = flowStepRange.SequenceEnd,
             steps = resolvedSteps,
             rawSteps = flow.Steps,
-            transitions = flow.Transitions
+            transitions = flow.Transitions,
+            macroBindings = macroBindings.Where(binding => string.Equals(binding.callerFlowId, flow.Id, StringComparison.OrdinalIgnoreCase) || string.Equals(binding.calleeFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList(),
+            callerMacroBindings = callerBindings,
+            calleeMacroBindings = calleeBindings
         };
     }
 
@@ -356,6 +381,8 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
             Id = step.Id,
             Number = step.Number,
             Label = step.Label,
+            Kind = step.Kind,
+            MacroFlowId = step.MacroFlowId,
             IsInitial = step.IsInitial,
             ExecAddress = step.ExecAddress,
             DoneAddress = step.DoneAddress,
@@ -631,6 +658,107 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
         return string.Equals(value, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
     }
 
+    private static string NormalizeDiagramType(FlowInfo flow)
+        => string.Equals(flow.DiagramType ?? flow.Diagram?.DiagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)
+            ? "MacroStep"
+            : "Macro";
+
+    private static string ResolveFlowUnitId(FlowInfo flow)
+        => flow.Diagram?.UnitId ?? string.Empty;
+
+    private static void ValidateMacroStepRules(IList<FlowInfo> flows)
+    {
+        var flowById = flows
+            .Where(flow => !string.IsNullOrWhiteSpace(flow.Id))
+            .ToDictionary(flow => flow.Id!, StringComparer.OrdinalIgnoreCase);
+        var references = new Dictionary<string, List<(FlowInfo Caller, Step Step)>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var flow in flows)
+        {
+            var flowType = NormalizeDiagramType(flow);
+            foreach (var step in flow.Steps ?? new List<Step>())
+            {
+                if (!string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (string.Equals(flowType, "MacroStep", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"MacroStep {flow.Name ?? flow.Id} cannot contain nested macro steps.");
+                }
+
+                if (string.IsNullOrWhiteSpace(step.MacroFlowId))
+                {
+                    throw new InvalidOperationException($"Step {step.LabelOrId()} is macro step but macroFlowId is empty.");
+                }
+
+                if (!flowById.TryGetValue(step.MacroFlowId!, out var target))
+                {
+                    throw new InvalidOperationException($"Step {step.LabelOrId()} references missing MacroStep flow: {step.MacroFlowId}.");
+                }
+
+                if (!string.Equals(NormalizeDiagramType(target), "MacroStep", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"Step {step.LabelOrId()} references flow {target.Name ?? target.Id}, but target diagramType is not MacroStep.");
+                }
+
+                if (!string.Equals(ResolveFlowUnitId(flow), ResolveFlowUnitId(target), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"Step {step.LabelOrId()} references MacroStep {target.Name ?? target.Id} from another unit.");
+                }
+
+                if (!references.TryGetValue(target.Id ?? step.MacroFlowId!, out var callers))
+                {
+                    callers = new List<(FlowInfo Caller, Step Step)>();
+                    references[target.Id ?? step.MacroFlowId!] = callers;
+                }
+                callers.Add((flow, step));
+            }
+        }
+
+        foreach (var pair in references)
+        {
+            if (pair.Value.Count > 1 && flowById.TryGetValue(pair.Key, out var target))
+            {
+                throw new InvalidOperationException($"MacroStep {target.Name ?? target.Id} is referenced by multiple macro steps.");
+            }
+        }
+    }
+    private static IList<MacroBindingContext> BuildMacroBindings(IList<FlowInfo> flows)
+    {
+        var flowById = flows
+            .Where(flow => !string.IsNullOrWhiteSpace(flow.Id))
+            .ToDictionary(flow => flow.Id!, StringComparer.OrdinalIgnoreCase);
+
+        return flows
+            .Where(flow => string.Equals(NormalizeDiagramType(flow), "Macro", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(flow => (flow.Steps ?? new List<Step>())
+                .Where(step => string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(step.MacroFlowId)
+                    && flowById.TryGetValue(step.MacroFlowId!, out var callee)
+                    && string.Equals(NormalizeDiagramType(callee), "MacroStep", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ResolveFlowUnitId(flow), ResolveFlowUnitId(callee), StringComparison.OrdinalIgnoreCase))
+                .Select(step =>
+                {
+                    var callee = flowById[step.MacroFlowId!];
+                    return new MacroBindingContext
+                    {
+                        unitId = ResolveFlowUnitId(flow),
+                        callerFlowId = flow.Id ?? string.Empty,
+                        callerStepId = step.Id,
+                        calleeFlowId = callee.Id ?? string.Empty,
+                        portName = BuildMacroPortName(callee)
+                    };
+                }))
+            .ToList();
+    }
+
+
+    private static string BuildMacroPortName(FlowInfo flow)
+    {
+        var source = !string.IsNullOrWhiteSpace(flow.Name) ? flow.Name! : flow.Id ?? "MacroStep";
+        var token = new string(source.Trim().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');
+        return $"{(string.IsNullOrWhiteSpace(token) ? "MacroStep" : token)}_Port";
+    }
+
     private static string NormalizeDeviceKind(string? format)
     {
         if (string.IsNullOrWhiteSpace(format)) return "generic";
@@ -644,4 +772,11 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
         "motor" => "uc.deviceMotor",
         _ => "uc.deviceGeneric"
     };
+}
+
+
+
+internal static class StepLabelExtensions
+{
+    public static string LabelOrId(this Step step) => !string.IsNullOrWhiteSpace(step.Label) ? step.Label : step.Id;
 }

@@ -5,8 +5,8 @@
 
   const MODE_COLORS = {Auto:'#39d353',Origin:'#f5a623',Manual:'#4fa3e3',Error:'#e35a4f',Drivers:'#a78bfa'};
   const modeColor = MODE_COLORS[d.mode]||'var(--text3)';
-  const typeLbl = d.diagramType==='SubRoutine'?'SR':'M';
-  const typeColor = d.diagramType==='SubRoutine'?'var(--blue)':'var(--amber)';
+  const typeLbl = d.diagramType==='MacroStep'?'MS':'M';
+  const typeColor = d.diagramType==='MacroStep'?'var(--blue)':'var(--amber)';
 
   item.innerHTML = `
     <span class="tree-item-mode-dot" style="background:${modeColor};box-shadow:0 0 5px ${modeColor};" title="${esc2(d.mode||'Program')}"></span>
@@ -78,7 +78,7 @@ function addDriverDiagram() {
   const id='diag-'+Date.now();
   project.diagrams.push({
     id, name:'Driver_Device', unitId:null,
-    mode:'Drivers', diagramType:'Main',
+    mode:'Drivers', diagramType:'Macro',
     machine:project.machineName||project.name, unit:'', description:''
   });
   saveDiagramData(id, {steps:[],transitions:[],parallels:[],connections:[],vars:[]}, 1, 1, 100, 80, 1);
@@ -121,7 +121,7 @@ function openDiagPropsPanel(id) {
   dpSetOrchestrator(!!(d.category === 'orchestrator'));
   dpRenderOrchestratorElements(d.orchestratorConfig);
   // Type chips
-  dpSetType(d.diagramType||'Main');
+  dpSetType(d.diagramType||'Macro');
   dpSetAddressMode(d.addressMode||'bool');
   dpSetBoolAddressMode(d.boolAddressMode||'linear');
   document.getElementById('dp-base-mr').value = d.baseMr ?? 100;
@@ -155,8 +155,8 @@ function dpSetMode(mode) {
 function dpSetType(type) {
   const mBtn = document.getElementById('dp-type-main');
   const sBtn = document.getElementById('dp-type-sub');
-  mBtn.className = 'dp-type-chip' + (type==='Main'?' active-main':'');
-  sBtn.className = 'dp-type-chip' + (type==='SubRoutine'?' active-sub':'');
+  mBtn.className = 'dp-type-chip' + (type==='Macro'||type==='Main'?' active-main':'');
+  sBtn.className = 'dp-type-chip' + (type==='MacroStep'||type==='SubRoutine'?' active-sub':'');
   dpLiveUpdate();
 }
 
@@ -266,7 +266,7 @@ function dpGetCurrentMode() {
   return active ? active.dataset.mode : 'Auto';
 }
 function dpGetCurrentType() {
-  return document.getElementById('dp-type-main').classList.contains('active-main') ? 'Main' : 'SubRoutine';
+  return document.getElementById('dp-type-main').classList.contains('active-main') ? 'Macro' : 'MacroStep';
 }
 
 function dpLiveUpdate() {
@@ -292,7 +292,7 @@ function dpUpdateCodePreview(d) {
     ['machine', d.machine||project.machineName||'Machine'],
     ['unit',    unit],
     ['mode',    d.mode||'Auto'],
-    ['type',    d.diagramType||'Main'],
+    ['type',    d.diagramType||'Macro'],
     ['address', d.addressMode === 'word'
       ? `@${d.activeWord||'DM0'} / @${d.completeWord||'DM100'}`
       : `@MR${d.baseMr ?? 100} (${d.boolAddressMode||'linear'})`],

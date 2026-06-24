@@ -6,7 +6,8 @@ namespace GrafcetStudioProject {
   export type DiagramMode = 'Main' | 'Sub' | 'Error' | 'Manual' | 'Drivers' | string;
   export type FlowCategory = 'normal' | 'orchestrator';
 
-  export type DiagramType = 'Grafcet' | 'Driver' | string;
+  export type DiagramType = 'Macro' | 'MacroStep' | 'Grafcet' | 'Driver' | string;
+  export type StepKind = 'normal' | 'macro';
   export type AddressMode = 'bool' | 'word' | string;
   export type BoolAddressMode = 'linear' | 'block' | string;
   export type SignalVarType = 'Input' | 'Output' | 'Var' | string;
@@ -87,6 +88,8 @@ namespace GrafcetStudioProject {
     y?: number;
     w?: number;
     h?: number;
+    kind?: StepKind;
+    macroFlowId?: string | null;
     actions?: StepAction[];
     connections?: Connection[];
     execAddress?: string | null;
@@ -188,6 +191,7 @@ namespace GrafcetStudioProject {
     controlState?: string;
     category?: FlowCategory;
     orchestratorConfig?: OrchestratorConfig;
+    diagramType?: DiagramType;
     diagram?: DiagramInfo;
     steps: Step[];
     transitions: Transition[];
@@ -203,6 +207,7 @@ namespace GrafcetStudioProject {
     orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
+    diagramType?: DiagramType;
     addressMode?: AddressMode;
     boolAddressMode?: BoolAddressMode;
     baseMr?: number | null;
@@ -332,4 +337,5 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 }
+
 

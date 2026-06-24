@@ -91,7 +91,8 @@ function buildStepEl(s) {
   const sel=selIds.has(s.id);
 
   // Body
-  const body=svgE('rect'); body.setAttribute('class','s-body'+(sel?' sel':''));
+  const isMacroStep = s.kind === 'macro';
+  const body=svgE('rect'); body.setAttribute('class','s-body'+(isMacroStep?' macro':'')+(sel?' sel':''));
   body.setAttribute('x',s.x);body.setAttribute('y',s.y);body.setAttribute('width',SW);body.setAttribute('height',SH);body.setAttribute('rx','2');
   g.appendChild(body);
 
@@ -113,6 +114,14 @@ function buildStepEl(s) {
   num.setAttribute('text-anchor','middle');
   num.textContent=String(s.number).padStart(2,'0');
   g.appendChild(num);
+
+  if(isMacroStep){
+    const tag=svgE('text'); tag.setAttribute('class','s-kind');
+    tag.setAttribute('x',s.x+SW-6); tag.setAttribute('y',s.y+10);
+    tag.setAttribute('text-anchor','end');
+    tag.textContent='MACRO STEP';
+    g.appendChild(tag);
+  }
 
   // Label area (right of divider)
   if(s.label){

@@ -18,6 +18,7 @@ const runPlacementTool = ({ x, y }) => {
   const placementActions = {
     step: () => addStep(x, y, false),
     initstep: () => addStep(x, y, true),
+    macrostep: () => addMacroStep(x, y),
     transition: () => addTransition(x, y),
     'par-split': () => addParallel(x, y, 'split'),
     'par-join': () => addParallel(x, y, 'join'),
@@ -502,7 +503,7 @@ const cancelConnect = () => {
 // ═══════════════════════════════════════════════════════════
 //  TOOLS
 // ═══════════════════════════════════════════════════════════
-const toolBtns = ['select', 'step', 'initstep', 'transition', 'par-split', 'par-join', 'connect', 'delete'];
+const toolBtns = ['select', 'step', 'initstep', 'macrostep', 'transition', 'par-split', 'par-join', 'connect', 'delete'];
 const clearToolButtonState = () => {
   toolBtns.forEach((button) => {
     const el = getById(`tb-${button}`);
@@ -527,6 +528,7 @@ const setTool = (nextTool) => {
     el.classList.add('active');
     if (nextTool === 'connect') el.classList.add('amber');
     if (nextTool === 'par-split' || nextTool === 'par-join') el.classList.add('purple');
+    if (nextTool === 'macrostep') el.classList.add('green');
   }
 
   setToolIndicator(nextTool);
@@ -542,6 +544,7 @@ const keyToolMap = {
   s: 'step',
   i: 'initstep',
   t: 'transition',
+  m: 'macrostep',
   p: 'par-split',
   j: 'par-join',
   c: 'connect',

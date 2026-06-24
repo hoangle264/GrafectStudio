@@ -99,6 +99,10 @@
         <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20"><rect x="2" y="2" width="24" height="16" rx="1" fill="#1a2035" stroke="#f5a623" stroke-width="1.5"/><rect x="4" y="4" width="20" height="12" fill="none" stroke="#f5a623" stroke-width="0.8"/><text x="14" y="13" text-anchor="middle" fill="#f5a623" font-size="9" font-family="monospace">S0</text></svg></div>
         Initial Step<span class="kbd">I</span>
       </button>
+      <button class="tbtn" id="tb-macrostep" onclick="setTool('macrostep')">
+        <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20"><rect x="2" y="2" width="24" height="16" rx="1" fill="#1a2035" stroke="#22d3ee" stroke-width="1.5"/><path d="M6 6 H22 M6 14 H22" stroke="#22d3ee" stroke-width="1" opacity=".8"/><text x="14" y="13" text-anchor="middle" fill="#22d3ee" font-size="8" font-family="monospace">MS</text></svg></div>
+        Macro Step<span class="kbd">M</span>
+      </button>
       <button class="tbtn" id="tb-transition" onclick="setTool('transition')">
         <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20"><line x1="14" y1="0" x2="14" y2="20" stroke="#5a6580" stroke-width="1.5"/><rect x="4" y="8" width="20" height="4" rx="0.5" fill="#1a2a1a" stroke="#39d353" stroke-width="1.5"/></svg></div>
         Transition<span class="kbd">T</span>
@@ -337,6 +341,10 @@
         <div class="prop-label">LABEL</div>
         <input class="prop-input" id="px-lbl" type="text" placeholder="Step name..." oninput="setProp('label',this.value)">
       </div>
+      <div class="prop-group" id="px-macro-flow-group" style="display:none">
+        <div class="prop-label">MACRO FLOW</div>
+        <select class="prop-input" id="px-macro-flow" onchange="setMacroFlowId(this.value)"></select>
+      </div>
       <div class="act-editor" id="act-editor">
         <div class="act-editor-label">ACTIONS — IEC 61131-3</div>
         <!-- datalist for variable autocomplete -->
@@ -449,13 +457,13 @@
     <div class="dp-section">
       <div class="dp-section-title">DIAGRAM TYPE</div>
       <div class="dp-type-chips">
-        <button class="dp-type-chip" id="dp-type-main" onclick="dpSetType('Main')">
-          <div class="dp-chip-title">Main</div>
-          <div class="dp-chip-desc">Entry point — gọi đầu tiên</div>
+        <button class="dp-type-chip" id="dp-type-main" onclick="dpSetType('Macro')">
+          <div class="dp-chip-title">Macro</div>
+          <div class="dp-chip-desc">Runnable flow</div>
         </button>
-        <button class="dp-type-chip" id="dp-type-sub" onclick="dpSetType('SubRoutine')">
-          <div class="dp-chip-title">SubRoutine</div>
-          <div class="dp-chip-desc">Được gọi từ Main</div>
+        <button class="dp-type-chip" id="dp-type-sub" onclick="dpSetType('MacroStep')">
+          <div class="dp-chip-title">MacroStep</div>
+          <div class="dp-chip-desc">Called by Macro</div>
         </button>
       </div>
     </div>
@@ -658,3 +666,4 @@
 <script src="js/codegen/modal-assets.js"></script>
 </body>
 </html>
+
