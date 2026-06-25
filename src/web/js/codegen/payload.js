@@ -104,62 +104,6 @@ var GrafcetStudioCodegenPayload;
         });
     }
     GrafcetStudioCodegenPayload.validateUnitAddressConfig = validateUnitAddressConfig;
-    function getDiagramSteps(context, diagram) {
-        const data = context.loadDiagramData(diagram.id);
-        if (data && data.state && Array.isArray(data.state.steps))
-            return data.state.steps;
-        if (data && Array.isArray(data.steps))
-            return data.steps;
-        return [];
-    }
-    function formatFlowName(diagram) {
-        return (diagram && (diagram.name || diagram.id)) || '';
-    }
-    function validateMacroStepRelations(context, unitDiagrams) {
-        const diagrams = unitDiagrams || [];
-        const diagramById = new Map(diagrams.map(diagram => [diagram.id, diagram]));
-        const callersByTarget = new Map();
-        const warnings = [];
-        diagrams.forEach(callerDiagram => {
-            const callerSteps = getDiagramSteps(context, callerDiagram);
-            callerSteps.forEach(step => {
-                if (!step || (step.kind || 'normal') !== 'macro')
-                    return;
-                const stepName = step.id || step.number || '?';
-                if (!step.macroFlowId)
-                    throw new Error('Step ' + stepName + ' is macro step but macroFlowId is empty.');
-                const targetDiagram = diagramById.get(step.macroFlowId) || (context.project.diagrams || []).find(diagram => diagram.id === step.macroFlowId);
-                if (!targetDiagram)
-                    throw new Error('Step ' + stepName + ' references missing MacroStep flow: ' + step.macroFlowId + '.');
-                if ((targetDiagram.diagramType || 'Macro') !== 'MacroStep')
-                    throw new Error('Step ' + stepName + ' references flow ' + formatFlowName(targetDiagram) + ', but target diagramType is not MacroStep.');
-                if ((targetDiagram.unitId || null) !== (callerDiagram.unitId || null))
-                    throw new Error('Step ' + stepName + ' references MacroStep ' + formatFlowName(targetDiagram) + ' from another unit.');
-                const callers = callersByTarget.get(targetDiagram.id) || [];
-                callers.push({ diagram: callerDiagram, step });
-                callersByTarget.set(targetDiagram.id, callers);
-            });
-        });
-        callersByTarget.forEach((callers, targetId) => {
-            if (callers.length > 1) {
-                const targetDiagram = diagramById.get(targetId) || (context.project.diagrams || []).find(diagram => diagram.id === targetId);
-                throw new Error('MacroStep ' + formatFlowName(targetDiagram) + ' is referenced by multiple macro steps.');
-            }
-        });
-        diagrams
-            .filter(diagram => (diagram.diagramType || 'Macro') === 'MacroStep')
-            .forEach(diagram => {
-                const nestedMacroStep = getDiagramSteps(context, diagram).find(step => step && (step.kind || 'normal') === 'macro');
-                if (nestedMacroStep)
-                    throw new Error('MacroStep ' + formatFlowName(diagram) + ' cannot contain nested macro steps.');
-                if (!callersByTarget.has(diagram.id))
-                    warnings.push('MacroStep ' + formatFlowName(diagram) + ' is not referenced by any Macro Step.');
-            });
-        if (warnings.length && typeof context.onCodegenWarnings === 'function')
-            context.onCodegenWarnings(warnings);
-        return warnings;
-    }
-    GrafcetStudioCodegenPayload.validateMacroStepRelations = validateMacroStepRelations;
     function normalizeCSharpSignal(context, deviceTypeName, signal) {
         const canonicalUnitSignals = new Map((context.projectUnitStructSignals || []).map(item => [item.id, item]));
         const canonical = deviceTypeName === 'Unit Station' ? canonicalUnitSignals.get(signal && signal.id) : null;
@@ -226,6 +170,23 @@ var GrafcetStudioCodegenPayload;
         });
         return signalAddresses;
     }
+    function normalizeVariableFormat(variable) {
+        return String((variable && (variable.format || variable.dataType || variable.structure)) || '').trim();
+    }
+    function findMacroPortVariable(flowName, variables) {
+        if (!flowName)
+            return null;
+        const matches = (variables || []).filter(variable => variable && String(variable.label || variable.name || '').trim().toLowerCase() === flowName.trim().toLowerCase());
+        if (matches.length === 0)
+            return null;
+        if (matches.length > 1)
+            throw new Error('Duplicate MacroPort variable name for MacroStep "' + flowName + '".');
+        const variable = matches[0];
+        const format = normalizeVariableFormat(variable);
+        if (format !== 'MacroPort')
+            throw new Error('MacroStep "' + flowName + '" has variable with same name but format/dataType/structure is "' + format + '", expected "MacroPort".');
+        return variable;
+    }
     function getCSharpVariables(context, diagramState) {
         const vars = [];
         const seen = new Set();
@@ -238,7 +199,7 @@ var GrafcetStudioCodegenPayload;
             seen.add(variable.label);
             vars.push({
                 label: variable.label,
-                format: variable.format || variable.dataType || '',
+                format: normalizeVariableFormat(variable),
                 address: variable.address || null,
                 signalAddresses: signalAddresses
             });
@@ -305,6 +266,10 @@ var GrafcetStudioCodegenPayload;
                 .filter((connection) => connection.from === transition.id && !!connection.to && stepIds.has(connection.to))
                 .map((connection) => connection.to || '')
         }));
+        const variables = getCSharpVariables(context, state);
+        const macroPortVariable = String(diagram.diagramType || 'Macro').toLowerCase() === 'macrostep'
+            ? findMacroPortVariable(diagram.name || diagramId, variables)
+            : null;
         return {
             diagram: {
                 id: diagram.id || diagramId,
@@ -324,7 +289,8 @@ var GrafcetStudioCodegenPayload;
             },
             steps,
             transitions,
-            variables: getCSharpVariables(context, state)
+            macroPortVariable,
+            variables
         };
     }
     GrafcetStudioCodegenPayload.buildCSharpFlow = buildCSharpFlow;
@@ -373,7 +339,8 @@ var GrafcetStudioCodegenPayload;
                     : undefined,
                 diagram: flow.diagram,
                 steps: flow.steps,
-                transitions: flow.transitions
+                transitions: flow.transitions,
+                macroPortVariable: flow.macroPortVariable || null
             };
         });
         const assets = context.getAssets();
@@ -403,7 +370,6 @@ var GrafcetStudioCodegenPayload;
             : null;
         const unitDiagrams = (context.project.diagrams || []).filter(diagram => unitId === '__none__' ? !diagram.unitId : diagram.unitId === unitId);
         validateUnitAddressConfig(context, unitDiagrams);
-        validateMacroStepRelations(context, unitDiagrams);
         const flowResults = unitDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
         const unit = {
             id: selectedUnit ? (selectedUnit.id || '') : (unitId || ''),
@@ -424,7 +390,6 @@ var GrafcetStudioCodegenPayload;
         });
         flowsByUnit.forEach(unitDiagrams => {
             validateUnitAddressConfig(context, unitDiagrams);
-            validateMacroStepRelations(context, unitDiagrams);
         });
         const flowResults = allDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
         return buildCSharpPayloadCore(context, platform, null, flowResults);
@@ -451,4 +416,3 @@ var GrafcetStudioCodegenPayload;
     };
 })(GrafcetStudioCodegenPayload || (GrafcetStudioCodegenPayload = {}));
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
-

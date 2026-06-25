@@ -221,6 +221,21 @@ namespace GrafcetStudioCodegenPayload {
     return signalAddresses;
   }
 
+  function normalizeVariableFormat(variable: { format?: string; dataType?: string; structure?: string } | null | undefined): string {
+    return String((variable && (variable.format || variable.dataType || variable.structure)) || '').trim();
+  }
+
+  function findMacroPortVariable(flowName: string, variables: DeviceVariable[]): DeviceVariable | null {
+    if (!flowName) return null;
+    const matches = (variables || []).filter(variable => variable && String(variable.label || (variable as any).name || '').trim().toLowerCase() === flowName.trim().toLowerCase());
+    if (matches.length === 0) return null;
+    if (matches.length > 1) throw new Error('Duplicate MacroPort variable name for MacroStep "' + flowName + '".');
+    const variable = matches[0];
+    const format = normalizeVariableFormat(variable as any);
+    if (format !== 'MacroPort') throw new Error('MacroStep "' + flowName + '" has variable with same name but format/dataType/structure is "' + format + '", expected "MacroPort".');
+    return variable;
+  }
+
   function getCSharpVariables(context: PayloadContext, diagramState: DiagramState & { vars?: ProjectVariable[] }): DeviceVariable[] {
     const vars: DeviceVariable[] = [];
     const seen = new Set<string>();
@@ -231,7 +246,7 @@ namespace GrafcetStudioCodegenPayload {
       seen.add(variable.label);
       vars.push({
         label: variable.label,
-        format: variable.format || variable.dataType || '',
+        format: normalizeVariableFormat(variable as any),
         address: variable.address || null,
         signalAddresses: signalAddresses
       });
@@ -298,6 +313,11 @@ namespace GrafcetStudioCodegenPayload {
         .map((connection: Connection) => connection.to || '')
     }));
 
+    const variables = getCSharpVariables(context, state);
+    const macroPortVariable = String(diagram.diagramType || 'Macro').toLowerCase() === 'macrostep'
+      ? findMacroPortVariable(diagram.name || diagramId, variables)
+      : null;
+
     return {
       diagram: {
         id: diagram.id || diagramId,
@@ -317,7 +337,8 @@ namespace GrafcetStudioCodegenPayload {
       },
       steps,
       transitions,
-      variables: getCSharpVariables(context, state)
+      macroPortVariable,
+      variables
     };
   }
 
@@ -376,7 +397,8 @@ namespace GrafcetStudioCodegenPayload {
           : undefined,
         diagram: flow.diagram,
         steps: flow.steps,
-        transitions: flow.transitions
+        transitions: flow.transitions,
+        macroPortVariable: (flow as any).macroPortVariable || null
       };
     });
 

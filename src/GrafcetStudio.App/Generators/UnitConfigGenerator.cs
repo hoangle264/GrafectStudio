@@ -106,6 +106,7 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
         ValidateMacroStepRules(flows);
+        ValidateMacroPortVariables(flows, payload.Variables);
         var macroBindings = BuildMacroBindings(flows);
         var macroPorts = macroBindings
             .Select(binding => new
@@ -114,7 +115,8 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
                 binding.callerFlowId,
                 binding.callerStepId,
                 binding.calleeFlowId,
-                binding.portName
+                binding.portName,
+                binding.variable
             })
             .ToList();
         var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library, macroBindings)).ToList();
@@ -213,6 +215,7 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
             normalizedType = NormalizeFlowType(flow),
             diagramType = NormalizeDiagramType(flow),
             diagram = flow.Diagram,
+            macroPortVariable = flow.MacroPortVariable,
             stepMinAddress = flowStepRange.MinAddress,
             stepMaxAddress = flowStepRange.MaxAddress,
             sequenceEnd = flowStepRange.SequenceEnd,
@@ -745,18 +748,54 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
                         callerFlowId = flow.Id ?? string.Empty,
                         callerStepId = step.Id,
                         calleeFlowId = callee.Id ?? string.Empty,
-                        portName = BuildMacroPortName(callee)
+                        portName = BuildMacroPortName(callee),
+                        variable = ResolveMacroPortVariable(callee)
                     };
                 }))
             .ToList();
     }
 
 
+    private static DeviceVariable? ResolveMacroPortVariable(FlowInfo flow)
+        => flow.MacroPortVariable;
+
+    private static void ValidateMacroPortVariables(IList<FlowInfo> flows, IList<DeviceVariable> variables)
+    {
+        foreach (var flow in flows.Where(flow => string.Equals(NormalizeDiagramType(flow), "MacroStep", StringComparison.OrdinalIgnoreCase)))
+        {
+            var name = flow.Name ?? flow.Id ?? string.Empty;
+            var matches = variables
+                .Where(variable => !string.IsNullOrWhiteSpace(variable.Label)
+                    && string.Equals(variable.Label, name, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException($"Duplicate MacroPort variable name for MacroStep {name}.");
+            }
+
+            if (matches.Count == 1 && !string.Equals(matches[0].Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"MacroStep {name} has variable with same name but format/dataType/structure is {matches[0].Format}, expected MacroPort.");
+            }
+
+            if (flow.MacroPortVariable is null && matches.Count == 1)
+            {
+                flow.MacroPortVariable = matches[0];
+            }
+
+            if (flow.MacroPortVariable is not null && !string.Equals(flow.MacroPortVariable.Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"MacroStep {name} macroPortVariable format is {flow.MacroPortVariable.Format}, expected MacroPort.");
+            }
+        }
+    }
+
     private static string BuildMacroPortName(FlowInfo flow)
     {
         var source = !string.IsNullOrWhiteSpace(flow.Name) ? flow.Name! : flow.Id ?? "MacroStep";
         var token = new string(source.Trim().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');
-        return $"{(string.IsNullOrWhiteSpace(token) ? "MacroStep" : token)}_Port";
+        return flow.MacroPortVariable?.Label ?? $"{(string.IsNullOrWhiteSpace(token) ? "MacroStep" : token)}_Port";
     }
 
     private static string NormalizeDeviceKind(string? format)

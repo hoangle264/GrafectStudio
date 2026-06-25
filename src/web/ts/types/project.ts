@@ -162,6 +162,8 @@ namespace GrafcetStudioProject {
   export interface DeviceVariable {
     label: string;
     format: string;
+    dataType?: string;
+    structure?: string;
     address?: string | null;
     signalAddresses?: Record<string, string>;
     [key: string]: unknown;
@@ -195,6 +197,7 @@ namespace GrafcetStudioProject {
     diagram?: DiagramInfo;
     steps: Step[];
     transitions: Transition[];
+    macroPortVariable?: DeviceVariable | null;
     [key: string]: unknown;
   }
 

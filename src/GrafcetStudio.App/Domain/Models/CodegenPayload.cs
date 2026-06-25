@@ -110,5 +110,6 @@ public class FlowInfo
     [JsonPropertyName("diagram")] public DiagramInfo? Diagram { get; set; }
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
+    [JsonPropertyName("macroPortVariable")] public DeviceVariable? MacroPortVariable { get; set; }
 }
 

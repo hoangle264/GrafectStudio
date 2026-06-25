@@ -307,6 +307,54 @@ public class GeneratorSmokeTests
         Assert.Contains("old-flow", output);
         Assert.DoesNotContain("cannot contain nested macro steps", output);
     }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepWithMacroPortVariable_UsesVariablePortData()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable
+        {
+            Label = "Clamp",
+            Format = "MacroPort",
+            SignalAddresses = new Dictionary<string, string>
+            {
+                ["Enable"] = "@MR300",
+                ["Start"] = "@MR301",
+                ["Busy"] = "@MR302",
+                ["Done"] = "@MR303",
+                ["Error"] = "@MR304",
+                ["Reset"] = "@MR305"
+            }
+        });
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("MacroPort", output);
+        Assert.Contains("@MR301", output);
+        Assert.Contains("macroPortVariable", output);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepWithWrongFormatVariable_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "Cylinder" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("expected MacroPort", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepDuplicateVariableName_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "MacroPort" });
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "MacroPort" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("Duplicate MacroPort variable name", ex.Message);
+    }
+
     private static CodegenPayload BuildPayload()
         => new()
         {

@@ -19,6 +19,8 @@ public class ResolvedFlow
 
     public DiagramInfo? diagram { get; init; }
 
+    public DeviceVariable? macroPortVariable { get; init; }
+
     public string stepMinAddress { get; init; } = string.Empty;
 
     public string stepMaxAddress { get; init; } = string.Empty;

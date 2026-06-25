@@ -8,4 +8,7 @@ public class MacroBindingContext
     public string callerStepId { get; init; } = string.Empty;
     public string calleeFlowId { get; init; } = string.Empty;
     public string portName { get; init; } = string.Empty;
+    public DeviceVariable? variable { get; init; }
+    public bool hasVariable => variable is not null;
 }
+
