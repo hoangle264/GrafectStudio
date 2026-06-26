@@ -154,6 +154,18 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<BrowseCodegenPathRequestedEvent>().Publish(message);
                     break;
                 }
+
+            case "READ_TEMPLATE_FILE":
+                {
+                    var message = new ReadTemplateFilePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath")
+                    };
+                    _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
+                    break;
+                }
         }
     }
 

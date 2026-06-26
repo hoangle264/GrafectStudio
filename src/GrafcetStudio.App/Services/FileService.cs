@@ -97,6 +97,37 @@ public class FileService : IFileService
         return BrowseFolderAsync("Select output folder");
     }
 
+
+    public async Task<string> ReadTemplateFileAsync(string rootPath, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(rootPath))
+        {
+            throw new InvalidOperationException("Template root path is empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new InvalidOperationException("Template relative path is empty.");
+        }
+
+        var rootFullPath = Path.GetFullPath(rootPath.Trim());
+        var safeRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fileFullPath = Path.GetFullPath(Path.Combine(rootFullPath, safeRelativePath));
+        var rootWithSeparator = rootFullPath.EndsWith(Path.DirectorySeparatorChar) ? rootFullPath : rootFullPath + Path.DirectorySeparatorChar;
+
+        if (!fileFullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase) && !string.Equals(fileFullPath, rootFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Template file path is outside the selected template root.");
+        }
+
+        if (!File.Exists(fileFullPath))
+        {
+            throw new FileNotFoundException("Template file not found.", fileFullPath);
+        }
+
+        return await File.ReadAllTextAsync(fileFullPath, Utf8NoBom);
+    }
+
     private static Task<string?> BrowseFolderAsync(string description)
     {
         var dispatcher = System.Windows.Application.Current.Dispatcher;

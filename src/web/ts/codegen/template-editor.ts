@@ -1,10 +1,21 @@
 namespace GrafcetStudioTemplateEditor {
+  type TemplateDiagnosticSeverity = 'error' | 'warning' | 'info';
   type Preset = { id: string; label: string; path: string };
-  type Suggestion = { label: string; insert: string };
+  type Suggestion = { label: string; insert: string; cursorToken?: string };
+  type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string };
+  type TemplateEditorApi = {
+    open(templateId?: string): Promise<void>;
+    close(): void;
+    save(): Promise<void>;
+    reset(): Promise<void>;
+  };
+
 
   const PRESETS: Preset[] = [
     { id: 'main-output', label: 'main-output.hbs', path: 'main-output.hbs' },
     { id: 'step-body', label: 'step-body.hbs', path: 'step-body.hbs' },
+    { id: 'step-body-1', label: 'step-body-1.hbs', path: 'step-body-1.hbs' },
     { id: 'error', label: 'error.hbs', path: 'error.hbs' },
     { id: 'manual', label: 'manual.hbs', path: 'manual.hbs' },
     { id: 'auto', label: 'auto.hbs', path: 'auto.hbs' },
@@ -25,31 +36,124 @@ namespace GrafcetStudioTemplateEditor {
     { id: 'devices-motor', label: 'devices/motor.hbs', path: 'devices/motor.hbs' },
     { id: 'devices-generic', label: 'devices/generic.hbs', path: 'devices/generic.hbs' },
     { id: 'devices-robot', label: 'devices/robot.hbs', path: 'devices/robot.hbs' },
-    { id: 'devices-device_robot', label: 'devices/device_robot.hbs', path: 'devices/device_robot.hbs' }
+    { id: 'devices-device_robot', label: 'devices/device_robot.hbs', path: 'devices/device_robot.hbs' },
+    { id: 'devices-device_starter', label: 'devices/device_starter.hbs', path: 'devices/device_starter.hbs' }
   ];
 
   const SUGGESTIONS: Suggestion[] = [
-    { label: '{{#each }}', insert: '{{#each items}}\n  \n{{/each}}' },
-    { label: '{{#if }}', insert: '{{#if condition}}\n  \n{{/if}}' },
+    { label: '{{#each }}', insert: '{{#each items}}\n  \n{{/each}}', cursorToken: 'items' },
+    { label: '{{#if }}', insert: '{{#if condition}}\n  \n{{/if}}', cursorToken: 'condition' },
+    { label: '{{else}}', insert: '{{else}}' },
     { label: '{{/each}}', insert: '{{/each}}' },
     { label: '{{/if}}', insert: '{{/if}}' },
-    { label: '{{else}}', insert: '{{else}}' },
-    { label: '{{> partial}}', insert: '{{> partial}}' },
-    { label: '{{! comment }}', insert: '{{! comment }}' }
+    { label: '{{> partial}}', insert: '{{> partial}}', cursorToken: 'partial' },
+    { label: '{{! comment }}', insert: '{{! comment }}', cursorToken: 'comment' }
   ];
 
   let activeId = PRESETS[0].id;
   let currentText = '';
   let loadedText = '';
+  let defaultText = '';
+  let visibleSuggestions: Suggestion[] = SUGGESTIONS;
   let suggestionVisible = false;
   let suggestionIndex = 0;
-
-  function host(): Window & { GrafcetStudio?: Record<string, unknown> } {
-    return window as Window & { GrafcetStudio?: Record<string, unknown> };
-  }
+  const pendingTemplateReads: Record<string, (content: string) => void> = {};
 
   function el<T extends HTMLElement = HTMLElement>(id: string): T | null {
     return document.getElementById(id) as T | null;
+  }
+
+
+  function presetById(id: string): Preset {
+    return PRESETS.find(preset => preset.id === id) || PRESETS[0];
+  }
+
+  function escapeHtml(text: string): string {
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function classForExpression(expression: string): string {
+    const inner = expression.slice(2, -2).trim();
+    if (inner.startsWith('!')) return 'hbs-comment';
+    if (/^#(each|if)\b/.test(inner)) return 'hbs-block';
+    if (/^\/(each|if)$/.test(inner)) return 'hbs-block-end';
+    if (inner === 'else') return 'hbs-else';
+    if (inner.startsWith('>')) return 'hbs-partial';
+    return 'hbs-var';
+  }
+
+  function renderExpression(expression: string): string {
+    const inner = expression.slice(2, -2);
+    const trimmed = inner.trim();
+    const prefixWhitespace = inner.match(/^\s*/)?.[0] || '';
+    const suffixWhitespace = inner.match(/\s*$/)?.[0] || '';
+    const body = trimmed || inner;
+    return '<span class="hbs-delim">{{</span>'
+      + escapeHtml(prefixWhitespace)
+      + `<span class="${classForExpression(expression)}">${escapeHtml(body)}</span>`
+      + escapeHtml(suffixWhitespace)
+      + '<span class="hbs-delim">}}</span>';
+  }
+
+  function renderHighlight(text: string): string {
+    const pattern = /\{\{[\s\S]*?\}\}/g;
+    let html = '';
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      html += escapeHtml(text.slice(lastIndex, match.index));
+      html += renderExpression(match[0]);
+      lastIndex = match.index + match[0].length;
+    }
+    html += escapeHtml(text.slice(lastIndex));
+    return html || '&nbsp;';
+  }
+
+  function lineColumnAt(text: string, index: number): { line: number; column: number } {
+    const before = text.slice(0, Math.max(0, index));
+    const lines = before.split('\n');
+    return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+  }
+
+  function validateTemplate(text: string): TemplateDiagnostic[] {
+    const diagnostics: TemplateDiagnostic[] = [];
+    const blockStack: { name: string; line: number; column: number }[] = [];
+    const pattern = /\{\{([\s\S]*?)(\}\}|$)/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+      const location = lineColumnAt(text, match.index);
+      if (match[2] !== '}}') {
+        diagnostics.push({ ...location, message: 'Missing closing delimiter }}', severity: 'error' });
+        break;
+      }
+
+      const inner = match[1].trim();
+      const open = inner.match(/^#(each|if)\b/);
+      const close = inner.match(/^\/(each|if)$/);
+      if (open) {
+        blockStack.push({ name: open[1], ...location });
+      } else if (close) {
+        const expected = blockStack.pop();
+        if (!expected) {
+          diagnostics.push({ ...location, message: `Closing block {{/${close[1]}}} has no opening block`, severity: 'error' });
+        } else if (expected.name !== close[1]) {
+          diagnostics.push({ ...location, message: `Expected {{/${expected.name}}} but found {{/${close[1]}}}`, severity: 'error' });
+        }
+      } else if (inner.startsWith('>') && !/^>\s*[\w./-]+$/.test(inner)) {
+        diagnostics.push({ ...location, message: 'Invalid partial syntax', severity: 'warning' });
+      }
+    }
+
+    for (const block of blockStack.reverse()) {
+      diagnostics.push({ line: block.line, column: block.column, message: `Missing closing block for {{#${block.name}}}`, severity: 'error' });
+    }
+    return diagnostics;
   }
 
   function ensureModal(): HTMLElement {
@@ -62,12 +166,12 @@ namespace GrafcetStudioTemplateEditor {
     root.innerHTML = `
       <section class="modal modal-wide template-editor-modal">
         <header class="modal-header template-editor-header">
-          <span class="modal-title-accent">? TEMPLATE EDITOR</span>
+          <span class="modal-title-accent">&#8862; TEMPLATE EDITOR</span>
           <span id="template-editor-title" class="modal-subtitle"></span>
           <div class="modal-actions">
             <button class="btn" onclick="openTemplateEditorReset()">Reset to default</button>
             <button class="btn" onclick="closeTemplateEditor()">Cancel</button>
-            <button class="btn a" onclick="saveTemplateEditor()">Save</button>
+            <button class="btn a" onclick="saveTemplateEditor()">Save Template</button>
           </div>
         </header>
         <div class="template-editor-toolbar">
@@ -96,28 +200,98 @@ namespace GrafcetStudioTemplateEditor {
     return root;
   }
 
-  function presetById(id: string): Preset {
-    return PRESETS.find(p => p.id === id) || PRESETS[0];
+  function setPresetOptions(): void {
+    const select = el<HTMLSelectElement>('template-editor-select');
+    if (!select) return;
+    select.innerHTML = PRESETS.map(preset => `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.label)}</option>`).join('');
+    select.value = activeId;
+    const title = el<HTMLElement>('template-editor-title');
+    if (title) title.textContent = presetById(activeId).label;
   }
 
-  function escapeHtml(text: string): string {
-    return String(text || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  function templateRootPath(): string {
+    const input = document.getElementById('cg-template-root-path') as HTMLInputElement | null;
+    return (input?.value || '').trim();
   }
 
-  function renderHighlight(text: string): string {
-    const escaped = escapeHtml(text);
-    return escaped
-      .replace(/\{\{!([\s\S]*?)\}\}/g, '<span class="hbs-comment">{{!$1}}</span>')
-      .replace(/\{\{#(each|if)\s*([^}]*)\}\}/g, '<span class="hbs-delim">{{</span><span class="hbs-block">#$1</span><span class="hbs-var"> $2</span><span class="hbs-delim">}}</span>')
-      .replace(/\{\{\/(each|if)\}\}/g, '<span class="hbs-delim">{{</span><span class="hbs-block-end">/$1</span><span class="hbs-delim">}}</span>')
-      .replace(/\{\{else\}\}/g, '<span class="hbs-delim">{{</span><span class="hbs-else">else</span><span class="hbs-delim">}}</span>')
-      .replace(/\{\{>\s*([^}]+?)\s*\}\}/g, '<span class="hbs-delim">{{</span><span class="hbs-partial">&gt; $1</span><span class="hbs-delim">}}</span>')
-      .replace(/\{\{\s*([a-zA-Z0-9_@.]+)\s*\}\}/g, '<span class="hbs-delim">{{</span><span class="hbs-var">$1</span><span class="hbs-delim">}}</span>');
+  function canUseHostBridge(): boolean {
+    const candidate = window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } };
+    return typeof candidate.chrome?.webview?.postMessage === 'function';
+  }
+
+  function readTemplateViaHost(rootPath: string, relativePath: string): Promise<string> {
+    const bridge = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome?.webview;
+    const postMessage = bridge?.postMessage;
+    if (!postMessage) return Promise.reject(new Error('Host bridge is unavailable.'));
+
+    const requestId = 'template-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        delete pendingTemplateReads[requestId];
+        reject(new Error('Timed out reading template from host.'));
+      }, 5000);
+      pendingTemplateReads[requestId] = content => {
+        window.clearTimeout(timeout);
+        delete pendingTemplateReads[requestId];
+        resolve(content);
+      };
+      postMessage.call(bridge, {
+        type: 'READ_TEMPLATE_FILE',
+        payload: { requestId, rootPath, relativePath }
+      });
+    });
+  }
+
+  async function loadDefaultText(id: string): Promise<string> {
+    const preset = presetById(id);
+    const rootPath = templateRootPath();
+    if (rootPath && canUseHostBridge()) {
+      try {
+        return await readTemplateViaHost(rootPath, preset.path);
+      } catch {
+      }
+    }
+
+    const url = `https://templates.grafcet.local/${preset.path}`;
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return await response.text();
+    } catch {
+      return '{{! Template file unavailable }}\n';
+    }
+  }
+
+  async function loadTemplate(id: string): Promise<void> {
+    defaultText = await loadDefaultText(id);
+    currentText = defaultText;
+    loadedText = currentText;
+    const input = el<HTMLTextAreaElement>('template-editor-textarea');
+    if (input) {
+      input.value = currentText;
+      input.focus();
+      input.setSelectionRange(0, 0);
+    }
+    syncFromTextarea();
+  }
+
+  function updateStatus(message?: string): void {
+    const status = el<HTMLElement>('template-editor-status');
+    if (!status) return;
+    if (message) {
+      status.textContent = message;
+      status.className = 'template-editor-status';
+      return;
+    }
+
+    const diagnostics = validateTemplate(currentText);
+    const firstError = diagnostics.find(diagnostic => diagnostic.severity === 'error');
+    status.className = 'template-editor-status' + (firstError ? ' has-error' : '');
+    if (firstError) {
+      status.textContent = `Line ${firstError.line}: ${firstError.message}`;
+      return;
+    }
+    status.textContent = currentText === loadedText ? 'No changes' : 'Edited';
   }
 
   function syncFromTextarea(): void {
@@ -129,12 +303,6 @@ namespace GrafcetStudioTemplateEditor {
     syncTemplateEditorScroll();
     updateStatus();
     updateCompletions();
-  }
-
-  function updateStatus(message?: string): void {
-    const status = el<HTMLElement>('template-editor-status');
-    if (!status) return;
-    status.textContent = message || (currentText === loadedText ? 'No changes' : 'Edited');
   }
 
   function syncTemplateEditorScroll(): void {
@@ -152,90 +320,70 @@ namespace GrafcetStudioTemplateEditor {
     box.classList.toggle('is-hidden', !visible);
   }
 
-  function updateCompletions(force = false): void {
+  function completionContext(force: boolean): { typed: string; shouldShow: boolean } {
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
-    const box = el<HTMLElement>('template-editor-completions');
-    if (!input || !box) return;
-
+    if (!input) return { typed: '', shouldShow: false };
     const cursor = input.selectionStart || 0;
     const before = input.value.slice(0, cursor);
     const markerIndex = before.lastIndexOf('{{');
-    const typed = markerIndex >= 0 ? before.slice(markerIndex + 2).trim().toLowerCase() : '';
-    const shouldShow = force || before.endsWith('{{') || before.endsWith('{{#') || before.endsWith('{{/') || before.endsWith('{{>') || (markerIndex >= 0 && typed.length <= 12);
-    if (!shouldShow) {
+    const closeIndex = before.lastIndexOf('}}');
+    const insideExpression = markerIndex >= 0 && markerIndex > closeIndex;
+    const typed = insideExpression ? before.slice(markerIndex + 2).trim().toLowerCase() : '';
+    return {
+      typed,
+      shouldShow: force || before.endsWith('{{') || before.endsWith('{{#') || before.endsWith('{{/') || before.endsWith('{{>') || (insideExpression && typed.length <= 16)
+    };
+  }
+
+  function updateCompletions(force = false): void {
+    const box = el<HTMLElement>('template-editor-completions');
+    if (!box) return;
+    const context = completionContext(force);
+    if (!context.shouldShow) {
       showCompletions(false);
       return;
     }
 
-    const items = SUGGESTIONS.filter(item => !typed || item.label.toLowerCase().includes(typed) || item.insert.toLowerCase().includes(typed));
-    box.innerHTML = items.map((item, idx) => `<button class="template-editor-completion ${idx === suggestionIndex ? 'active' : ''}" data-index="${idx}" onclick="pickTemplateEditorSuggestion(${idx})"><span>${escapeHtml(item.label)}</span></button>`).join('');
+    visibleSuggestions = SUGGESTIONS.filter(item => !context.typed || item.label.toLowerCase().includes(context.typed) || item.insert.toLowerCase().includes(context.typed));
+    if (!visibleSuggestions.length) {
+      showCompletions(false);
+      return;
+    }
+    suggestionIndex = Math.max(0, Math.min(suggestionIndex, visibleSuggestions.length - 1));
+    box.innerHTML = visibleSuggestions.map((item, index) => `<button class="template-editor-completion ${index === suggestionIndex ? 'active' : ''}" data-index="${index}" onclick="pickTemplateEditorSuggestion(${index})"><span>${escapeHtml(item.label)}</span></button>`).join('');
     showCompletions(true);
+  }
+
+  function replaceRangeForSuggestion(input: HTMLTextAreaElement): { start: number; end: number } {
+    const cursor = input.selectionStart || 0;
+    const before = input.value.slice(0, cursor);
+    const markerIndex = before.lastIndexOf('{{');
+    if (markerIndex < 0) return { start: cursor, end: input.selectionEnd || cursor };
+    const closingIndex = input.value.indexOf('}}', cursor);
+    return { start: markerIndex, end: closingIndex >= 0 ? closingIndex + 2 : input.selectionEnd || cursor };
   }
 
   function insertSuggestion(index: number): void {
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
     if (!input) return;
-    const cursor = input.selectionStart || 0;
-    const before = input.value.slice(0, cursor);
-    const after = input.value.slice(input.selectionEnd || cursor);
-    const start = Math.max(0, before.lastIndexOf('{{'));
-    const item = SUGGESTIONS[index] || SUGGESTIONS[0];
-    input.value = before.slice(0, start) + item.insert + after;
-    const nextPos = start + item.insert.length;
+    const item = visibleSuggestions[index] || visibleSuggestions[0] || SUGGESTIONS[0];
+    const range = replaceRangeForSuggestion(input);
+    input.value = input.value.slice(0, range.start) + item.insert + input.value.slice(range.end);
+    const tokenIndex = item.cursorToken ? item.insert.indexOf(item.cursorToken) : -1;
+    const nextPos = range.start + (tokenIndex >= 0 ? tokenIndex : item.insert.length);
     input.focus();
-    input.setSelectionRange(nextPos, nextPos);
+    input.setSelectionRange(nextPos, nextPos + (tokenIndex >= 0 && item.cursorToken ? item.cursorToken.length : 0));
+    showCompletions(false);
     syncFromTextarea();
-  }
-
-  function setPresetOptions(): void {
-    const select = el<HTMLSelectElement>('template-editor-select');
-    if (!select) return;
-    select.innerHTML = PRESETS.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`).join('');
-    select.value = activeId;
-    const title = el<HTMLElement>('template-editor-title');
-    if (title) title.textContent = presetById(activeId).label;
-  }
-
-  async function loadPresetText(id: string): Promise<string> {
-    const preset = presetById(id);
-    const url = `https://templates.grafcet.local/${preset.path}`;
-    try {
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return await response.text();
-    } catch {
-      return '';
-    }
-  }
-
-  function saveDownloadedFile(): void {
-    const preset = presetById(activeId);
-    const filename = preset.path.replace(/[\\/]/g, '__');
-    const blob = new Blob([currentText || ''], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    closeTemplateEditor();
   }
 
   async function openTemplateEditor(id?: string): Promise<void> {
     const modal = ensureModal();
-    modal.classList.add('show');
     activeId = id || activeId || PRESETS[0].id;
     setPresetOptions();
     showCompletions(false);
-    const text = await loadPresetText(activeId);
-    currentText = text;
-    loadedText = text;
-    const input = el<HTMLTextAreaElement>('template-editor-textarea');
-    if (input) {
-      input.value = text;
-      input.focus();
-      input.setSelectionRange(0, 0);
-    }
-    syncFromTextarea();
+    modal.classList.add('show');
+    await loadTemplate(activeId);
   }
 
   function closeTemplateEditor(): void {
@@ -244,19 +392,33 @@ namespace GrafcetStudioTemplateEditor {
     showCompletions(false);
   }
 
+  async function saveTemplateEditor(): Promise<void> {
+    const preset = presetById(activeId);
+    const filename = preset.path.replace(/[\\/]/g, '__');
+    const blob = new Blob([currentText || ''], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    loadedText = currentText;
+    updateStatus('Downloaded template file');
+  }
+
   async function switchTemplateEditorPreset(id: string): Promise<void> {
     activeId = id;
     setPresetOptions();
-    const text = await loadPresetText(id);
-    currentText = text;
-    loadedText = text;
-    const input = el<HTMLTextAreaElement>('template-editor-textarea');
-    if (input) input.value = text;
-    syncFromTextarea();
+    showCompletions(false);
+    await loadTemplate(id);
   }
 
-  function openTemplateEditorReset(): void {
-    switchTemplateEditorPreset(activeId);
+  async function openTemplateEditorReset(): Promise<void> {
+    currentText = defaultText || await loadDefaultText(activeId);
+    loadedText = currentText;
+    const input = el<HTMLTextAreaElement>('template-editor-textarea');
+    if (input) input.value = currentText;
+    syncFromTextarea();
+    updateStatus('Reset to default');
   }
 
   function onTemplateEditorInput(): void {
@@ -266,7 +428,20 @@ namespace GrafcetStudioTemplateEditor {
   function onTemplateEditorKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
-      closeTemplateEditor();
+      if (suggestionVisible) showCompletions(false);
+      else closeTemplateEditor();
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      const input = el<HTMLTextAreaElement>('template-editor-textarea');
+      if (!input) return;
+      event.preventDefault();
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || start;
+      input.value = input.value.slice(0, start) + '  ' + input.value.slice(end);
+      input.setSelectionRange(start + 2, start + 2);
+      syncFromTextarea();
       return;
     }
 
@@ -278,7 +453,7 @@ namespace GrafcetStudioTemplateEditor {
 
     if (event.key === 'ArrowDown' && suggestionVisible) {
       event.preventDefault();
-      suggestionIndex = Math.min(SUGGESTIONS.length - 1, suggestionIndex + 1);
+      suggestionIndex = Math.min(visibleSuggestions.length - 1, suggestionIndex + 1);
       updateCompletions(true);
       return;
     }
@@ -301,19 +476,36 @@ namespace GrafcetStudioTemplateEditor {
     insertSuggestion(index);
   }
 
+  const api: TemplateEditorApi = {
+    open: openTemplateEditor,
+    close: closeTemplateEditor,
+    save: saveTemplateEditor,
+    reset: openTemplateEditorReset
+  };
+
+  function receiveTemplateFile(payload: TemplateFilePayload): void {
+    const requestId = payload?.requestId || '';
+    const resolve = pendingTemplateReads[requestId];
+    if (resolve) resolve(payload?.content || '');
+  }
+
   (window as Window & {
+    GrafcetTemplateEditor?: TemplateEditorApi;
+    receiveTemplateFile?: typeof receiveTemplateFile;
     openTemplateEditor?: typeof openTemplateEditor;
     closeTemplateEditor?: typeof closeTemplateEditor;
-    saveTemplateEditor?: typeof saveDownloadedFile;
+    saveTemplateEditor?: typeof saveTemplateEditor;
     switchTemplateEditorPreset?: typeof switchTemplateEditorPreset;
     openTemplateEditorReset?: typeof openTemplateEditorReset;
     onTemplateEditorInput?: typeof onTemplateEditorInput;
     onTemplateEditorKeydown?: typeof onTemplateEditorKeydown;
     syncTemplateEditorScroll?: typeof syncTemplateEditorScroll;
     pickTemplateEditorSuggestion?: typeof pickTemplateEditorSuggestion;
-  }).openTemplateEditor = openTemplateEditor;
+  }).GrafcetTemplateEditor = api;
+  (window as Window & any).receiveTemplateFile = receiveTemplateFile;
+  (window as Window & any).openTemplateEditor = openTemplateEditor;
   (window as Window & any).closeTemplateEditor = closeTemplateEditor;
-  (window as Window & any).saveTemplateEditor = saveDownloadedFile;
+  (window as Window & any).saveTemplateEditor = saveTemplateEditor;
   (window as Window & any).switchTemplateEditorPreset = switchTemplateEditorPreset;
   (window as Window & any).openTemplateEditorReset = openTemplateEditorReset;
   (window as Window & any).onTemplateEditorInput = onTemplateEditorInput;

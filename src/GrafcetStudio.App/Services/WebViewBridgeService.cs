@@ -66,6 +66,13 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveSavedPaths({payload});");
     }
 
+
+    public async Task SendTemplateFileAsync(string requestId, string relativePath, string content)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, relativePath, content });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
     private async Task ExecuteAsync(string script)
     {
         if (_webView?.CoreWebView2 is null)

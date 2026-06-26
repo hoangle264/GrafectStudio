@@ -15,5 +15,6 @@ public interface IWebViewBridgeService
     Task UpdateDiagramStateAsync(string actionsJson);
     Task SendCodegenPathAsync(string target, string path);
     Task SendSavedPathsAsync(string deviceLibraryPath, string templatePath, string outputPath);
+    Task SendTemplateFileAsync(string requestId, string relativePath, string content);
 }
 

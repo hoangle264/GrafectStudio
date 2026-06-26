@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Events;
+﻿using GrafcetStudio.App.Events;
 using Prism.Events;
 using System;
 
@@ -23,6 +23,7 @@ public class FileIOOrchestrator
         _events.GetEvent<OpenFileRequestedEvent>().Subscribe(OnOpenRequested);
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
+        _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
     }
 
     private async void OnSaveRequested(string projectJson)
@@ -70,7 +71,7 @@ public class FileIOOrchestrator
                 ? "deviceLibrary"
                 : string.Equals(payload.Target, "outputRoot", StringComparison.OrdinalIgnoreCase)
                     ? "outputRoot"
-                : "templateRoot";
+                    : "templateRoot";
             var path = target switch
             {
                 "deviceLibrary" => await _files.BrowseDeviceLibraryPathAsync(),
@@ -86,6 +87,19 @@ public class FileIOOrchestrator
         catch (Exception ex)
         {
             await _bridge.SendErrorAsync("fileIO", ex.Message);
+        }
+    }
+
+    private async void OnReadTemplateFileRequested(ReadTemplateFilePayload payload)
+    {
+        try
+        {
+            var content = await _files.ReadTemplateFileAsync(payload.RootPath, payload.RelativePath);
+            await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, content);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendErrorAsync("template-editor", ex.Message);
         }
     }
 }
