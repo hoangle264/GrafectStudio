@@ -632,6 +632,14 @@ body.unified-vars .vartable-panel{display:none;}
   display:flex;align-items:center;gap:6px;background:var(--s1);font-weight:600;text-transform:uppercase;
 }
 .rpanel-head-title{flex:1;}
+.right-panel-tabs{height:34px;display:flex;border-bottom:1px solid var(--border);background:var(--s2);flex-shrink:0;}
+.right-panel-tab{flex:1;background:transparent;border:0;border-right:1px solid var(--border);color:var(--text3);font-size:10px;font-family:var(--font-mono);cursor:pointer;letter-spacing:.4px;}
+.right-panel-tab:last-child{border-right:0;}
+.right-panel-tab:hover{color:var(--text);background:rgba(255,255,255,.04);}
+.right-panel-tab.active{color:var(--cyan);background:rgba(79,195,247,.08);box-shadow:inset 0 -2px 0 var(--cyan);}
+.right-panel-tab-ai #props-area,.right-panel-tab-ai #dp-panel{display:none!important;}
+.right-panel-tab-props #ai-chat-panel{display:none!important;}
+.right-panel-tab-ai .ai-chat-panel{display:flex!important;}
 .prop-group{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05);}
 .prop-label{font-size:9px;letter-spacing:1px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;font-weight:600;}
 .prop-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Consolas',monospace;font-size:12px;padding:6px 8px;border-radius:2px;outline:none;transition:.15s;}
@@ -868,7 +876,7 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 }
 
 /* AI chat preview */
-.ai-chat-panel{display:none;border-top:1px solid var(--border);background:var(--s1);min-height:260px;max-height:52vh;flex-direction:column;}
+.ai-chat-panel{display:none;background:var(--s1);height:auto;min-height:0;max-height:none;flex:1;flex-direction:column;overflow:hidden;}
 .ai-chat-panel.show{display:flex;}
 .ai-chat-head{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border-bottom:1px solid var(--border);background:var(--s2);}
 .ai-chat-title{font-size:10px;letter-spacing:1.2px;color:var(--cyan);font-weight:bold;}
@@ -895,3 +903,4 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .ai-chat-intent{padding:5px 6px;}
 .ai-chat-input{resize:vertical;min-height:52px;padding:6px;}
 .ai-chat-actions{display:flex;justify-content:flex-end;gap:6px;}
+

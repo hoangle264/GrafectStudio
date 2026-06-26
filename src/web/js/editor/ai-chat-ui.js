@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 const AI_CHAT_STATE = {
   messages: [],
@@ -32,10 +32,32 @@ function aiChatGetBody() {
   return document.getElementById('ai-chat-body');
 }
 
+function setRightPanelTab(tab) {
+  const mode = tab === 'ai' ? 'ai' : 'props';
+  const panel = document.getElementById('right-panel');
+  const title = document.getElementById('rpanel-head-title');
+  const propsTab = document.getElementById('right-tab-props');
+  const aiTab = document.getElementById('right-tab-ai');
+  if (panel) {
+    panel.classList.toggle('right-panel-tab-ai', mode === 'ai');
+    panel.classList.toggle('right-panel-tab-props', mode !== 'ai');
+  }
+  if (title) title.textContent = mode === 'ai' ? 'AI PREVIEW' : 'PROPERTIES';
+  if (propsTab) {
+    propsTab.classList.toggle('active', mode !== 'ai');
+    propsTab.setAttribute('aria-selected', mode !== 'ai' ? 'true' : 'false');
+  }
+  if (aiTab) {
+    aiTab.classList.toggle('active', mode === 'ai');
+    aiTab.setAttribute('aria-selected', mode === 'ai' ? 'true' : 'false');
+  }
+}
+
 function toggleAiChatPanel(show) {
   const panel = document.getElementById('ai-chat-panel');
   if (!panel) return;
   panel.classList.toggle('show', show !== false);
+  setRightPanelTab(show === false ? 'props' : 'ai');
   if (show !== false && !AI_CHAT_STATE.messages.length) {
     aiChatAddMessage('assistant', 'Create or receive an AI proposal here. Preview and validation are required before Apply is enabled.');
   }
@@ -531,6 +553,7 @@ function runAiChatStreamingValidation() {
   }
   return { ok: errors.length === 0, errors };
 }
+window.setRightPanelTab = setRightPanelTab;
 window.toggleAiChatPanel = toggleAiChatPanel;
 window.aiChatSend = aiChatSend;
 window.aiChatInsertMockProposal = aiChatInsertMockProposal;
