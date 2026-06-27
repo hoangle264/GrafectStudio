@@ -73,6 +73,12 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveTemplateFile({payload});");
     }
 
+    public async Task SendSiemensTiaPushResultAsync(object result)
+    {
+        var payload = JsonSerializer.Serialize(result);
+        await ExecuteAsync($"receiveSiemensTiaPushResult({payload});");
+    }
+
     private async Task ExecuteAsync(string script)
     {
         if (_webView?.CoreWebView2 is null)

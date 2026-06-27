@@ -10,7 +10,7 @@ function cgExportViaHost(code, platform) {
   }
   window.chrome.webview.postMessage({
     type: 'EXPORT_CODE',
-    payload: { code, platform }
+    payload: { files: code, platform }
   });
   toast('Export dialog opened');
   return true;

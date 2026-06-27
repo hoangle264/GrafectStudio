@@ -70,6 +70,29 @@ function cgGenerateViaHost(platform, diagId) {
   }
 
   try {
+    if (typeof cgShouldPushSiemensTia === 'function' && cgShouldPushSiemensTia()) {
+      const codegenPayload = cgBuildCSharpPayload(platform, diagId);
+      const tiaConfig = typeof cgGetSiemensTiaConfig === 'function' ? cgGetSiemensTiaConfig() : {};
+      if (!tiaConfig.deviceName || !tiaConfig.plcName || !tiaConfig.targetFolderPath) {
+        if (typeof cgSetSiemensLadStatus === 'function') cgSetSiemensLadStatus('Push failed: device, PLC, and block folder are required', false);
+        if (stat) stat.textContent = 'Siemens TIA target config is incomplete';
+        return false;
+      }
+      if (typeof cgSetSiemensLadStatus === 'function') cgSetSiemensLadStatus('Generating Siemens LAD XML in host...', null);
+      window.chrome.webview.postMessage({
+        type: 'PUSH_SIEMENS_LAD',
+        payload: {
+          platform: 'siemens-lad',
+          templateRootPath: codegenPayload.templateRootPath || '',
+          deviceLibraryPath: codegenPayload.deviceLibraryPath || '',
+          outputPath: codegenPayload.outputPath || '',
+          codegenPayload,
+          ...tiaConfig
+        }
+      });
+      return true;
+    }
+
     window.chrome.webview.postMessage({
       type: 'GENERATE_CODE',
       payload: cgBuildCSharpPayload(platform, diagId)

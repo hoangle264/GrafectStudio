@@ -38,3 +38,17 @@ public class ReadTemplateFilePayload
     public string RootPath { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
 }
+
+public class PushSiemensLadPayload
+{
+    public string DevPath { get; set; } = string.Empty;
+    public string Platform { get; set; } = "siemens-lad";
+    public string TemplatePath { get; set; } = string.Empty;
+    public string OutputPath { get; set; } = string.Empty;
+    public string RawJson { get; set; } = string.Empty;
+    public string ProjectPath { get; set; } = string.Empty;
+    public string DeviceName { get; set; } = string.Empty;
+    public string PlcName { get; set; } = string.Empty;
+    public string TargetFolderPath { get; set; } = string.Empty;
+    public string OverwriteMode { get; set; } = string.Empty;
+}

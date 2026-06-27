@@ -48,6 +48,18 @@ public partial class MainWindow : Window
         {
             var config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
             await bridge.SendSavedPathsAsync(config.DeviceLibraryPath, config.TemplatePath, config.OutputPath);
+            await bridge.SendSiemensTiaPushResultAsync(new
+            {
+                kind = "config",
+                config = new
+                {
+                    projectPath = config.SiemensTia.ProjectPath,
+                    deviceName = config.SiemensTia.DeviceName,
+                    plcName = config.SiemensTia.PlcName,
+                    targetFolderPath = config.SiemensTia.TargetFolderPath,
+                    overwriteMode = config.SiemensTia.OverwriteMode
+                }
+            });
             if (!string.IsNullOrWhiteSpace(config.DeviceLibraryPath) && File.Exists(config.DeviceLibraryPath))
             {
                 var projectJson = await File.ReadAllTextAsync(config.DeviceLibraryPath);
@@ -164,6 +176,24 @@ public partial class MainWindow : Window
                         RelativePath = GetOptionalString(payload, "relativePath")
                     };
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
+                    break;
+                }
+            case "PUSH_SIEMENS_LAD":
+                {
+                    var message = new PushSiemensLadPayload
+                    {
+                        DevPath = GetOptionalString(payload, "deviceLibraryPath"),
+                        Platform = GetOptionalString(payload, "platform"),
+                        TemplatePath = GetOptionalString(payload, "templateRootPath"),
+                        OutputPath = GetOptionalString(payload, "outputPath"),
+                        RawJson = payload.TryGetProperty("codegenPayload", out var codegenPayload) && codegenPayload.ValueKind == JsonValueKind.Object ? codegenPayload.GetRawText() : payload.GetRawText(),
+                        ProjectPath = GetOptionalString(payload, "projectPath"),
+                        DeviceName = GetOptionalString(payload, "deviceName"),
+                        PlcName = GetOptionalString(payload, "plcName"),
+                        TargetFolderPath = GetOptionalString(payload, "targetFolderPath"),
+                        OverwriteMode = GetOptionalString(payload, "overwriteMode")
+                    };
+                    _eventAggregator.GetEvent<PushSiemensLadRequestedEvent>().Publish(message);
                     break;
                 }
         }

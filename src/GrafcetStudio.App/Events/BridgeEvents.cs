@@ -29,3 +29,7 @@ public class BrowseCodegenPathRequestedEvent : PubSubEvent<BrowseCodegenPathPayl
 public class ReadTemplateFileRequestedEvent : PubSubEvent<ReadTemplateFilePayload>
 {
 }
+
+public class PushSiemensLadRequestedEvent : PubSubEvent<PushSiemensLadPayload>
+{
+}

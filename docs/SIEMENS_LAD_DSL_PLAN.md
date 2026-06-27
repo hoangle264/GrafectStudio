@@ -223,12 +223,13 @@ Checklist:
 - [x] Dang ky `UnavailableSiemensTiaProjectService` mac dinh de app khong crash khi may khong cai TIA.
 - [x] Ghi extension point cho implementation dung reflection hoac bridge rieng, khong reference cung Siemens TIA assemblies trong app chinh.
 - [x] Them tai lieu cau hinh quyen TIA Openness tai `docs/SIEMENS_TIA_OPENNESS_IMPORT.md`.
+- [x] Them tai lieu van hanh/checklist tai `docs/SIEMENS_TIA_OPENNESS_SETUP.md` va `docs/SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md`.
 - [x] Them mock/integration notes vi moi truong hien tai khong co TIA Portal.
 - [x] Them unit tests cho unavailable service.
-- [ ] Xac dinh version TIA Portal can ho tro: V16/V17/V18/V19/V20?
+- [x] Xac dinh version TIA Portal can ho tro ban dau: V17/V18/V19/V20; may hien tai phat hien TIA Portal V19 va PublicAPI V16-V19, chua xac nhan import/compile pass.
 - [x] Xac dinh vi tri Siemens Openness assemblies qua `GRAFCETSTUDIO_TIA_OPENNESS_DIR` tro toi PublicAPI folder.
 - [x] Tao service wrapper de tranh app chinh phu thuoc cung vao TIA DLL neu may khong cai TIA.
-- [ ] Them config path cho TIA Portal / project.
+- [x] Them config path cho TIA Portal / project.
 - [x] Them `ReflectionSiemensTiaProjectService` import XML vao block folder bang TIA Openness reflection runtime load.
 - [x] Ho tro overwrite mode best-effort qua TIA `ImportOptions` (`Override`/`Overwrite`, `Rename`, default).
 - [x] Tra loi ro neu TIA Openness chua duoc cau hinh trong implementation mac dinh.
@@ -240,18 +241,20 @@ Muc tieu: user chon Siemens LAD, chinh template va bam push.
 
 Checklist:
 
-- [ ] Them target `Siemens LAD XML` hoac `Siemens LAD Direct` vao modal codegen.
-- [ ] Them path/config:
+- [x] Them target `Siemens LAD XML` hoac `Siemens LAD Direct` vao modal codegen.
+- [x] Them path/config:
   - TIA project path
   - PLC target
   - block folder
   - template folder
-- [ ] Co 2 mode:
+- [x] Co 2 mode:
   - Preview XML
   - Push to TIA
-- [ ] Hien thi trang thai push/import.
+- [x] Hien thi trang thai push/import.
 - [ ] Cho phep mo/chinh `default.lad.json` tu UI template editor.
-- [ ] Luu config vao config service hien co.
+- [x] Luu config vao config service hien co.
+- [x] Noi WebView host bridge `PUSH_SIEMENS_LAD`: UI gui raw codegen payload + TIA target config, C# host tu generate `siemens-lad` XML roi goi `ISiemensTiaProjectService`.
+- [x] Them unit test boundary cho Siemens LAD push orchestrator generate XML truoc khi goi TIA service.
 
 ## Milestone 6 - Test thuc te voi TIA Portal
 
@@ -259,13 +262,27 @@ Muc tieu: xac nhan block import compile duoc trong TIA.
 
 Checklist:
 
+- [x] Kiem tra moi truong hien tai: phat hien TIA Portal V19 tai `C:\Program Files\Siemens\Automation\Portal V19` va PublicAPI V16-V19.
+- [x] Tao checklist manual test khi chua the xac nhan GUI/import/compile: `docs/SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md`.
 - [ ] Tao project TIA sample.
-- [ ] Import XML FC sinh ra tu `siemens-lad`.
-- [ ] Kiem tra network hien thi dung LAD.
+- [ ] Import XML FC sinh ra tu `siemens-lad` thu cong trong TIA Portal.
+- [ ] Push direct vao project bang TIA Openness reflection adapter.
+- [ ] Kiem tra network hien thi dung LAD Contact/Coil/OR/AND.
 - [ ] Kiem tra tag global/local dung scope.
 - [ ] Compile PLC software khong loi.
-- [ ] Test voi TIA V17 va version thuc te can ho tro.
+- [ ] Test voi TIA V19 tren may hien tai; sau do lap lai voi V17/V18/V20 neu can ho tro chinh thuc.
 - [ ] Ghi lai cac namespace/version khac nhau cua SimaticML neu co.
+
+Ket qua moi nhat:
+
+- 2026-06-27: TIA Portal V19/PublicAPI V16-V19 available, nhung chua thuc hien import XML/direct push/compile vi can project TIA sample va xac nhan GUI. Trang thai Milestone 6 la prepared only, chua pass.
+
+Loi thuong gap can kiem trong test:
+
+- Openness permission: user chua nam trong Siemens TIA Openness group hoac chua restart/sign-in lai.
+- Namespace/version mismatch: XML SimaticML khong khop schema cua TIA version dang import.
+- Block overwrite: block da ton tai va overwrite mode khong phu hop.
+- Missing global tags: scope `global` tham chieu PLC tags chua ton tai.
 
 ## Rui ro ky thuat
 
@@ -323,8 +340,11 @@ Khi bat dau phien moi, nen lam theo thu tu:
 
 Uu tien de xuat cho phien tiep theo:
 
-1. Render output preview voi extension `.xml` ro rang.
-2. Mo rong generator de sinh network theo tung step/action thay vi vi du dau tien.
-3. Tao JSON schema cho `templates/siemens-lad/*.json`.
+1. Chay manual import XML FC tren TIA Portal V19 voi project sample va ghi ket qua vao `docs/SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md`.
+2. Chay direct push bang `GRAFCETSTUDIO_TIA_OPENNESS_MODE=reflection` va PublicAPI V19, sau do compile PLC software.
+3. Export mot FC LAD mau tu TIA V19 de diff namespace/SimaticML voi XML generator.
+4. Them generator PLC tag table cho parameters scope `global` de giam loi missing global tags.
+5. Render output preview voi extension `.xml` ro rang.
+
 
 

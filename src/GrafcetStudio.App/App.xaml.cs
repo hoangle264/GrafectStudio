@@ -70,11 +70,13 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ConfigService>();
         containerRegistry.RegisterSingleton<CodeGenerationOrchestrator>();
         containerRegistry.RegisterSingleton<FileIOOrchestrator>();
+        containerRegistry.RegisterSingleton<SiemensTiaPushOrchestrator>();
         RegisterAiServices(containerRegistry);
         containerRegistry.RegisterSingleton<AiRequestOrchestrator>();
 
         Container.Resolve<CodeGenerationOrchestrator>().Init();
         Container.Resolve<FileIOOrchestrator>().Init();
+        Container.Resolve<SiemensTiaPushOrchestrator>().Init();
         Container.Resolve<AiRequestOrchestrator>();
     }
 
