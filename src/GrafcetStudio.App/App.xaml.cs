@@ -1,5 +1,7 @@
-﻿using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Generators.Siemens;
 using GrafcetStudio.App.Services.Ai;
+using GrafcetStudio.App.Services.Siemens;
 using GrafcetStudio.App.Services;
 using GrafcetStudio.CodeGen.Profile;
 using GrafcetStudio.CodeGen.Template;
@@ -46,12 +48,14 @@ public partial class App : PrismApplication
     {
         containerRegistry.RegisterSingleton<IWebViewBridgeService, WebViewBridgeService>();
         containerRegistry.RegisterSingleton<IFileService, FileService>();
+        RegisterSiemensTiaServices(containerRegistry);
         containerRegistry.RegisterSingleton<ISequenceResolver, SequenceResolver>();
         containerRegistry.RegisterSingleton<ICodeGenerator, KeyenceMnemonicGenerator>();
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Kv8000.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Melsec.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Omron.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Siemens.Id));
+        containerRegistry.RegisterSingleton<ICodeGenerator, SiemensLadDslGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, RuntimePlanGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
         containerRegistry.RegisterSingleton<UnitConfigGenerator>();
@@ -146,6 +150,17 @@ public partial class App : PrismApplication
         throw new InvalidOperationException("AI mock streaming failure fixture did not fail: " + fixtureName);
     }
 
+    private static void RegisterSiemensTiaServices(IContainerRegistry containerRegistry)
+    {
+        var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE")?.Trim();
+        if (string.Equals(mode, "reflection", StringComparison.OrdinalIgnoreCase))
+        {
+            containerRegistry.RegisterSingleton<ISiemensTiaProjectService, ReflectionSiemensTiaProjectService>();
+            return;
+        }
+
+        containerRegistry.RegisterSingleton<ISiemensTiaProjectService, UnavailableSiemensTiaProjectService>();
+    }
     private static void RegisterAiServices(IContainerRegistry containerRegistry)
     {
         var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_AI_MODE")?.Trim();
@@ -162,6 +177,4 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
     }
 }
-
-
 

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grafcetstudio.local/schemas/siemens-lad-template.schema.json",
+  "title": "GrafcetStudio Siemens LAD DSL Template",
+  "description": "Schema for GrafcetStudio Siemens LAD JSON DSL templates used by the siemens-lad generator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "platform", "parameters", "networks"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional schema URI for editor tooling."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "DSL template version. Current default templates use 1.0."
+    },
+    "platform": {
+      "const": "siemens-lad",
+      "description": "Generator platform identifier."
+    },
+    "tiaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "TIA Portal / SimaticML target version metadata."
+    },
+    "blockName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Generated FC block name. Supports text placeholders such as {{unit.name}}."
+    },
+    "blockNumber": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Generated FC block number."
+    },
+    "parameters": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Named operands available to expression trees and output coils.",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "networks": {
+      "type": "array",
+      "minItems": 1,
+      "description": "LAD networks rendered into the generated FC.",
+      "items": { "$ref": "#/$defs/network" }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique parameter key referenced by TAG expressions and outputs."
+        },
+        "source": {
+          "type": "string",
+          "description": "Value source resolved from the current render context, or a custom source string that falls back to default/source text.",
+          "examples": ["step.execAddress", "step.doneAddress", "transition.condition", "action.address", "action.variable", "my.custom.source"]
+        },
+        "default": {
+          "type": ["string", "null"],
+          "description": "Fallback operand/tag value when source cannot resolve in the current context."
+        },
+        "scope": {
+          "type": "string",
+          "description": "Operand scope. global creates a global variable access; FC interface scopes create interface entries; local/unknown uses local variable access.",
+          "examples": ["global", "local", "input", "output", "inout", "temp", "constant"]
+        },
+        "dataType": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Siemens data type used when the parameter is added to the FC interface. Boolean/Bool are typical for LAD contacts and coils."
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "expression", "output"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Network identifier used in diagnostics."
+        },
+        "repeat": {
+          "type": "string",
+          "enum": ["once", "steps", "transitions", "actions"],
+          "default": "once",
+          "description": "Render mode: once, for every step, for every transition, or for every step action."
+        },
+        "title": {
+          "type": "string",
+          "description": "Network title. Supports text placeholders."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Network comment. Supports text placeholders."
+        },
+        "expression": {
+          "$ref": "#/$defs/expression",
+          "description": "Recursive expression tree rendered as LAD contacts/branches."
+        },
+        "output": {
+          "$ref": "#/$defs/output",
+          "description": "Output coil for the network."
+        }
+      }
+    },
+    "expression": {
+      "oneOf": [
+        { "$ref": "#/$defs/tagExpression" },
+        { "$ref": "#/$defs/andExpression" },
+        { "$ref": "#/$defs/orExpression" },
+        { "$ref": "#/$defs/notExpression" }
+      ]
+    },
+    "tagExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ref"],
+      "properties": {
+        "type": { "const": "TAG" },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Parameter key to read as a LAD contact."
+        },
+        "negated": {
+          "type": "boolean",
+          "description": "Optional legacy flag for negated contacts. Prefer an explicit NOT node."
+        }
+      }
+    },
+    "andExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "nodes"],
+      "properties": {
+        "type": { "const": "AND" },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/expression" },
+          "description": "Child expressions connected in series."
+        }
+      }
+    },
+    "orExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "nodes"],
+      "properties": {
+        "type": { "const": "OR" },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/expression" },
+          "description": "Child expressions connected as parallel branches."
+        }
+      }
+    },
+    "notExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "node"],
+      "properties": {
+        "type": { "const": "NOT" },
+        "node": {
+          "$ref": "#/$defs/tagExpression",
+          "description": "Negated child contact. Runtime validation currently supports NOT around TAG only."
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ref"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["coil", "set_coil", "reset_coil"],
+          "description": "LAD output coil type."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Parameter key used as the coil operand."
+        }
+      }
+    }
+  }
+}

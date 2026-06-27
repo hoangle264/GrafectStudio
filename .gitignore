@@ -44,5 +44,8 @@ _ReSharper*/
 node_modules/
 
 #template
-templates/
+templates/**
+!templates/siemens-lad/
+templates/siemens-lad/**
+!templates/siemens-lad/default.lad.json
 config/

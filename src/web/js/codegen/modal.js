@@ -45,7 +45,8 @@ function showGenerateCodeModal() {
             <option value="kv-8000">Keyence KV-8000</option>
             <option value="melsec">Mitsubishi MELSEC</option>
             <option value="omron">OMRON</option>
-            <option value="siemens">Siemens</option>
+            <option value="siemens">Siemens AWL</option>
+            <option value="siemens-lad">Siemens LAD XML</option>
             <option value="twincat-st">TwinCAT ST</option>
             <option value="csharp-kv-5500">C# Keyence KV demo</option>
             <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
