@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.CodeGen.Runtime.Models;
+using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.CodeGen.Runtime;
@@ -58,9 +58,17 @@ public static class RuntimePlanBuilder
         return new DiagramRuntimePlan
         {
             Diagram = diagram,
-            BaseMr = flow.Diagram?.BaseMr ?? 0,
+            BaseMr = ParseBaseMrNumber(flow.Diagram?.BaseMr),
             StepPlans = stepPlans,
             OutputBindingPlan = outputBindingPlan
         };
+    }
+
+    private static int ParseBaseMrNumber(string? value)
+    {
+        var text = (value ?? string.Empty).Trim().TrimStart('@');
+        var prefixLength = text.TakeWhile(char.IsLetter).Count();
+        if (prefixLength <= 0 || prefixLength >= text.Length) return 0;
+        return int.TryParse(text[prefixLength..], out var number) ? number : 0;
     }
 }

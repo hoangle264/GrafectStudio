@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>GrafcetStudio.TiaBridge.V19</AssemblyName>
+    <RootNamespace>GrafcetStudio.TiaBridge.V19</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GrafcetStudio.TiaBridge.Contracts\GrafcetStudio.TiaBridge.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+  <Choose>
+    <When Condition="Exists('$(GRAFCETSTUDIO_TIA_OPENNESS_DIR)\Siemens.Engineering.dll')">
+      <ItemGroup>
+        <Reference Include="Siemens.Engineering">
+          <HintPath>$(GRAFCETSTUDIO_TIA_OPENNESS_DIR)\Siemens.Engineering.dll</HintPath>
+          <Private>false</Private>
+        </Reference>
+      </ItemGroup>
+    </When>
+    <When Condition="Exists('C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll')">
+      <ItemGroup>
+        <Reference Include="Siemens.Engineering">
+          <HintPath>C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll</HintPath>
+          <Private>false</Private>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+</Project>

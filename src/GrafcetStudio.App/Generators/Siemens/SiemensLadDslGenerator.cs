@@ -524,10 +524,3 @@ public sealed class SiemensLadOutput
     [JsonPropertyName("type")] public string Type { get; set; } = "coil";
     [JsonPropertyName("ref")] public string Ref { get; set; } = string.Empty;
 }
-
-
-
-
-
-
-

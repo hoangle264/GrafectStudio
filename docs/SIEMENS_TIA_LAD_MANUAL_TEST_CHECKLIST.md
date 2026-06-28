@@ -33,11 +33,11 @@ Checklist nay dung de xac nhan thuc te Siemens LAD XML/direct push voi TIA Porta
 
 ## Push direct vao TIA
 
-- [ ] Set `GRAFCETSTUDIO_TIA_OPENNESS_MODE=reflection`.
-- [ ] Set `GRAFCETSTUDIO_TIA_OPENNESS_DIR` toi PublicAPI version dung, vi du `C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19`.
-- [ ] Cau hinh `ProjectPath`, `DeviceName`, `PlcName`, `TargetFolderPath`, `BlockName`, `OverwriteMode` trong UI GrafcetStudio.
-- [ ] Mo project trong TIA Portal hoac cung cap `ProjectPath` hop le de adapter mo project.
-- [ ] Bam Push to TIA tu GrafcetStudio.
+- [ ] Set `GRAFCETSTUDIO_TIA_IMPORT_MODE=bridge` hoac bo trong de dung mac dinh bridge-first.
+- [ ] Neu bridge exe khong nam canh app, set `GRAFCETSTUDIO_TIA_BRIDGE_PATH` toi `GrafcetStudio.TiaBridge.V19.exe`.
+- [ ] Neu can test reflection legacy, set them `GRAFCETSTUDIO_TIA_OPENNESS_DIR` toi PublicAPI version dung.
+- [ ] Neu can test reflection legacy, set them `GRAFCETSTUDIO_TIA_OPENNESS_DIR` toi PublicAPI version dung.
+- [ ] Mo project trong TIA Portal hoac cung cap `ProjectPath` hop le de bridge mo project, sau do bam Push to TIA tu GrafcetStudio.
 - [ ] Xac nhan ket qua push tra ve success va block xuat hien trong folder dich.
 - [ ] Mo block vua push va xac nhan Contact/Coil/OR/AND dung voi preview XML.
 - [ ] Compile PLC software va ghi ket qua.
@@ -57,3 +57,7 @@ Checklist nay dung de xac nhan thuc te Siemens LAD XML/direct push voi TIA Porta
 | Block overwrite | Import/push that bai vi block da ton tai. | Test ro `FailIfExists`, `Overwrite`, `Rename`; voi direct push dung `OverwriteMode=Overwrite` khi chap nhan ghi de. |
 | Missing global tags | Compile loi unknown tag/global variable not found. | Tao PLC tag table truoc, doi parameter scope sang local/input/output neu phu hop, hoac bo sung generator tag table trong milestone sau. |
 | Wrong target path | Direct push tra `DeviceNotFound`, `PlcNotFound`, hoac `TargetFolderNotFound`. | Copy dung ten device/PLC/folder tu project tree TIA; dung folder path tu Program blocks, vi du `Program blocks/Grafcet`. |
+
+
+
+

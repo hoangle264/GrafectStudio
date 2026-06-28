@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GRAFCET Studio — IEC 60848</title>
+    <title>GRAFCET Studio - IEC 60848</title>
     <link rel="stylesheet" href="css/grafcet-studio.css">
 </head>
 
@@ -21,23 +21,23 @@
             </div>
             <div class="menu"> <button class="menu-btn">Tools</button>
                 <div class="menu-pop"> <button onclick="showExcelImportModal()">Import CSV/Excel</button> <button onclick="showExportTablesModal()">Tables</button> <button onclick="showGenerateCodeModal()">Code</button> <button onclick="toggleAiChatPanel(true)">AI Preview</button> </div>
-            </div> <button class="btn" onclick="newProject()">✦ New Project</button> <button class="btn a" onclick="saveDiagram()">⬇ Save</button> <button class="btn g" onclick="exportHTML()">⬆ Export HTML</button> <button class="btn p" onclick="exportProject()">⬆ Export Project</button> <button class="btn btn-cyan" onclick="showExportTablesModal()">⊞ Tables</button> <button class="btn btn-purple" onclick="showGenerateCodeModal()">⟨/⟩ Code</button> <button class="btn btn-cyan" onclick="toggleAiChatPanel(true)">AI Preview</button> <button class="btn" onclick="triggerImport()">↑ Import</button> <input type="file" id="file-input" accept=".json,.grafcet,.grafcet2" class="is-hidden" onchange="handleImport(event)">
+            </div> <button class="btn" onclick="newProject()">âœ¦ New Project</button> <button class="btn a" onclick="saveDiagram()">â¬‡ Save</button> <button class="btn g" onclick="exportHTML()">â¬† Export HTML</button> <button class="btn p" onclick="exportProject()">â¬† Export Project</button> <button class="btn btn-cyan" onclick="showExportTablesModal()">âŠž Tables</button> <button class="btn btn-purple" onclick="showGenerateCodeModal()">âŸ¨/âŸ© Code</button> <button class="btn btn-cyan" onclick="toggleAiChatPanel(true)">AI Preview</button> <button class="btn" onclick="triggerImport()">â†‘ Import</button> <input type="file" id="file-input" accept=".json,.grafcet,.grafcet2" class="is-hidden" onchange="handleImport(event)">
         </nav>
     </header>
     <main class="app"> <!-- Left Sidebar -->
         <aside class="sidebar" id="sidebar" aria-label="Project and tools panels"> <!-- Collapsed strip -->
-            <div class="sidebar-strip"> <button class="sidebar-strip-btn" onclick="toggleSidebar()" title="Open sidebar">▶</button> <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('proj')" title="Project">📁</button> <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('tools')" title="Tools">🔧</button>
+            <div class="sidebar-strip"> <button class="sidebar-strip-btn" onclick="toggleSidebar()" title="Open sidebar">â–¶</button> <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('proj')" title="Project">ðŸ“</button> <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('tools')" title="Tools">ðŸ”§</button>
                 <div class="sidebar-strip-label">PANELS</div>
             </div>
-            <div class="sidebar-content"> <!-- ══ PROJECT Panel ══ -->
+            <div class="sidebar-content"> <!-- â•â• PROJECT Panel â•â• -->
                 <div class="sidebar-panel active" id="sidebar-panel-proj"> <!-- Panel header -->
-                    <div class="sub-panel-head"> <span class="sub-panel-title">📁 PROJECT</span> <button class="panel-head-btn" onclick="addUnit()" title="Add Unit">⊕ Unit</button> </div>
+                    <div class="sub-panel-head"> <span class="sub-panel-title">ðŸ“ PROJECT</span> <button class="panel-head-btn" onclick="addUnit()" title="Add Unit">âŠ• Unit</button> </div>
                     <div class="panel-scroll">
                         <div class="tree-body" id="tree-body"></div>
                     </div>
-                </div> <!-- ══ TOOLS Panel ══ -->
+                </div> <!-- â•â• TOOLS Panel â•â• -->
                 <div class="sidebar-panel" id="sidebar-panel-tools"> <!-- Panel header -->
-                    <div class="sub-panel-head"> <span class="sub-panel-title">🔧 TOOLS</span> </div>
+                    <div class="sub-panel-head"> <span class="sub-panel-title">ðŸ”§ TOOLS</span> </div>
                     <div class="panel-scroll">
                         <div class="tools-panel">
                             <div class="tool-section">
@@ -98,16 +98,16 @@
                             </div>
                             <div class="tool-section">
                                 <div class="tool-section-title">VIEW</div> <button class="tbtn" onclick="zoomIn()">
-                                    <div class="ticon">🔍+</div>Zoom In<span class="kbd">+</span>
+                                    <div class="ticon">ðŸ”+</div>Zoom In<span class="kbd">+</span>
                                 </button> <button class="tbtn" onclick="zoomOut()">
-                                    <div class="ticon">🔍−</div>Zoom Out<span class="kbd">−</span>
+                                    <div class="ticon">ðŸ”âˆ’</div>Zoom Out<span class="kbd">âˆ’</span>
                                 </button> <button class="tbtn" onclick="fitView()">
-                                    <div class="ticon">⛶</div>Fit View<span class="kbd">F</span>
+                                    <div class="ticon">â›¶</div>Fit View<span class="kbd">F</span>
                                 </button>
                             </div>
                             <div class="tool-section">
                                 <div class="tool-section-title">SNAP</div> <button class="tbtn active" id="tb-snap" onclick="toggleSnap()">
-                                    <div class="ticon">⊞</div>Grid Snap
+                                    <div class="ticon">âŠž</div>Grid Snap
                                 </button>
                             </div> <!-- Alignment Panel -->
                             <div class="align-panel">
@@ -162,12 +162,12 @@
                             </div><!-- /align-panel -->
                         </div><!-- /tools-panel -->
                     </div><!-- /scrollable area tools -->
-                </div><!-- /sidebar-panel-tools --> <!-- ══ Bottom Tab Bar ══ -->
-                <div class="sidebar-tab-bar"> <button class="sidebar-tab active" id="stab-proj" onclick="switchSidebarTab('proj')"> 📁 PROJECT </button> <button class="sidebar-tab" id="stab-tools" onclick="switchSidebarTab('tools')"> 🔧 TOOLS </button> </div>
-            </div><!-- /sidebar-content --> <button class="sidebar-strip-btn sidebar-toggle-floating" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">◀</button>
+                </div><!-- /sidebar-panel-tools --> <!-- â•â• Bottom Tab Bar â•â• -->
+                <div class="sidebar-tab-bar"> <button class="sidebar-tab active" id="stab-proj" onclick="switchSidebarTab('proj')"> ðŸ“ PROJECT </button> <button class="sidebar-tab" id="stab-tools" onclick="switchSidebarTab('tools')"> ðŸ”§ TOOLS </button> </div>
+            </div><!-- /sidebar-content --> <button class="sidebar-strip-btn sidebar-toggle-floating" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">â—€</button>
         </aside><!-- /sidebar --> <!-- Main Area -->
         <section class="main-area" aria-label="Diagram workspace"> <!-- Tabs -->
-            <div class="tabs-bar" id="tabs-bar"> <button class="tab-new" onclick="addDiagram()" title="New Diagram">＋</button> </div> <!-- Canvas -->
+            <div class="tabs-bar" id="tabs-bar"> <button class="tab-new" onclick="addDiagram()" title="New Diagram">ï¼‹</button> </div> <!-- Canvas -->
             <div class="canvas-wrap" id="canvas-wrap"> <canvas id="grid-canvas"></canvas> <svg id="svg-canvas" onmousedown="cvDown(event)" onmousemove="cvMove(event)" onmouseup="cvUp(event)" oncontextmenu="cvRClick(event)" ondblclick="cvDbl(event)">
                     <defs>
                         <marker id="arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
@@ -187,12 +187,12 @@
                         <path id="ghost-path" d="" stroke="#f5a623" stroke-width="1.5" stroke-dasharray="6,3" fill="none" display="none" pointer-events="none" />
                     </g>
                 </svg>
-                <div class="conn-hint" id="conn-hint">Click on Step/Transition/ParallelBar to connect — ESC to cancel</div>
+                <div class="conn-hint" id="conn-hint">Click on Step/Transition/ParallelBar to connect â€” ESC to cancel</div>
                 <div class="mini-map"><svg id="mini-svg"></svg></div>
-            </div> <!-- Global Vars Tab Panel (virtual tab — shown when __vars__ tab is active) -->
+            </div> <!-- Global Vars Tab Panel (virtual tab â€” shown when __vars__ tab is active) -->
             <section id="gvt-main-panel" class="virtual-panel is-hidden" aria-label="Variables">
-                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">📋 VARIABLES</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import từ CSV/Excel">📥 Import</button> <button class="panel-head-btn" onclick="gvtAddUserVar()" title="Add user variable">+ User Var</button> </div>
-                <div class="gvt-toolbar"> <input id="gvt-search" type="text" placeholder="🔍 Filter..." class="gvt-search-input" oninput="renderGlobalVarTable()"> <span id="gvt-count" class="muted-mini">0 struct data</span> </div>
+                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ“‹ VARIABLES</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import tá»« CSV/Excel">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="gvtAddUserVar()" title="Add user variable">+ User Var</button> </div>
+                <div class="gvt-toolbar"> <input id="gvt-search" type="text" placeholder="ðŸ” Filter..." class="gvt-search-input" oninput="renderGlobalVarTable()"> <span id="gvt-count" class="muted-mini">0 struct data</span> </div>
                 <div class="panel-scroll">
                     <table class="vt-table table-full">
                         <thead>
@@ -208,7 +208,7 @@
                 </div>
             </section>
             <section id="iomap-main-panel" class="virtual-panel is-hidden" aria-label="IO Mapping">
-                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">🔌 IO MAPPING</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import Physical IO">📥 Import</button> <button class="panel-head-btn" onclick="exportIOCode()" title="Export IO Mapping Code">⬇ Export Code</button> <button class="panel-head-btn" onclick="clearIOMappingImport()" title="Clear IO Mapping imported data">Clear Data</button> </div>
+                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ”Œ IO MAPPING</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import Physical IO">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="exportIOCode()" title="Export IO Mapping Code">â¬‡ Export Code</button> <button class="panel-head-btn" onclick="clearIOMappingImport()" title="Clear IO Mapping imported data">Clear Data</button> </div>
                 <div class="gvt-toolbar"> <select id="iomap-filter" class="gvt-search-input iomap-filter" onchange="renderIOMappingTable(this.value)">
                         <option value="All">All</option>
                         <option value="Input">Input</option>
@@ -427,8 +427,8 @@
                                 <button class="dp-chip dp-chip-auto" data-bool-mode="linear" onclick="dpSetBoolAddressMode('linear')">Linear</button>
                                 <button class="dp-chip dp-chip-origin" data-bool-mode="block" onclick="dpSetBoolAddressMode('block')">Block</button>
                             </div>
-                            <div class="dp-label">Base MR</div>
-                            <input class="dp-input" id="dp-base-mr" type="number" min="0" step="1" oninput="dpLiveUpdate()">
+                            <div class="dp-label">Base address</div>
+                            <input class="dp-input" id="dp-base-mr" type="text" placeholder="MR100" oninput="dpLiveUpdate()">
                         </div>
 
                         <div id="dp-word-address-fields">
@@ -478,26 +478,26 @@
         <div class="s-dot" id="s-dot"></div> <span id="s-tool">SELECT</span> <span>Steps: <b id="s-steps">0</b></span> <span>Trans: <b id="s-trans">0</b></span> <span>Bars: <b id="s-bars">0</b></span> <span>Conns: <b id="s-conns">0</b></span> <span class="status-spacer">Zoom: <b id="s-zoom">100%</b></span> <span>X:<b id="s-cx">0</b> Y:<b id="s-cy">0</b></span>
     </footer> <!-- Context Menu -->
     <div class="ctx" id="ctx">
-        <div class="ctx-i" onclick="ctxEdit()">✎ Properties</div>
-        <div class="ctx-i" onclick="ctxDup()">⊞ Duplicate</div>
+        <div class="ctx-i" onclick="ctxEdit()">âœŽ Properties</div>
+        <div class="ctx-i" onclick="ctxDup()">âŠž Duplicate</div>
         <div class="ctx-sep"></div>
-        <div class="ctx-i" onclick="ctxConn()">⊸ Connect from here</div>
+        <div class="ctx-i" onclick="ctxConn()">âŠ¸ Connect from here</div>
         <div class="ctx-sep"></div>
-        <div class="ctx-i r" onclick="ctxDel()">⊘ Delete</div>
+        <div class="ctx-i r" onclick="ctxDel()">âŠ˜ Delete</div>
     </div> <!-- Tree Context Menu -->
     <div class="tree-ctx" id="tree-ctx">
-        <div class="tree-ctx-i" id="tctx-open" onclick="tctxOpen()">📂 Open Diagram</div>
-        <div class="tree-ctx-i" id="tctx-rename" onclick="tctxRename()">✎ Rename</div>
-        <div class="tree-ctx-i" id="tctx-dup" onclick="tctxDup()">⊞ Duplicate</div>
+        <div class="tree-ctx-i" id="tctx-open" onclick="tctxOpen()">ðŸ“‚ Open Diagram</div>
+        <div class="tree-ctx-i" id="tctx-rename" onclick="tctxRename()">âœŽ Rename</div>
+        <div class="tree-ctx-i" id="tctx-dup" onclick="tctxDup()">âŠž Duplicate</div>
         <div class="tree-ctx-sep"></div>
-        <div class="tree-ctx-i r" id="tctx-del" onclick="tctxDel()">⊘ Delete</div>
+        <div class="tree-ctx-i r" id="tctx-del" onclick="tctxDel()">âŠ˜ Delete</div>
     </div> <!-- Export Tables Modal -->
     <div class="modal-bg modal-bg-stretch" id="modal-tables">
         <section class="modal modal-wide"> <!-- Modal header -->
-            <header class="modal-header"> <span class="modal-title-accent">⊞ EXPORT TABLES</span> <span id="et-diag-name" class="modal-subtitle"></span>
-                <div class="modal-actions"> <button class="btn btn-cyan" onclick="etExportHTML()">⬆ Export HTML</button> <button class="btn a" onclick="etExportCSV()">⬆ Export CSV</button> <button class="btn" onclick="closeModal('modal-tables')">✕ Close</button> </div>
+            <header class="modal-header"> <span class="modal-title-accent">âŠž EXPORT TABLES</span> <span id="et-diag-name" class="modal-subtitle"></span>
+                <div class="modal-actions"> <button class="btn btn-cyan" onclick="etExportHTML()">â¬† Export HTML</button> <button class="btn a" onclick="etExportCSV()">â¬† Export CSV</button> <button class="btn" onclick="closeModal('modal-tables')">âœ• Close</button> </div>
             </header> <!-- Tab bar -->
-            <nav class="modal-tabbar" aria-label="Export table tabs"> <button class="et-tab active" id="et-tab-steps" onclick="etShowTab('steps')">📋 Steps</button> <button class="et-tab" id="et-tab-transitions" onclick="etShowTab('transitions')">⇌ Transitions</button> <button class="et-tab" id="et-tab-branches" onclick="etShowTab('branches')">⊸ Parallel Branches</button> <button class="et-tab" id="et-tab-vars" onclick="etShowTab('vars')">⊞ Variables</button> </nav> <!-- Table area -->
+            <nav class="modal-tabbar" aria-label="Export table tabs"> <button class="et-tab active" id="et-tab-steps" onclick="etShowTab('steps')">ðŸ“‹ Steps</button> <button class="et-tab" id="et-tab-transitions" onclick="etShowTab('transitions')">â‡Œ Transitions</button> <button class="et-tab" id="et-tab-branches" onclick="etShowTab('branches')">âŠ¸ Parallel Branches</button> <button class="et-tab" id="et-tab-vars" onclick="etShowTab('vars')">âŠž Variables</button> </nav> <!-- Table area -->
             <div class="modal-table-content" id="et-content"></div>
         </section>
     </div> <!-- Unit Modal -->
@@ -505,13 +505,13 @@
         <div class="modal">
             <h2 id="modal-unit-title">ADD UNIT</h2>
             <div class="modal-field-label">UNIT NAME</div> <input type="text" id="modal-unit-name" placeholder="e.g. Unit_01_Dispensing">
-            <div class="modal-btns"> <button class="btn" onclick="closeModal('modal-unit')">Cancel</button> <button class="btn a" onclick="confirmUnit()">✓ Confirm</button> </div>
+            <div class="modal-btns"> <button class="btn" onclick="closeModal('modal-unit')">Cancel</button> <button class="btn a" onclick="confirmUnit()">âœ“ Confirm</button> </div>
         </div>
     </div> <!-- Project Rename Modal -->
     <div class="modal-bg" id="modal-rename">
         <div class="modal">
             <h2>RENAME</h2> <input type="text" id="modal-input" placeholder="Enter name...">
-            <div class="modal-btns"> <button class="btn" onclick="closeModal('modal-rename')">Cancel</button> <button class="btn a" onclick="confirmRename()">✓ Confirm</button> </div>
+            <div class="modal-btns"> <button class="btn" onclick="closeModal('modal-rename')">Cancel</button> <button class="btn a" onclick="confirmRename()">âœ“ Confirm</button> </div>
         </div>
     </div>
     <script src="js/core/interop.js"></script>

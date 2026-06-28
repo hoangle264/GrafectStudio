@@ -154,11 +154,15 @@ public partial class App : PrismApplication
 
     private static void RegisterSiemensTiaServices(IContainerRegistry containerRegistry)
     {
-        var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE")?.Trim();
+        var mode = Environment.GetEnvironmentVariable(BridgeSiemensTiaProjectService.ImportModeEnvironmentVariable)?.Trim();
+        if (string.Equals(mode, "bridge", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(mode))
+        {
+            containerRegistry.RegisterInstance<ISiemensTiaProjectService>(new BridgeSiemensTiaProjectService());
+            return;
+        }
+
         if (string.Equals(mode, "reflection", StringComparison.OrdinalIgnoreCase))
         {
-            // Register an explicit instance so the container cannot choose the test-only
-            // Func<string?> constructor and inject a provider that returns null.
             containerRegistry.RegisterInstance<ISiemensTiaProjectService>(new ReflectionSiemensTiaProjectService());
             return;
         }
@@ -181,4 +185,5 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
     }
 }
+
 

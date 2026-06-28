@@ -279,27 +279,28 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
             return FormatWordStepExecAddress(diagram?.ActiveWord, stepNumber + 1);
         }
 
-        var baseMr = diagram?.BaseMr ?? ResolveBoolBaseMr(parsedAddress, stepNumber, diagram?.BoolAddressMode);
+        var parsedBase = TryParseAddressBase(diagram?.BaseMr, out var configuredBase)
+            ? configuredBase
+            : ResolveBoolBase(parsedAddress, stepNumber, diagram?.BoolAddressMode);
         var offset = stepNumber * 2;
-        var nextNumber = ResolveBoolMr(baseMr, offset, diagram?.BoolAddressMode);
-        return $"@MR{nextNumber}";
+        var nextNumber = ResolveBoolMr(parsedBase.Number, offset, diagram?.BoolAddressMode);
+        return FormatAddressBase(parsedBase.Prefix, nextNumber, parsedBase.Width);
     }
-
-    private static int ResolveBoolBaseMr(StepExecAddress parsedAddress, int stepNumber, string? boolAddressMode)
+    private static ParsedBoolBase ResolveBoolBase(StepExecAddress parsedAddress, int stepNumber, string? boolAddressMode)
     {
         var offset = Math.Max(0, (stepNumber - 1) * 2);
         if (string.Equals(boolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
         {
-            return parsedAddress.Number - (offset / 16) * 100 - (offset % 16);
+            return new ParsedBoolBase(parsedAddress.Prefix, parsedAddress.Number - (offset / 8) * 100 - (offset % 8), 0);
         }
 
-        return parsedAddress.Number - offset;
+        return new ParsedBoolBase(parsedAddress.Prefix, parsedAddress.Number - offset, 0);
     }
 
     private static int ResolveBoolMr(int baseMr, int offset, string? boolAddressMode)
     {
         return string.Equals(boolAddressMode, "block", StringComparison.OrdinalIgnoreCase)
-            ? baseMr + (offset / 16) * 100 + offset % 16
+            ? baseMr + (offset / 8) * 100 + offset % 8
             : baseMr + offset;
     }
 
@@ -311,7 +312,7 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
         var wordOffset = bitIndex / 16;
         var bit = bitIndex % 16;
         var word = FormatWordAddress(activeWord, wordOffset);
-        return $"@{word}.{bit}";
+        return $"{word}.{bit}";
     }
 
     private static string FormatWordAddress(string? baseWord, int offset)
@@ -328,8 +329,25 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
 
     private static string IncrementParsedAddress(StepExecAddress parsedAddress)
         => parsedAddress.HasBit
-            ? $"@{parsedAddress.Prefix}{parsedAddress.Number}.{parsedAddress.Bit + 1}"
-            : $"@{parsedAddress.Prefix}{parsedAddress.Number + 1}";
+            ? $"{parsedAddress.Prefix}{parsedAddress.Number}.{parsedAddress.Bit + 1}"
+            : $"{parsedAddress.Prefix}{parsedAddress.Number + 1}";
+
+    private static bool TryParseAddressBase(string? value, out ParsedBoolBase parsed)
+    {
+        parsed = default;
+        var text = (value ?? string.Empty).Trim().TrimStart('@');
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var prefixLength = text.TakeWhile(char.IsLetter).Count();
+        if (prefixLength <= 0 || prefixLength >= text.Length) return false;
+        var prefix = text[..prefixLength].ToUpperInvariant();
+        var numberText = text[prefixLength..];
+        if (!int.TryParse(numberText, out var number)) return false;
+        parsed = new ParsedBoolBase(prefix, number, numberText.Length > 1 ? numberText.Length : 0);
+        return true;
+    }
+
+    private static string FormatAddressBase(string prefix, int number, int width)
+        => width > 0 ? $"{prefix}{number.ToString().PadLeft(width, '0')}" : $"{prefix}{number}";
 
     private static bool TryParseStepExecAddress(string? address, DiagramInfo? diagram, out StepExecAddress parsed)
     {
@@ -356,12 +374,12 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
     {
         if (string.Equals(prefix, "MR", StringComparison.OrdinalIgnoreCase))
         {
-            if (diagram?.BaseMr is int baseMr && string.Equals(diagram.BoolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
+            if (TryParseAddressBase(diagram?.BaseMr, out var baseMr) && string.Equals(diagram.BoolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
             {
-                var relative = number - baseMr;
+                var relative = number - baseMr.Number;
                 if (relative >= 0)
                 {
-                    return ((long)(relative / 100) * 16) + relative % 100;
+                    return ((long)(relative / 100) * 8) + relative % 100;
                 }
             }
 
@@ -370,6 +388,8 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
 
         return ((long)number * 16) + bit;
     }
+
+    private readonly record struct ParsedBoolBase(string Prefix, int Number, int Width);
 
     private readonly record struct StepExecAddress(string Prefix, int Number, bool HasBit, int Bit, long SortValue);
 
@@ -818,4 +838,5 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
 internal static class StepLabelExtensions
 {
     public static string LabelOrId(this Step step) => !string.IsNullOrWhiteSpace(step.Label) ? step.Label : step.Id;
+    private readonly record struct ParsedBoolBase(string Prefix, int Number, int Width);
 }

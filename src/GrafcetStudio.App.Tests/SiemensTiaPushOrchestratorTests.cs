@@ -7,6 +7,7 @@ using GrafcetStudio.Domain.Models;
 using HandlebarsDotNet;
 using Microsoft.Web.WebView2.Wpf;
 using Prism.Events;
+using System.Text.Json;
 using Xunit;
 
 namespace GrafcetStudio.App.Tests;
@@ -47,6 +48,51 @@ public class SiemensTiaPushOrchestratorTests
         Assert.Equal(SiemensOverwriteMode.Overwrite, tia.Request.OverwriteMode);
         Assert.Contains("SW.Blocks.FC", tia.Request.XmlContent);
         Assert.NotNull(bridge.LastPushResult);
+
+        var json = JsonSerializer.Serialize(bridge.LastPushResult);
+        Assert.Contains("generatedXmlPath", json);
+        Assert.Contains("generated successfully", json);
+        Assert.Contains("completed successfully", json);
+    }
+
+    [Fact]
+    public async Task PushAsync_ReportsManualFallbackWhenBridgeIsMissing()
+    {
+        var codegen = new FakeCodeGeneratorService();
+        var tia = new FailingSiemensTiaProjectService(SiemensPushResult.Failure(
+            SiemensTiaProjectServiceStatus.BridgeNotFound,
+            "TIA bridge executable was not found.",
+            new SiemensPushRequest
+            {
+                DeviceName = "PLC Station",
+                PlcName = "PLC_1",
+                TargetFolderPath = "Program blocks/Grafcet",
+                BlockName = "Main_Grafcet_LAD"
+            }));
+        var bridge = new CapturingBridgeService();
+        var orchestrator = new SiemensTiaPushOrchestrator(
+            new EventAggregator(),
+            codegen,
+            tia,
+            bridge,
+            new ConfigService(Path.Combine(Path.GetTempPath(), "grafcetstudio-test-" + Guid.NewGuid().ToString("N"), "config.json")),
+            new TemplateManager(Handlebars.Create()));
+
+        var result = await orchestrator.PushAsync(new PushSiemensLadPayload
+        {
+            Platform = "siemens-lad",
+            RawJson = "{\"platform\":\"siemens-lad\",\"project\":{\"name\":\"Demo\"}}",
+            DeviceName = "PLC Station",
+            PlcName = "PLC_1",
+            TargetFolderPath = "Program blocks/Grafcet",
+            OverwriteMode = "Overwrite"
+        });
+
+        Assert.False(result.Ok);
+
+        var json = JsonSerializer.Serialize(bridge.LastPushResult);
+        Assert.Contains("generated successfully", json);
+        Assert.Contains("manually in TIA Portal", json);
     }
 
     private sealed class FakeCodeGeneratorService : ICodeGeneratorService
@@ -79,6 +125,19 @@ public class SiemensTiaPushOrchestratorTests
             Request = request;
             return Task.FromResult(SiemensPushResult.Success("Imported", request, "Main_Grafcet_LAD.xml"));
         }
+    }
+
+    private sealed class FailingSiemensTiaProjectService : ISiemensTiaProjectService
+    {
+        private readonly SiemensPushResult result;
+
+        public FailingSiemensTiaProjectService(SiemensPushResult result)
+        {
+            this.result = result;
+        }
+
+        public Task<SiemensPushResult> PushBlockXmlAsync(SiemensPushRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
     }
 
     private sealed class CapturingBridgeService : IWebViewBridgeService

@@ -213,7 +213,7 @@ namespace GrafcetStudioProject {
     diagramType?: DiagramType;
     addressMode?: AddressMode;
     boolAddressMode?: BoolAddressMode;
-    baseMr?: number | null;
+    baseMr?: string | null;
     activeWord?: string;
     completeWord?: string;
     [key: string]: unknown;

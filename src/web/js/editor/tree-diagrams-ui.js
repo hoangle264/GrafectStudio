@@ -1,4 +1,4 @@
-﻿function makeDiagItem(d) {
+function makeDiagItem(d) {
   const item = document.createElement('div');
   item.className = 'tree-item' + (d.id===activeDiagramId?' active':'');
   item.dataset.id = d.id; item.dataset.type = 'diagram';
@@ -124,7 +124,7 @@ function openDiagPropsPanel(id) {
   dpSetType(d.diagramType||'Macro');
   dpSetAddressMode(d.addressMode||'bool');
   dpSetBoolAddressMode(d.boolAddressMode||'linear');
-  document.getElementById('dp-base-mr').value = d.baseMr ?? 100;
+  document.getElementById('dp-base-mr').value = d.baseMr || 'MR100';
   document.getElementById('dp-active-word').value = d.activeWord || 'DM0';
   document.getElementById('dp-complete-word').value = d.completeWord || 'DM100';
   dpUpdateAddressFields();
@@ -192,22 +192,20 @@ function dpUpdateAddressFields() {
 }
 function dpReadAddressConfig() {
   const mode = dpGetCurrentAddressMode();
-  const baseMrRaw = document.getElementById('dp-base-mr')?.value || '0';
-  const baseMr = Number(baseMrRaw);
+  const baseMr = (document.getElementById('dp-base-mr')?.value || 'MR100').trim() || 'MR100';
   return {
     addressMode: mode,
     boolAddressMode: dpGetCurrentBoolAddressMode(),
-    baseMr: Number.isInteger(baseMr) && baseMr >= 0 ? baseMr : 0,
+    baseMr,
     activeWord: (document.getElementById('dp-active-word')?.value || 'DM0').trim() || 'DM0',
     completeWord: (document.getElementById('dp-complete-word')?.value || 'DM100').trim() || 'DM100'
   };
 }
 function dpValidateAddressConfig(config) {
   if (config.addressMode === 'bool') {
-    const baseText = document.getElementById('dp-base-mr')?.value || '';
-    const base = Number(baseText);
-    if (!Number.isInteger(base) || base < 0) {
-      toast('Warning: Base MR must be a non-negative integer');
+    const boolRe = /^[A-Za-z]+\\d+$/;
+    if (!boolRe.test(String(config.baseMr || '').trim())) {
+      toast('Warning: Base address must look like MR100 or LR0');
       return false;
     }
   }

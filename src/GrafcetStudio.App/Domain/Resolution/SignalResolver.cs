@@ -7,7 +7,7 @@ namespace GrafcetStudio.Domain.Resolution;
 /// <summary>Provides static helpers to resolve variables, signals, and PLC literal addresses.</summary>
 public static class SignalResolver
 {
-    private static readonly Regex PlcAddressRegex = new("^(@MR\\d+|%[IQM][A-Z]?\\d|[A-Z]{1,3}\\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PlcAddressRegex = new("^(@?[A-Z]{1,3}\\d+(?:\\.\\d+)?|%[IQM][A-Z]?\\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static string? ResolveAddress(string varOrAddr, IList<DeviceVariable> vars)
         => ResolveSignalInfo(varOrAddr, vars)?.PhysAddr;

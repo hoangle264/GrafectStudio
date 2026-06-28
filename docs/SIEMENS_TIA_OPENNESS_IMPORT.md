@@ -1,19 +1,19 @@
-﻿# Siemens TIA Openness Import Setup
+# Siemens TIA Openness Import Setup
 
 GrafcetStudio can generate Siemens Openness XML from the `siemens-lad` generator. Direct push/import into TIA Portal is implemented as an optional runtime adapter so normal CI/dev builds do not require Siemens TIA Portal assemblies.
 
 ## Load strategy
 
-The main app uses `ReflectionSiemensTiaProjectService` and loads `Siemens.Engineering.dll` at runtime only when explicitly enabled.
+The main app uses `BridgeSiemensTiaProjectService` and delegates direct import to the external `.NET Framework 4.8` bridge. `Siemens.Engineering.dll` is only loaded by the bridge process or by the legacy reflection mode when explicitly enabled.
 
-- Default mode: `UnavailableSiemensTiaProjectService`, safe on machines without TIA Portal.
-- Opt-in mode: set `GRAFCETSTUDIO_TIA_OPENNESS_MODE=reflection`.
+- Default mode: `GRAFCETSTUDIO_TIA_IMPORT_MODE=bridge` (or unset), which uses `BridgeSiemensTiaProjectService` and keeps Siemens assemblies out of the main `.NET 8` app.
+- Legacy mode: set `GRAFCETSTUDIO_TIA_IMPORT_MODE=reflection` only for troubleshooting or experiments on a TIA-enabled machine.
 - Assembly path: set `GRAFCETSTUDIO_TIA_OPENNESS_DIR` to the TIA Portal PublicAPI folder that contains `Siemens.Engineering.dll`.
 
 Typical Siemens PublicAPI locations vary by installed version, for example:
 
 ```powershell
-$env:GRAFCETSTUDIO_TIA_OPENNESS_MODE = "reflection"
+$env:GRAFCETSTUDIO_TIA_IMPORT_MODE = "reflection"
 $env:GRAFCETSTUDIO_TIA_OPENNESS_DIR = "C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17"
 ```
 
@@ -46,16 +46,16 @@ If permissions are missing, GrafcetStudio should return `TiaOpennessUnavailable`
 
 ## Current implementation notes
 
-The reflection adapter performs this flow:
+The bridge-based adapter performs this flow:
 
-1. Load `Siemens.Engineering.dll` from `GRAFCETSTUDIO_TIA_OPENNESS_DIR` or normal assembly probing.
-2. Attach to the first running TIA Portal process when possible.
-3. If `ProjectPath` is provided and no matching project is open, create a headless TIA Portal instance and open the project.
-4. Find the requested device, PLC software, and target block folder.
-5. Import the XML block file into the target folder.
+1. Generate/request a temporary JSON request file and invoke `GrafcetStudio.TiaBridge.V19.exe`.
+2. Let the `.NET Framework 4.8` bridge load `Siemens.Engineering.dll` and attach/open TIA Portal.
+3. Pass `ProjectPath`, `DeviceName`, `PlcName`, `TargetFolderPath`, `BlockName`, and `OverwriteMode` to the bridge over the shared contract.
+4. Parse bridge stdout JSON, stderr, and exit code into `SiemensPushResult`.
+5. Clean up temporary request/XML files and preserve manual XML fallback when the bridge is unavailable.
 6. Return a typed `SiemensPushResult` instead of crashing the app.
 
-The adapter intentionally avoids compile-time references to Siemens assemblies. If Siemens changes method signatures between versions, keep the main abstraction and replace this implementation with either:
+The app-side adapter intentionally avoids compile-time references to Siemens assemblies. If Siemens changes method signatures between versions, keep the main abstraction and replace this implementation with either:
 
 - a version-specific reflection adapter,
 - a separate bridge executable built on a TIA machine, or
@@ -72,3 +72,7 @@ This repository environment does not include TIA Portal, so direct import cannot
 - Wrong `PlcName`: returns `PlcNotFound`.
 - Wrong `TargetFolderPath`: returns `TargetFolderNotFound`.
 - Valid Siemens LAD XML import with `FailIfExists`, `Overwrite`, and `Rename` modes.
+
+
+
+

@@ -79,5 +79,7 @@ public enum SiemensTiaProjectServiceStatus
     DeviceNotFound,
     PlcNotFound,
     TargetFolderNotFound,
-    ImportFailed
+    ImportFailed,
+    Timeout,
+    BridgeNotFound
 }

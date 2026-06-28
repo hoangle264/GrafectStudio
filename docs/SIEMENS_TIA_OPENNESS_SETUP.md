@@ -8,16 +8,16 @@ Kiem tra ngay 2026-06-27 tren may workspace nay:
 
 - TIA Portal V19 duoc phat hien tai `C:\Program Files\Siemens\Automation\Portal V19`.
 - PublicAPI duoc phat hien tai `C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V16` den `V19`.
-- Bien moi truong `GRAFCETSTUDIO_TIA_OPENNESS_MODE` va `GRAFCETSTUDIO_TIA_OPENNESS_DIR` chua duoc set trong shell hien tai.
+- Bien moi truong `GRAFCETSTUDIO_TIA_IMPORT_MODE` va `GRAFCETSTUDIO_TIA_OPENNESS_DIR` chua duoc set trong shell hien tai.
 - Chua thuc hien import/compile thuc te vi can project TIA mau va xac nhan GUI trong TIA Portal.
 - Trang thai test duoc ghi la prepared only; chua duoc tinh la pass Milestone 6.
 
 ## Cau hinh runtime
 
-GrafcetStudio chi load Siemens assemblies khi duoc bat bang bien moi truong:
+GrafcetStudio mac dinh dung bridge process rieng. Chi bat reflection legacy neu can debug tren may co TIA:
 
 ```powershell
-$env:GRAFCETSTUDIO_TIA_OPENNESS_MODE = "reflection"
+$env:GRAFCETSTUDIO_TIA_IMPORT_MODE = "bridge"
 $env:GRAFCETSTUDIO_TIA_OPENNESS_DIR = "C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19"
 ```
 
@@ -52,11 +52,11 @@ Checklist chi tiet nam tai `docs/SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md`.
 
 Dung flow nay sau khi manual import da on dinh:
 
-1. Set `GRAFCETSTUDIO_TIA_OPENNESS_MODE=reflection`.
-2. Set `GRAFCETSTUDIO_TIA_OPENNESS_DIR` toi folder PublicAPI dung version.
-3. Mo project trong TIA Portal hoac dien `ProjectPath` de adapter mo project.
-4. Trong GrafcetStudio, dien `DeviceName`, `PlcName`, `TargetFolderPath`, `BlockName`, `OverwriteMode`.
-5. Bam Push to TIA.
+1. Set `GRAFCETSTUDIO_TIA_IMPORT_MODE=bridge` hoac de trong/khong set de dung mac dinh bridge-first.
+2. Neu bridge exe khong nam canh app, set `GRAFCETSTUDIO_TIA_BRIDGE_PATH` toi `GrafcetStudio.TiaBridge.V19.exe`.
+3. Bridge `.NET Framework 4.8` se tu load Siemens assemblies; chi can `GRAFCETSTUDIO_TIA_OPENNESS_DIR` khi ban chu dong chay reflection mode legacy.
+4. Mo project trong TIA Portal hoac dien `ProjectPath` de bridge mo project.
+5. Trong GrafcetStudio, dien `DeviceName`, `PlcName`, `TargetFolderPath`, `BlockName`, `OverwriteMode`, sau do bam Push to TIA.
 6. Xac nhan block xuat hien trong folder dich, mo block de xem LAD, roi compile PLC software.
 
 Nen test lan luot `FailIfExists`, `Overwrite`, va `Rename` tren project copy de tranh ghi de block san xuat.
@@ -85,3 +85,7 @@ Nen test lan luot `FailIfExists`, `Overwrite`, va `Rename` tren project copy de 
 - Them generator PLC tag table cho parameters scope `global` de giam loi missing global tags.
 - Them nut validate target de kiem tra device/PLC/folder truoc khi import block.
 - Them log chi tiet cho direct push gom TIA version, PublicAPI path, project/device/plc/folder, overwrite mode.
+
+
+
+
