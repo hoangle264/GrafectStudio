@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>false</UseWPF>
     <UseWindowsForms>false</UseWindowsForms>
     <Nullable>enable</Nullable>
@@ -19,3 +19,4 @@
     </PackageReference>
   </ItemGroup>
 </Project>
+

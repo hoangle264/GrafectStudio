@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
@@ -459,7 +460,22 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         };
 
     private static string ToString(XmlDocument document)
-        => document.OuterXml;
+    {
+        var settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "  ",
+            NewLineChars = Environment.NewLine,
+            NewLineHandling = NewLineHandling.Replace,
+            OmitXmlDeclaration = false
+        };
+
+        using var writer = new StringWriter();
+        using var xmlWriter = XmlWriter.Create(writer, settings);
+        document.WriteContentTo(xmlWriter);
+        xmlWriter.Flush();
+        return writer.ToString();
+    }
 }
 
 public sealed record SiemensLadRenderContext(CodegenPayload Payload, ProjectInfo? Project, UnitInfo? Unit, FlowInfo? Flow = null, Step? Step = null, Transition? Transition = null, StepAction? Action = null);
