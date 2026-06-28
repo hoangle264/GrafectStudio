@@ -154,9 +154,7 @@ public partial class App : PrismApplication
 
     private static void RegisterSiemensTiaServices(IContainerRegistry containerRegistry)
     {
-        var rawMode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE");
-        SiemensDebugLogger.LogOpennessStartupMode(rawMode);
-        var mode = rawMode?.Trim();
+        var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE")?.Trim();
         if (string.Equals(mode, "reflection", StringComparison.OrdinalIgnoreCase))
         {
             // Register an explicit instance so the container cannot choose the test-only

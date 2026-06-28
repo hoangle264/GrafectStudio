@@ -4,93 +4,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace GrafcetStudio.App.Services.Siemens;
 
-
-internal static class SiemensDebugLogger
-{
-    private static readonly object Sync = new();
-
-    public static void LogOpennessStartupMode(string? rawMode)
-        => Write("STARTUP", new[]
-        {
-            "mode.process=" + Safe(rawMode),
-            "mode.user=" + Safe(Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE", EnvironmentVariableTarget.User)),
-            "mode.machine=" + Safe(Environment.GetEnvironmentVariable("GRAFCETSTUDIO_TIA_OPENNESS_MODE", EnvironmentVariableTarget.Machine)),
-            EnvLine(ReflectionSiemensTiaProjectService.OpennessDirectoryEnvironmentVariable)
-        });
-
-    public static void LogOpennessAssemblyProbe(string? rawConfiguredDirectory, string? configuredDirectory)
-        => Write("ASSEMBLY_PROBE", new[]
-        {
-            "provider.raw=" + Safe(rawConfiguredDirectory),
-            "provider.trimmed=" + Safe(configuredDirectory),
-            EnvLine(ReflectionSiemensTiaProjectService.OpennessDirectoryEnvironmentVariable)
-        });
-
-    public static void LogConfiguredAssemblyProbe(string configuredAssembly, bool exists)
-        => Write("CONFIGURED_ASSEMBLY", new[]
-        {
-            "path=" + configuredAssembly,
-            "exists=" + exists
-        });
-
-    public static void LogAssemblyLoadAttempt(string method, string target)
-        => Write("ASSEMBLY_LOAD_ATTEMPT", new[]
-        {
-            "method=" + method,
-            "target=" + target
-        });
-
-    public static void LogAssemblyLoadFailure(Exception error)
-        => Write("ASSEMBLY_LOAD_FAILURE", new[]
-        {
-            "type=" + error.GetType().FullName,
-            "message=" + error.Message
-        });
-
-    private static string EnvLine(string name)
-        => name + ".process=" + Safe(Environment.GetEnvironmentVariable(name))
-            + "; user=" + Safe(Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.User))
-            + "; machine=" + Safe(Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Machine));
-
-    private static string Safe(string? value)
-        => string.IsNullOrWhiteSpace(value) ? "<null-or-empty>" : value;
-
-    private static void Write(string kind, IReadOnlyList<string> lines)
-    {
-        try
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine("[" + DateTimeOffset.Now.ToString("O") + "] Siemens TIA " + kind);
-            builder.AppendLine("processId=" + Environment.ProcessId);
-            builder.AppendLine("user=" + Environment.UserDomainName + "\\" + Environment.UserName);
-            builder.AppendLine("currentDirectory=" + Environment.CurrentDirectory);
-            builder.AppendLine("baseDirectory=" + AppContext.BaseDirectory);
-            foreach (var line in lines) builder.AppendLine(line);
-            builder.AppendLine();
-
-            var text = builder.ToString();
-            lock (Sync)
-            {
-                File.AppendAllText(Path.Combine(Environment.CurrentDirectory, "debug.log"), text, Encoding.UTF8);
-                var basePath = Path.Combine(AppContext.BaseDirectory, "debug.log");
-                var currentPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "debug.log"));
-                if (!string.Equals(Path.GetFullPath(basePath), currentPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    File.AppendAllText(basePath, text, Encoding.UTF8);
-                }
-            }
-        }
-        catch
-        {
-        }
-    }
-}
 
 public sealed class ReflectionSiemensTiaProjectService : ISiemensTiaProjectService
 {
@@ -272,15 +190,11 @@ public sealed class ReflectionSiemensTiaProjectService : ISiemensTiaProjectServi
 
     private AssemblyLoadResult LoadEngineeringAssembly(SiemensPushRequest request)
     {
-        var rawConfiguredDirectory = opennessDirectoryProvider();
-        var configuredDirectory = rawConfiguredDirectory?.Trim().Trim('"');
-        SiemensDebugLogger.LogOpennessAssemblyProbe(rawConfiguredDirectory, configuredDirectory);
+        var configuredDirectory = opennessDirectoryProvider()?.Trim().Trim('"');
         if (!string.IsNullOrWhiteSpace(configuredDirectory))
         {
             var configuredAssembly = Path.Combine(configuredDirectory, EngineeringAssemblyName);
-            var configuredAssemblyExists = File.Exists(configuredAssembly);
-            SiemensDebugLogger.LogConfiguredAssemblyProbe(configuredAssembly, configuredAssemblyExists);
-            if (!configuredAssemblyExists)
+            if (!File.Exists(configuredAssembly))
             {
                 return AssemblyLoadResult.Failure(SiemensPushResult.Failure(
                     SiemensTiaProjectServiceStatus.TiaOpennessUnavailable,
@@ -288,18 +202,15 @@ public sealed class ReflectionSiemensTiaProjectService : ISiemensTiaProjectServi
                     request));
             }
 
-            SiemensDebugLogger.LogAssemblyLoadAttempt("LoadFrom", configuredAssembly);
             return AssemblyLoadResult.Success(Assembly.LoadFrom(configuredAssembly));
         }
 
         try
         {
-            SiemensDebugLogger.LogAssemblyLoadAttempt("AssemblyName", "Siemens.Engineering");
             return AssemblyLoadResult.Success(Assembly.Load(new AssemblyName("Siemens.Engineering")));
         }
-        catch (FileNotFoundException error)
+        catch (FileNotFoundException)
         {
-            SiemensDebugLogger.LogAssemblyLoadFailure(error);
             return AssemblyLoadResult.Failure(SiemensPushResult.Failure(
                 SiemensTiaProjectServiceStatus.TiaOpennessUnavailable,
                 $"TIA Openness assembly '{EngineeringAssemblyName}' was not found. Install TIA Portal Openness or set {OpennessDirectoryEnvironmentVariable} to the PublicAPI folder for your TIA version.",
