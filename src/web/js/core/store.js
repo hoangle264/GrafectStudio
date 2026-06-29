@@ -1,12 +1,12 @@
 "use strict";
 // -------------------------------------------------------------------
-//  store.js � Grafcet Studio
+//  store.js ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Grafcet Studio
 //  Project state singleton + localStorage persistence.
 //  Must be loaded BEFORE grafcet-studio-v2.js and grafcet-codegen.js.
 //
 //  NOTE: saveDiagramData / flushState reference runtime globals
 //  (state, nextId, nextStepNum, viewX, viewY, viewScale) that are
-//  declared in grafcet-studio-v2.js. This is intentional � those are
+//  declared in grafcet-studio-v2.js. This is intentional ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ those are
 //  diagram-render globals and belong with the canvas layer. They are
 //  only accessed at call-time (not parse-time), so load order is safe.
 // -------------------------------------------------------------------
@@ -50,11 +50,24 @@ var GrafcetStudioStoreHelpers;
         const steps = (data && data.state && data.state.steps) || [];
         return steps.reduce(function (max, step) { return Math.max(max, Number(step && step.number) || 0); }, 0);
     }
+    function parseAddressBase(value, fallback) {
+        const source = String(value == null || value === '' ? fallback : value).trim();
+        const match = source.match(/^([A-Za-z]+)(\d+)$/);
+        if (!match) {
+            const fallbackMatch = fallback.match(/^([A-Za-z]+)(\d+)$/);
+            return { prefix: fallbackMatch[1].toUpperCase(), number: Number(fallbackMatch[2]), width: fallbackMatch[2].length };
+        }
+        return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+    }
+    function formatAddressBase(prefix, number, width) {
+        const numberText = width > 1 ? String(number).padStart(width, '0') : String(number);
+        return prefix + numberText;
+    }
     function getBoolAddressRange(context, flow) {
         if (!flow || flow.addressMode !== 'bool')
             return null;
         const maxStepNumber = Math.max(1, getFlowStepMaxNumber(context, flow.id));
-        const start = Number(flow.baseMr || 0);
+        const start = parseAddressBase(flow.baseMr, 'MR100').number;
         return { start, end: start + maxStepNumber * 2 - 1 };
     }
     function boolAddressRangesOverlap(a, b) {
@@ -75,10 +88,10 @@ var GrafcetStudioStoreHelpers;
                 return boolAddressRangesOverlap(candidate, getBoolAddressRange(context, diag));
             });
             if (!overlaps)
-                return base;
+                return formatAddressBase('MR', base, 0);
             base += GrafcetStudioStoreHelpers.GF_ADDRESS_DEFAULT_BOOL_SPAN;
         }
-        return base;
+        return 'MR100';
     }
     GrafcetStudioStoreHelpers.findNextAvailableBaseMr = findNextAvailableBaseMr;
     function ensureFlowAddressConfig(context, diag, assignUniqueBase) {
@@ -102,7 +115,7 @@ var GrafcetStudioStoreHelpers;
                 }
             }
             if (diag.baseMr === undefined || diag.baseMr === null || diag.baseMr === '') {
-                diag.baseMr = assignUniqueBase ? findNextAvailableBaseMr(context, diag.unitId || null, diag.id) : 100;
+                diag.baseMr = assignUniqueBase ? findNextAvailableBaseMr(context, diag.unitId || null, diag.id) : 'MR100';
                 changed = true;
             }
             else {

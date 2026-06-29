@@ -76,7 +76,7 @@ var GrafcetStudioTree;
             description: '',
             addressMode: 'bool',
             boolAddressMode: 'linear',
-            baseMr: context.findNextAvailableBaseMr ? context.findNextAvailableBaseMr(unitId || null, id) : 100
+            baseMr: context.findNextAvailableBaseMr ? context.findNextAvailableBaseMr(unitId || null, id) : 'MR100'
         };
         diagrams.push(diagram);
         return {

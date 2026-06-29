@@ -484,7 +484,7 @@ public sealed class SiemensLadTemplate
 {
     [JsonPropertyName("version")] public string Version { get; set; } = "1.0";
     [JsonPropertyName("platform")] public string Platform { get; set; } = "siemens-lad";
-    [JsonPropertyName("tiaVersion")] public uint TiaVersion { get; set; } = 17;
+    [JsonPropertyName("tiaVersion")] public uint TiaVersion { get; set; } = 19;
     [JsonPropertyName("blockName")] public string BlockName { get; set; } = "{{unit.name}}_Grafcet";
     [JsonPropertyName("blockNumber")] public uint BlockNumber { get; set; } = 1;
     [JsonPropertyName("parameters")] public List<SiemensLadParameter> Parameters { get; set; } = [];

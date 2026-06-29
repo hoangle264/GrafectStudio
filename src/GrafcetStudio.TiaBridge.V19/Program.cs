@@ -2,6 +2,7 @@ using GrafcetStudio.TiaBridge.Contracts;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GrafcetStudio.TiaBridge.V19;
 
@@ -17,7 +18,8 @@ internal static class Program
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        WriteIndented = false
+        WriteIndented = false,
+        Converters = { new JsonStringEnumConverter() }
     };
 
     private static int Main(string[] args)
@@ -209,3 +211,6 @@ internal static class Program
             }, InvalidRequestExitCode);
     }
 }
+
+
+

@@ -203,7 +203,7 @@ function dpReadAddressConfig() {
 }
 function dpValidateAddressConfig(config) {
   if (config.addressMode === 'bool') {
-    const boolRe = /^[A-Za-z]+\\d+$/;
+    const boolRe = /^[A-Za-z]+\d+$/;
     if (!boolRe.test(String(config.baseMr || '').trim())) {
       toast('Warning: Base address must look like MR100 or LR0');
       return false;
@@ -292,8 +292,8 @@ function dpUpdateCodePreview(d) {
     ['mode',    d.mode||'Auto'],
     ['type',    d.diagramType||'Macro'],
     ['address', d.addressMode === 'word'
-      ? `@${d.activeWord||'DM0'} / @${d.completeWord||'DM100'}`
-      : `@MR${d.baseMr ?? 100} (${d.boolAddressMode||'linear'})`],
+      ? `${d.activeWord||'DM0'} / ${d.completeWord||'DM100'}`
+      : `${d.baseMr || 'MR100'} (${d.boolAddressMode||'linear'})`],
     ['name',    d.name||'GRAFCET'],
   ].map(([k,v])=>`<span class="k">${k}</span>: <span class="v">${esc(v)}</span>`).join('\n');
 }

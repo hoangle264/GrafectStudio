@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  PROJECT MANAGEMENT
@@ -118,7 +118,7 @@ function addDiagram(isFirst=false, unitId=null, mode='Auto') {
     unit: unit, description:'',
     addressMode:'bool',
     boolAddressMode:'linear',
-    baseMr: typeof findNextAvailableBaseMr === 'function' ? findNextAvailableBaseMr(unitId||null, id) : 100
+    baseMr: typeof findNextAvailableBaseMr === 'function' ? findNextAvailableBaseMr(unitId||null, id) : 'MR100'
   };
   project.diagrams.push(diagram);
   const emptyState = {steps:[],transitions:[],parallels:[],connections:[],vars:[]};

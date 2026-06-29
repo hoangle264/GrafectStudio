@@ -13,17 +13,25 @@ var GrafcetStudioCodegenPayload;
         const numberText = parsed.width > 1 ? String(next).padStart(parsed.width, '0') : String(next);
         return parsed.prefix + numberText;
     }
-    function formatMrAddress(number) {
-        return '@MR' + Number(number);
+    function parseAddressBase(value, fallback) {
+        const source = String(value == null || value === '' ? fallback : value).trim();
+        const match = source.match(/^([A-Za-z]+)(\d+)$/);
+        if (!match)
+            throw new Error('Invalid base address: ' + value);
+        return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+    }
+    function formatBaseAddress(base, number) {
+        const numberText = base.width > 1 ? String(number).padStart(base.width, '0') : String(number);
+        return base.prefix + numberText;
     }
     function normalizeBoolAddressMode(mode) {
         const value = String(mode || '').trim().toLowerCase();
         return value === 'block' ? 'block' : 'linear';
     }
     function resolveBoolMr(baseMr, offset, boolAddressMode) {
-        const base = Number(baseMr || 0);
+        const base = parseAddressBase(baseMr, 'MR100').number;
         if (normalizeBoolAddressMode(boolAddressMode) === 'block') {
-            return base + Math.floor(offset / 16) * 100 + (offset % 16);
+            return base + Math.floor(offset / 8) * 100 + (offset % 8);
         }
         return base + offset;
     }
@@ -40,14 +48,15 @@ var GrafcetStudioCodegenPayload;
             const wordOffset = Math.floor(bitIndex / 16);
             const bit = bitIndex % 16;
             return {
-                execAddress: '@' + formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
-                doneAddress: '@' + formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
+                execAddress: formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
+                doneAddress: formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
             };
         }
         const pairOffset = (stepNumber - 1) * 2;
+        const boolBase = parseAddressBase(flow.baseMr, 'MR100');
         return {
-            execAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset, flow.boolAddressMode)),
-            doneAddress: formatMrAddress(resolveBoolMr(flow.baseMr, pairOffset + 1, flow.boolAddressMode))
+            execAddress: formatBaseAddress(boolBase, resolveBoolMr(flow.baseMr, pairOffset, flow.boolAddressMode)),
+            doneAddress: formatBaseAddress(boolBase, resolveBoolMr(flow.baseMr, pairOffset + 1, flow.boolAddressMode))
         };
     }
     GrafcetStudioCodegenPayload.resolveStepAddress = resolveStepAddress;
@@ -55,7 +64,7 @@ var GrafcetStudioCodegenPayload;
         if (!flow || flow.addressMode !== 'bool')
             return null;
         const maxStepNumber = (steps || []).reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
-        const start = Number(flow.baseMr || 0);
+        const start = parseAddressBase(flow.baseMr, 'MR100').number;
         return { start, end: start + Math.max(1, maxStepNumber) * 2 - 1 };
     }
     function validateStepNumbers(steps, flowName) {
@@ -283,7 +292,7 @@ var GrafcetStudioCodegenPayload;
                 diagramType: diagram.diagramType || 'Macro',
                 addressMode: diagram.addressMode || 'bool',
                 boolAddressMode: diagram.boolAddressMode || 'linear',
-                baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : Number(diagram.baseMr),
+                baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : String(diagram.baseMr),
                 activeWord: diagram.activeWord || '',
                 completeWord: diagram.completeWord || ''
             },
