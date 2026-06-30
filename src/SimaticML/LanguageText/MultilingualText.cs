@@ -1,4 +1,4 @@
-﻿using SimaticML.API;
+using SimaticML.API;
 using SimaticML.Enums;
 using SimaticML.XMLClasses;
 using System.Globalization;
@@ -67,10 +67,10 @@ namespace SimaticML.LanguageText
             {
                 var items = this.objectList.GetItems();
 
-                MultilingualTextItem? textItem = items.Where(i => i.Culture == culture).FirstOrDefault();
-                if (textItem != null)
+                var duplicateItems = items.Where(i => i.Culture == culture).ToList();
+                foreach (var duplicateItem in duplicateItems)
                 {
-                    items.Remove(textItem);
+                    items.Remove(duplicateItem);
                 }
 
                 if (value != null)

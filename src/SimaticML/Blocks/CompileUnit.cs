@@ -1,4 +1,4 @@
-﻿using SimaticML.API;
+using SimaticML.API;
 using SimaticML.Blocks.FlagNet;
 using SimaticML.Blocks.FlagNet.nAccess;
 using SimaticML.Blocks.FlagNet.nCall;
@@ -30,7 +30,7 @@ namespace SimaticML.Blocks
         public PowerrailWire Powerrail { get => new(this.ComputePowerrail()); }
 
         //Start from a high number in case there are nodes not included! Since siemens starts from 20, i SHOULD avoid most conflicts.
-        //Is not nice but works ¯\_(ツ)_/¯
+        //Is not nice but works �\_(?)_/�
         public IDGenerator LocalIDGenerator { get; private set; } = new IDGenerator(10000);
 
         private readonly GlobalObjectData globalObjectData;
@@ -132,8 +132,8 @@ namespace SimaticML.Blocks
 
         public void Init()
         {
-            this.Title[SimaticMLAPI.CULTURE] = "";
-            this.Comment[SimaticMLAPI.CULTURE] = "";
+
+
         }
 
         private MultilingualText ComputeMultilingualText(MultilingualTextType type)

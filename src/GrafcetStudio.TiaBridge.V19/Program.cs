@@ -1,6 +1,7 @@
 using GrafcetStudio.TiaBridge.Contracts;
 using System;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,6 +9,8 @@ namespace GrafcetStudio.TiaBridge.V19;
 
 internal static class Program
 {
+    private const string OpennessDirectoryEnvironmentVariable = "GRAFCETSTUDIO_TIA_OPENNESS_DIR";
+    private const string EngineeringAssemblyName = "Siemens.Engineering.dll";
     private const int SuccessExitCode = 0;
     private const int InvalidRequestExitCode = 1;
     private const int TiaUnavailableExitCode = 2;
@@ -94,6 +97,46 @@ internal static class Program
                 ExitCode = UnexpectedErrorExitCode
             }, UnexpectedErrorExitCode);
         }
+    }
+
+    private static Assembly? ResolveEngineeringAssembly(object? sender, ResolveEventArgs args)
+    {
+        AssemblyName requestedAssembly;
+        try
+        {
+            requestedAssembly = new AssemblyName(args.Name);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (!string.Equals(requestedAssembly.Name, "Siemens.Engineering", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var configuredDirectory = Environment.GetEnvironmentVariable(OpennessDirectoryEnvironmentVariable)?.Trim().Trim('"');
+        if (!string.IsNullOrWhiteSpace(configuredDirectory))
+        {
+            var configuredAssemblyPath = Path.Combine(configuredDirectory, EngineeringAssemblyName);
+            if (File.Exists(configuredAssemblyPath))
+            {
+                return Assembly.LoadFrom(configuredAssemblyPath);
+            }
+        }
+
+        var defaultAssemblyPath = @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll";
+        if (File.Exists(defaultAssemblyPath))
+        {
+            return Assembly.LoadFrom(defaultAssemblyPath);
+        }
+
+        throw new FileNotFoundException(
+            $"TIA Openness assembly '{EngineeringAssemblyName}' was not found. Install TIA Portal Openness V19 or set {OpennessDirectoryEnvironmentVariable} to the folder containing {EngineeringAssemblyName}.",
+            !string.IsNullOrWhiteSpace(configuredDirectory)
+                ? Path.Combine(configuredDirectory, EngineeringAssemblyName)
+                : defaultAssemblyPath);
     }
 
     private static string? TryGetRequestPath(string[] args)
