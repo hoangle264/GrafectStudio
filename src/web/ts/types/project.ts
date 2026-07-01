@@ -57,6 +57,8 @@ namespace GrafcetStudioProject {
     baseMr?: number | string;
     activeWord?: string;
     completeWord?: string;
+    activeWordTag?: string;
+    completeWordTag?: string;
     [key: string]: unknown;
   }
 
@@ -216,6 +218,8 @@ namespace GrafcetStudioProject {
     baseMr?: string | null;
     activeWord?: string;
     completeWord?: string;
+    activeWordTag?: string;
+    completeWordTag?: string;
     [key: string]: unknown;
   }
 
@@ -340,5 +344,8 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 }
+
+
+
 
 

@@ -392,7 +392,6 @@ public class GeneratorSmokeTests
         Assert.Equal("Auto", payloadA.Flows[0].ControlState);
         Assert.Equal("Manual", payloadB.Flows[0].ControlState);
     }
-
     [Fact]
     public void BuildCSharpPayload_AllUnits_IncludesUnitsAndFlowsAcrossProject()
     {

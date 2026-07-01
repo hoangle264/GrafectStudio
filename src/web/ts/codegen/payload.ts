@@ -59,6 +59,10 @@ namespace GrafcetStudioCodegenPayload {
     width: number;
   }
 
+  function formatSiemensBitSlice(tagName: string, bit: number): string {
+    return '"' + String(tagName || '').trim() + '".%X' + bit;
+  }
+
   interface ParsedAddressBase {
     prefix: string;
     number: number;
@@ -115,9 +119,15 @@ namespace GrafcetStudioCodegenPayload {
       const bitIndex = stepNumber - 1;
       const wordOffset = Math.floor(bitIndex / 16);
       const bit = bitIndex % 16;
+      const activeWordTag = String((flow && (flow as any).activeWordTag) || '').trim();
+      const completeWordTag = String((flow && (flow as any).completeWordTag) || '').trim();
       return {
-        execAddress: formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
-        doneAddress: formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
+        execAddress: activeWordTag
+          ? formatSiemensBitSlice(wordOffset > 0 ? activeWordTag + '_' + wordOffset : activeWordTag, bit)
+          : formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
+        doneAddress: completeWordTag
+          ? formatSiemensBitSlice(wordOffset > 0 ? completeWordTag + '_' + wordOffset : completeWordTag, bit)
+          : formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
       };
     }
 
@@ -348,7 +358,9 @@ namespace GrafcetStudioCodegenPayload {
         boolAddressMode: diagram.boolAddressMode || 'linear',
         baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : String(diagram.baseMr),
         activeWord: diagram.activeWord || '',
-        completeWord: diagram.completeWord || ''
+        completeWord: diagram.completeWord || '',
+        activeWordTag: String((diagram as any).activeWordTag || ''),
+        completeWordTag: String((diagram as any).completeWordTag || '')
       },
       steps,
       transitions,
