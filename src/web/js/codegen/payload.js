@@ -1,6 +1,9 @@
 "use strict";
 var GrafcetStudioCodegenPayload;
 (function (GrafcetStudioCodegenPayload) {
+    function formatSiemensBitSlice(tagName, bit) {
+        return '"' + String(tagName || '').trim() + '".%X' + bit;
+    }
     function parseWordAddress(address) {
         const match = String(address || '').trim().match(/^([A-Za-z]+)(\d+)$/);
         if (!match)

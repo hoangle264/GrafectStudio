@@ -142,7 +142,7 @@ public static class GrafcetStudioCodegenPayload
                 DiagramType = string.IsNullOrWhiteSpace(diagram.DiagramType) ? "Macro" : diagram.DiagramType,
                 AddressMode = string.IsNullOrWhiteSpace(diagram.AddressMode) ? "bool" : diagram.AddressMode,
                 BoolAddressMode = string.IsNullOrWhiteSpace(diagram.BoolAddressMode) ? "linear" : diagram.BoolAddressMode,
-                BaseMr = diagram.BaseMr,
+                BaseMr = diagram.BaseMr?.ToString(),
                 ActiveWord = diagram.ActiveWord,
                 CompleteWord = diagram.CompleteWord
             },

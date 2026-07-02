@@ -68,59 +68,32 @@ public class GeneratorSmokeTests
 
 
     [Fact]
-    public void SiemensLadDslGenerator_CustomTemplateRootOverridesDefaultTemplate()
+    public void SiemensLadDslGenerator_CustomHbsTextTemplateOverridesDefaultTemplate()
     {
         var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(templateRoot);
-        File.WriteAllText(Path.Combine(templateRoot, "default.lad.json"), """
-        {
-          "version": "1.0",
-          "platform": "siemens-lad",
-          "tiaVersion": 17,
-          "blockName": "DefaultTemplate_Should_Not_Be_Used",
-          "blockNumber": 99,
-          "parameters": [
-            { "key": "exec", "source": "step.execAddress", "default": "Exec", "scope": "global", "dataType": "Bool" }
-          ],
-          "networks": [
-            {
-              "id": "default",
-              "title": "DefaultTemplateNetwork",
-              "comment": "Default fallback template",
-              "expression": { "type": "TAG", "ref": "exec" },
-              "output": { "type": "coil", "ref": "exec" }
-            }
-          ]
-        }
+        File.WriteAllText(Path.Combine(templateRoot, "default.lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME DefaultTemplate_Should_Not_Be_Used
+        BLOCK_NUMBER 99
+
+        NETWORK default
+        TITLE DefaultTemplateNetwork
+        EXPR M9.0
+        COIL REF M9.1
+        END
         """);
-        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.json"), """
-        {
-          "version": "1.0",
-          "platform": "siemens-lad",
-          "tiaVersion": 17,
-          "blockName": "{{unit.name}}_CustomOverride_LAD",
-          "blockNumber": 10,
-          "parameters": [
-            { "key": "prevDone", "source": "step.doneAddress", "default": "PrevDone", "scope": "global", "dataType": "Bool" },
-            { "key": "condition", "source": "transition.condition", "default": "Condition", "scope": "global", "dataType": "Bool" },
-            { "key": "exec", "source": "step.execAddress", "default": "Exec", "scope": "global", "dataType": "Bool" }
-          ],
-          "networks": [
-            {
-              "id": "activation",
-              "title": "CustomOverrideActivation",
-              "comment": "custom root siemens-lad.json override",
-              "expression": {
-                "type": "AND",
-                "nodes": [
-                  { "type": "TAG", "ref": "prevDone" },
-                  { "type": "TAG", "ref": "condition" }
-                ]
-              },
-              "output": { "type": "coil", "ref": "exec" }
-            }
-          ]
-        }
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME {{unit.label}}_CustomOverride_LAD
+        BLOCK_NUMBER 10
+
+        NETWORK activation
+        TITLE CustomOverrideActivation
+        COMMENT custom root siemens-lad.hbs override
+        EXPR M0.1 & M0.2
+        COIL REF M0.0
+        END
         """);
 
         try
@@ -128,22 +101,6 @@ public class GeneratorSmokeTests
             var payload = BuildPayload();
             payload.TemplateRootPath = templateRoot;
             payload.Unit = new UnitInfo { Id = "unit-1", Name = "Main Unit", Label = "MainUnit" };
-            payload.Flows = new List<FlowInfo>
-            {
-                new()
-                {
-                    Id = "flow-1",
-                    Diagram = new DiagramInfo { Id = "diag-1", UnitId = "unit-1", Unit = "MainUnit" },
-                    Steps = new List<Step>
-                    {
-                        new() { Id = "s1", Number = 1, ExecAddress = "M0.0", DoneAddress = "M0.1" }
-                    },
-                    Transitions = new List<Transition>
-                    {
-                        new() { Id = "t1", Condition = "M0.2" }
-                    }
-                }
-            };
 
             var file = Assert.Single(new SiemensLadDslGenerator().GenerateFiles(payload));
 
@@ -161,51 +118,77 @@ public class GeneratorSmokeTests
             if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
         }
     }
+
     [Fact]
-    public void SiemensLadDslGenerator_RepeatNetworksUseCurrentGrafcetContext()
+    public void SiemensLadTextTemplateParser_ParsesNetworkFieldsAndExpression()
+    {
+        var template = SiemensLadTextTemplateParser.Parse("""
+        TIA_VERSION 17
+        BLOCK_NAME Demo_LAD
+        BLOCK_NUMBER 3
+
+        NETWORK n1
+        TITLE Activate step
+        STATUS ready
+        COMMENT first comment line
+        COMMENT second comment line
+        EXPR M0.0 & (I0.0 | I0.1)
+        SET_COIL REF M0.1
+        END
+        """, "inline.lad.hbs");
+
+        Assert.Equal((uint)17, template.TiaVersion);
+        Assert.Equal("Demo_LAD", template.BlockName);
+        Assert.Equal((uint)3, template.BlockNumber);
+        var network = Assert.Single(template.Networks);
+        Assert.Equal("n1", network.Id);
+        Assert.Equal("Activate step", network.Title);
+        Assert.Equal("ready", network.Status);
+        Assert.Contains("first comment line", network.Comment);
+        Assert.Contains("second comment line", network.Comment);
+        Assert.Equal("set_coil", network.Output!.Type);
+        Assert.Equal("M0.1", network.Output.Ref);
+        Assert.Equal("AND", network.Expression!.Type);
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_RepeatNetworksUseRenderedHbsTextContext()
     {
         var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-repeat-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(templateRoot);
-        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.json"), """
-        {
-          "version": "1.0",
-          "platform": "siemens-lad",
-          "tiaVersion": 17,
-          "blockName": "{{unit.name}}_Repeat_LAD",
-          "blockNumber": 11,
-          "parameters": [
-            { "key": "exec", "source": "step.execAddress", "default": "Exec", "scope": "global", "dataType": "Bool" },
-            { "key": "done", "source": "step.doneAddress", "default": "Done", "scope": "global", "dataType": "Bool" },
-            { "key": "actionAddr", "source": "action.address", "default": "Action", "scope": "global", "dataType": "Bool" },
-            { "key": "condition", "source": "transition.condition", "default": "Condition", "scope": "global", "dataType": "Bool" }
-          ],
-          "networks": [
-            {
-              "id": "step_done",
-              "repeat": "steps",
-              "title": "Step {{flow.name}} {{step.number}} {{step.label}}",
-              "comment": "Done for {{step.label}}",
-              "expression": { "type": "TAG", "ref": "exec" },
-              "output": { "type": "coil", "ref": "done" }
-            },
-            {
-              "id": "transition",
-              "repeat": "transitions",
-              "title": "Transition {{transition.label}} in {{flow.name}}",
-              "comment": "Condition {{transition.label}}",
-              "expression": { "type": "TAG", "ref": "condition" },
-              "output": { "type": "coil", "ref": "condition" }
-            },
-            {
-              "id": "actions",
-              "repeat": "actions",
-              "title": "Action {{action.variable}} on {{step.label}}",
-              "comment": "Action variable {{action.variable}}",
-              "expression": { "type": "TAG", "ref": "exec" },
-              "output": { "type": "coil", "ref": "actionAddr" }
-            }
-          ]
-        }
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME {{unit.label}}_Repeat_LAD
+        BLOCK_NUMBER 11
+
+        {{#each flows}}
+        {{#each steps}}
+        NETWORK step_{{id}}
+        TITLE Step {{../name}} {{number}} {{label}}
+        COMMENT Done for {{label}}
+        EXPR {{execAddress}}
+        COIL REF {{doneAddress}}
+        END
+
+        {{#each actions}}
+        NETWORK action_{{../id}}_{{@index}}
+        TITLE Action {{variable}} on {{../label}}
+        COMMENT Action variable {{variable}}
+        EXPR {{../execAddress}}
+        COIL REF {{address}}
+        END
+        {{/each}}
+        {{/each}}
+
+        {{#each transitions}}
+        NETWORK transition_{{id}}
+        TITLE Transition {{label}} in {{../name}}
+        COMMENT Condition {{label}}
+        EXPR {{condition}}
+        COIL REF {{condition}}
+        END
+        {{/each}}
+        {{/each}}
         """);
 
         try
@@ -265,98 +248,135 @@ public class GeneratorSmokeTests
             if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
         }
     }
-    [Fact]
-    public void SiemensLadDslGenerator_InvalidTemplates_ReturnHelpfulValidationErrors()
-    {
-        var cases = new[]
-        {
-            (
-                Json: """
-                {
-                  "platform": "wrong-platform",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "TAG", "ref": "exec" }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "JSON path 'platform'", "must be 'siemens-lad'" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }, { "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "TAG", "ref": "exec" }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "JSON path 'parameters[1].key'", "duplicate parameter key 'exec'" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "", "expression": { "type": "TAG", "ref": "exec" }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "JSON path 'networks[0].id'", "must not be empty" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "Network 'n1'", "JSON path 'networks[0].expression'", "must not be null" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "TAG", "ref": "exec" }, "output": { "ref": "missing" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "Network 'n1'", "JSON path 'networks[0].output.ref'", "unknown parameter 'missing'" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "TAG", "ref": "missing" }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "Network 'n1'", "JSON path 'networks[0].expression.ref'", "TAG references unknown parameter 'missing'" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "AND", "nodes": [] }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "Network 'n1'", "JSON path 'networks[0].expression.nodes'", "AND expression must have at least one node" }
-            ),
-            (
-                Json: """
-                {
-                  "platform": "siemens-lad",
-                  "parameters": [{ "key": "exec" }],
-                  "networks": [{ "id": "n1", "expression": { "type": "NOT", "node": { "type": "AND", "nodes": [{ "type": "TAG", "ref": "exec" }] } }, "output": { "ref": "exec" } }]
-                }
-                """,
-                Expected: new[] { "siemens-lad.json", "Network 'n1'", "JSON path 'networks[0].expression.node.type'", "NOT currently supports only TAG nodes" }
-            )
-        };
 
-        foreach (var testCase in cases)
+    [Fact]
+    public void SiemensLadDslGenerator_SetAndResetCoils_GenerateXml()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-set-reset-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME Main_SetReset_LAD
+
+        NETWORK set_done
+        TITLE SetDone
+        EXPR M0.0
+        SET_COIL REF M0.1
+        END
+
+        NETWORK reset_exec
+        TITLE ResetExec
+        EXPR M0.1
+        RESET_COIL REF M0.0
+        END
+        """);
+
+        try
         {
-            AssertInvalidSiemensTemplate(testCase.Json, testCase.Expected);
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var file = Assert.Single(new SiemensLadDslGenerator().GenerateFiles(payload));
+
+            Assert.Equal("Main_SetReset_LAD.xml", file.Path);
+            Assert.Contains("SetDone", file.Content);
+            Assert.Contains("ResetExec", file.Content);
+            Assert.Contains("Name=\"SCoil\"", file.Content);
+            Assert.Contains("Name=\"RCoil\"", file.Content);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
         }
     }
+
+    [Fact]
+    public void SiemensLadDslGenerator_InvalidRenderedText_ReturnsNetworkAndLineError()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => SiemensLadTextTemplateParser.Parse("""
+        TIA_VERSION 17
+        BLOCK_NAME Bad_LAD
+
+        NETWORK n1
+        TITLE BadExpr
+        EXPR M0.0 $
+        COIL REF M0.1
+        END
+        """, "bad.lad.hbs"));
+
+        Assert.Contains("bad.lad.hbs", ex.Message);
+        Assert.Contains("Network 'n1'", ex.Message);
+        Assert.Contains("line 6", ex.Message);
+        Assert.Contains("Invalid ladder expression", ex.Message);
+        Assert.Contains("unexpected '$'", ex.Message);
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_DoesNotFallbackToJsonTemplate()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-json-not-used-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.json"), """
+        {
+          "platform": "siemens-lad",
+          "blockName": "Json_Should_Not_Be_Used",
+          "networks": []
+        }
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var ex = Assert.Throws<FileNotFoundException>(() => new SiemensLadDslGenerator().GenerateFiles(payload).ToList());
+            Assert.Contains("Cannot find Siemens LAD HBS text template", ex.Message);
+            Assert.Contains("siemens-lad.hbs", ex.Message);
+            Assert.Contains("default.lad.hbs", ex.Message);
+            Assert.DoesNotContain("siemens-lad.json", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_UnsupportedInstructionReportsClearError()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-ton-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME Main_TON_LAD
+
+        NETWORK timer
+        TITLE Timer
+        STATUS partial
+        EXPR M0.0
+        TON T1
+        PT LIT T#5s
+        Q REF M0.1
+        END_TON
+        END
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new SiemensLadDslGenerator().GenerateFiles(payload).ToList());
+            Assert.Contains("Network 'timer'", ex.Message);
+            Assert.Contains("instruction 'TON'", ex.Message);
+            Assert.Contains("XML generation is not implemented yet", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
     [Fact]
     public void BuildCSharpPayload_KeepsLegacyControlStateAsAuto()
     {
@@ -435,7 +455,7 @@ public class GeneratorSmokeTests
             {
                 Id = "flow-a",
                 Name = "Flow A",
-                Diagram = new DiagramInfo { Id = "diag-a", UnitId = "unit-a", Unit = "Unit A", BaseMr = 100 },
+                Diagram = new DiagramInfo { Id = "diag-a", UnitId = "unit-a", Unit = "Unit A", BaseMr = "100" },
                 Steps = new List<Step> { new() { Id = "step-a", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } },
                 Transitions = new List<Transition>()
             },
@@ -443,7 +463,7 @@ public class GeneratorSmokeTests
             {
                 Id = "flow-b",
                 Name = "Flow B",
-                Diagram = new DiagramInfo { Id = "diag-b", UnitId = "unit-b", Unit = "Unit B", BaseMr = 200 },
+                Diagram = new DiagramInfo { Id = "diag-b", UnitId = "unit-b", Unit = "Unit B", BaseMr = "200" },
                 Steps = new List<Step> { new() { Id = "step-b", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" } },
                 Transitions = new List<Transition>()
             }
@@ -590,7 +610,7 @@ public class GeneratorSmokeTests
         payload.Flows[0].Id = "old-flow";
         payload.Flows[0].Name = "Old";
         payload.Flows[0].DiagramType = null;
-        payload.Flows[0].Diagram = new DiagramInfo { Id = "old-diag", UnitId = "unit-1", Unit = "Main", BaseMr = 100 };
+        payload.Flows[0].Diagram = new DiagramInfo { Id = "old-diag", UnitId = "unit-1", Unit = "Main", BaseMr = "100" };
         payload.Flows[0].Steps = new List<Step> { new() { Id = "old-s1", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } };
 
         var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
@@ -658,28 +678,6 @@ public class GeneratorSmokeTests
 
         return count;
     }
-    private static void AssertInvalidSiemensTemplate(string json, params string[] expectedMessages)
-    {
-        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-invalid-siemens-lad-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(templateRoot);
-        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.json"), json);
-
-        try
-        {
-            var payload = BuildPayload();
-            payload.TemplateRootPath = templateRoot;
-
-            var ex = Assert.Throws<InvalidOperationException>(() => new SiemensLadDslGenerator().GenerateFiles(payload).ToList());
-            foreach (var expected in expectedMessages)
-            {
-                Assert.Contains(expected, ex.Message);
-            }
-        }
-        finally
-        {
-            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
-        }
-    }
     private static CodegenPayload BuildPayload()
         => new()
         {
@@ -735,7 +733,7 @@ public class GeneratorSmokeTests
                     Id = "flow-macro",
                     Name = "Pick",
                     DiagramType = "Macro",
-                    Diagram = new DiagramInfo { Id = "diag-macro", UnitId = "unit-a", Unit = "Main", BaseMr = 100 },
+                    Diagram = new DiagramInfo { Id = "diag-macro", UnitId = "unit-a", Unit = "Main", BaseMr = "100" },
                     Steps = new List<Step>
                     {
                         new() { Id = "s10", Label = "S10", Number = 10, Kind = "macro", MacroFlowId = "flow-step", ExecAddress = "@MR100", DoneAddress = "@MR101" }
@@ -751,7 +749,7 @@ public class GeneratorSmokeTests
                     Id = "flow-step",
                     Name = "Clamp",
                     DiagramType = "MacroStep",
-                    Diagram = new DiagramInfo { Id = "diag-step", UnitId = "unit-a", Unit = "Main", BaseMr = 200 },
+                    Diagram = new DiagramInfo { Id = "diag-step", UnitId = "unit-a", Unit = "Main", BaseMr = "200" },
                     Steps = new List<Step>
                     {
                         new() { Id = "s1", Label = "S1", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" }
@@ -823,6 +821,10 @@ public class GeneratorSmokeTests
         DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
     }
 }
+
+
+
+
 
 
 

@@ -125,8 +125,8 @@ function openDiagPropsPanel(id) {
   dpSetAddressMode(d.addressMode||'bool');
   dpSetBoolAddressMode(d.boolAddressMode||'linear');
   document.getElementById('dp-base-mr').value = d.baseMr || 'MR100';
-  document.getElementById('dp-active-word').value = d.activeWord || 'DM0';
-  document.getElementById('dp-complete-word').value = d.completeWord || 'DM100';
+  document.getElementById('dp-active-word').value = d.activeWordTag || d.activeWord || 'DM0';
+  document.getElementById('dp-complete-word').value = d.completeWordTag || d.completeWord || 'DM100';
   dpUpdateAddressFields();
   // Header badge
   dpUpdateBadge(d.mode||'Auto');
@@ -193,12 +193,17 @@ function dpUpdateAddressFields() {
 function dpReadAddressConfig() {
   const mode = dpGetCurrentAddressMode();
   const baseMr = (document.getElementById('dp-base-mr')?.value || 'MR100').trim() || 'MR100';
+  const activeWordInput = (document.getElementById('dp-active-word')?.value || 'DM0').trim() || 'DM0';
+  const completeWordInput = (document.getElementById('dp-complete-word')?.value || 'DM100').trim() || 'DM100';
+  const wordAddressRe = /^[A-Za-z]+\d+$/;
   return {
     addressMode: mode,
     boolAddressMode: dpGetCurrentBoolAddressMode(),
     baseMr,
-    activeWord: (document.getElementById('dp-active-word')?.value || 'DM0').trim() || 'DM0',
-    completeWord: (document.getElementById('dp-complete-word')?.value || 'DM100').trim() || 'DM100'
+    activeWord: wordAddressRe.test(activeWordInput) ? activeWordInput : 'DM0',
+    completeWord: wordAddressRe.test(completeWordInput) ? completeWordInput : 'DM100',
+    activeWordTag: wordAddressRe.test(activeWordInput) ? '' : activeWordInput,
+    completeWordTag: wordAddressRe.test(completeWordInput) ? '' : completeWordInput
   };
 }
 function dpValidateAddressConfig(config) {
@@ -210,9 +215,10 @@ function dpValidateAddressConfig(config) {
     }
   }
   if (config.addressMode === 'word') {
-    const wordRe = /^[A-Za-z]+\d+$/;
-    if (!wordRe.test(config.activeWord) || !wordRe.test(config.completeWord)) {
-      toast('Warning: Word addresses must look like DM0 or DM100');
+    const hasActive = !!String(config.activeWordTag || config.activeWord || '').trim();
+    const hasComplete = !!String(config.completeWordTag || config.completeWord || '').trim();
+    if (!hasActive || !hasComplete) {
+      toast('Warning: Enter an active and complete word source, for example DM0 or StepWord');
       return false;
     }
   }
@@ -292,7 +298,7 @@ function dpUpdateCodePreview(d) {
     ['mode',    d.mode||'Auto'],
     ['type',    d.diagramType||'Macro'],
     ['address', d.addressMode === 'word'
-      ? `${d.activeWord||'DM0'} / ${d.completeWord||'DM100'}`
+      ? `${d.activeWordTag || d.activeWord || 'DM0'} / ${d.completeWordTag || d.completeWord || 'DM100'}`
       : `${d.baseMr || 'MR100'} (${d.boolAddressMode||'linear'})`],
     ['name',    d.name||'GRAFCET'],
   ].map(([k,v])=>`<span class="k">${k}</span>: <span class="v">${esc(v)}</span>`).join('\n');
