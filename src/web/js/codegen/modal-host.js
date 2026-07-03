@@ -1,3 +1,11 @@
+function cgDebugLog(label, data) {
+  try {
+    const line = '[cg] ' + label + ' ' + JSON.stringify(data);
+    console.log(line);
+  } catch (err) {
+    console.log('[cg] ' + label + ' <unserializable>');
+  }
+}
 function cgGetPayloadApi() {
   return window.GrafcetStudio && window.GrafcetStudio.codegenPayload;
 }
@@ -72,6 +80,26 @@ function cgGenerateViaHost(platform, diagId) {
   try {
     if (typeof cgShouldPushSiemensTia === 'function' && cgShouldPushSiemensTia()) {
       const codegenPayload = cgBuildCSharpPayload(platform, diagId);
+      cgDebugLog('push payload summary', {
+        platform,
+        diagId,
+        flowCount: (codegenPayload.flows || []).length,
+        flows: (codegenPayload.flows || []).map(function(flow) {
+          const firstStep = (flow.steps || [])[0] || null;
+          return {
+            id: flow.id,
+            name: flow.name,
+            stepCount: (flow.steps || []).length,
+            addressMode: flow.diagram && flow.diagram.addressMode,
+            activeWord: flow.diagram && flow.diagram.activeWord,
+            activeWordTag: flow.diagram && flow.diagram.activeWordTag,
+            completeWord: flow.diagram && flow.diagram.completeWord,
+            completeWordTag: flow.diagram && flow.diagram.completeWordTag,
+            firstExec: firstStep && firstStep.execAddress,
+            firstDone: firstStep && firstStep.doneAddress
+          };
+        })
+      });
       const tiaConfig = typeof cgGetSiemensTiaConfig === 'function' ? cgGetSiemensTiaConfig() : {};
       if (!tiaConfig.deviceName || !tiaConfig.plcName || !tiaConfig.targetFolderPath) {
         if (typeof cgSetSiemensLadStatus === 'function') cgSetSiemensLadStatus('Push failed: device, PLC, and block folder are required', false);

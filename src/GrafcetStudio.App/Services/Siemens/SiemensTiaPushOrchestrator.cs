@@ -7,11 +7,23 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.IO;
 
 namespace GrafcetStudio.App.Services.Siemens;
 
 public sealed class SiemensTiaPushOrchestrator
 {
+    private static readonly string SiemensDebugLogPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "debug.log"));
+    private static void SiemensDebugLog(string message)
+    {
+        try
+        {
+            File.AppendAllText(SiemensDebugLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+        }
+        catch
+        {
+        }
+    }
     private readonly IEventAggregator events;
     private readonly ICodeGeneratorService codegen;
     private readonly ISiemensTiaProjectService tiaProjectService;
@@ -79,8 +91,22 @@ public sealed class SiemensTiaPushOrchestrator
 
     private CodegenOutput GenerateSiemensLadXml(PushSiemensLadPayload message)
     {
+        SiemensDebugLog("PushAsync raw payload length=" + (message.RawJson?.Length ?? 0));
         var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson, PayloadJsonOptions)
             ?? throw new InvalidOperationException("Invalid Siemens LAD codegen payload.");
+        SiemensDebugLog("Deserialized payload platform=" + payload.Platform
+            + ", units=" + payload.Units.Count
+            + ", flows=" + payload.Flows.Count
+            + ", flowSummary=" + string.Join(" | ", payload.Flows.Select(flow =>
+                (flow.Name ?? flow.Id ?? "<unnamed>")
+                + " steps=" + flow.Steps.Count
+                + " addrMode=" + (flow.Diagram?.AddressMode ?? "")
+                + " activeWord=" + (flow.Diagram?.ActiveWord ?? "")
+                + " activeWordTag=" + (flow.Diagram?.ActiveWordTag ?? "")
+                + " completeWord=" + (flow.Diagram?.CompleteWord ?? "")
+                + " completeWordTag=" + (flow.Diagram?.CompleteWordTag ?? "")
+                + " firstExec=" + (flow.Steps.FirstOrDefault()?.ExecAddress ?? "")
+                + " firstDone=" + (flow.Steps.FirstOrDefault()?.DoneAddress ?? ""))));
 
         if (string.IsNullOrWhiteSpace(payload.TemplateRootPath))
         {

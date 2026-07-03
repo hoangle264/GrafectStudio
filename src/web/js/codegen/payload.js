@@ -1,8 +1,50 @@
 "use strict";
 var GrafcetStudioCodegenPayload;
 (function (GrafcetStudioCodegenPayload) {
+    function splitSiemensSymbolicPath(tagName) {
+        const source = String(tagName || '').trim();
+        if (!source)
+            throw new Error('Siemens symbolic tag name is required');
+        const components = [];
+        let current = '';
+        let inQuotes = false;
+        for (let index = 0; index < source.length; index++) {
+            const char = source[index];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+                current += char;
+                continue;
+            }
+            if (char === '.' && !inQuotes) {
+                const component = current.trim();
+                if (!component)
+                    throw new Error('Invalid Siemens symbolic path: ' + tagName);
+                components.push(component);
+                current = '';
+                continue;
+            }
+            current += char;
+        }
+        if (inQuotes)
+            throw new Error('Invalid Siemens symbolic path: ' + tagName);
+        const last = current.trim();
+        if (!last)
+            throw new Error('Invalid Siemens symbolic path: ' + tagName);
+        components.push(last);
+        return components;
+    }
+    function normalizeSiemensSymbolicComponent(component, index) {
+        const value = String(component || '').trim();
+        if (!value)
+            throw new Error('Invalid Siemens symbolic component');
+        const quotedMatch = value.match(/^"([^"]+)"$/);
+        if (quotedMatch)
+            return '"' + quotedMatch[1] + '"';
+        return index === 0 ? '"' + value + '"' : value;
+    }
     function formatSiemensBitSlice(tagName, bit) {
-        return '"' + String(tagName || '').trim() + '".%X' + bit;
+        const components = splitSiemensSymbolicPath(tagName);
+        return components.map((component, index) => normalizeSiemensSymbolicComponent(component, index)).join('.') + '.%X' + bit;
     }
     function parseWordAddress(address) {
         const match = String(address || '').trim().match(/^([A-Za-z]+)(\d+)$/);
@@ -50,9 +92,15 @@ var GrafcetStudioCodegenPayload;
             const bitIndex = stepNumber - 1;
             const wordOffset = Math.floor(bitIndex / 16);
             const bit = bitIndex % 16;
+            const activeWordTag = String((flow && flow.activeWordTag) || '').trim();
+            const completeWordTag = String((flow && flow.completeWordTag) || '').trim();
             return {
-                execAddress: formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
-                doneAddress: formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
+                execAddress: activeWordTag
+                    ? formatSiemensBitSlice(wordOffset > 0 ? activeWordTag + '_' + wordOffset : activeWordTag, bit)
+                    : formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
+                doneAddress: completeWordTag
+                    ? formatSiemensBitSlice(wordOffset > 0 ? completeWordTag + '_' + wordOffset : completeWordTag, bit)
+                    : formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
             };
         }
         const pairOffset = (stepNumber - 1) * 2;
@@ -297,7 +345,9 @@ var GrafcetStudioCodegenPayload;
                 boolAddressMode: diagram.boolAddressMode || 'linear',
                 baseMr: diagram.baseMr == null || diagram.baseMr === '' ? null : String(diagram.baseMr),
                 activeWord: diagram.activeWord || '',
-                completeWord: diagram.completeWord || ''
+                completeWord: diagram.completeWord || '',
+                activeWordTag: String(diagram.activeWordTag || ''),
+                completeWordTag: String(diagram.completeWordTag || '')
             },
             steps,
             transitions,

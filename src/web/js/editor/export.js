@@ -1,8 +1,8 @@
 "use strict";
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
 //  IMPORT / EXPORT
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 function triggerImport(){ document.getElementById('file-input').click(); }
 function handleImport(e) {
   const file=e.target.files[0]; if(!file) return;
@@ -11,7 +11,7 @@ function handleImport(e) {
     try {
       const raw=JSON.parse(ev.target.result);
 
-      // â”€â”€ v1: single diagram â”€â”€
+      //  v1: single diagram 
       if(raw.state&&raw.state.steps!==undefined) {
         const id='diag-'+Date.now();
         const name='Imported: '+file.name.replace(/\.(grafcet|json)$/,'');
@@ -29,17 +29,17 @@ function handleImport(e) {
         }));
         saveDiagramData(id, raw.state, raw.nextId||1, Math.max(1, raw.nextStepNum || 1), 60, 40, 1);
         saveProject(); renderTree(); openTab(id);
-        toast('âœ“ Imported v1 diagram');
+        toast('Imported v1 diagram');
         return;
       }
 
-      // â”€â”€ v2/v3: full project â”€â”€
+      // v2/v3: full project 
       if(raw.project&&raw.diagrams) {
         const ver = raw.version||'2.0';
         const mode = confirm(
           `Import project "${raw.project.name}" (v${ver})?\n\n` +
-          `â€¢ REPLACE â€” clear current project and load this one\n` +
-          `â€¢ MERGE â€” add to current project\n\n` +
+          `REPLACE - clear current project and load this one\n` +
+          ` MERGE - to current project\n\n` +
           `OK = Replace  |  Cancel = Merge`
         );
 
@@ -125,7 +125,9 @@ function handleImport(e) {
             boolAddressMode: d.boolAddressMode,
             baseMr: d.baseMr,
             activeWord: d.activeWord,
-            completeWord: d.completeWord
+            completeWord: d.completeWord,
+            activeWordTag: d.activeWordTag,
+            completeWordTag: d.completeWordTag
           });
           if (typeof ensureFlowAddressConfig === 'function') {
             ensureFlowAddressConfig(project.diagrams[project.diagrams.length - 1], true);
@@ -143,12 +145,12 @@ function handleImport(e) {
         saveProject(); renderTree(); renderTabs();
         const firstDiag = project.diagrams[0];
         if(firstDiag) openTab(firstDiag.id);
-        toast(`âœ“ ${mode?'Replaced':'Merged'}: ${raw.diagrams.length} diagrams, ${(raw.units||[]).length} units`);
+        toast(` ${mode?'Replaced':'Merged'}: ${raw.diagrams.length} diagrams, ${(raw.units||[]).length} units`);
         return;
       }
 
-      toast('âš  Unknown file format');
-    } catch(err){ toast('âš  Import error: '+err.message); console.error(err); }
+      toast('  Unknown file format');
+    } catch(err){ toast(' Import error: '+err.message); console.error(err); }
   };
   reader.readAsText(file); e.target.value='';
 }
@@ -170,6 +172,8 @@ function exportProject() {
     baseMr: d.baseMr || 'MR100',
     activeWord: d.activeWord || '',
     completeWord: d.completeWord || '',
+    activeWordTag: d.activeWordTag || '',
+    completeWordTag: d.completeWordTag || '',
     // Full diagram data (steps, transitions, vars, etc.)
     data: loadDiagramData(d.id)||{}
   }));
@@ -197,11 +201,11 @@ function exportProject() {
   a.href=URL.createObjectURL(blob);
   a.download=project.name.replace(/\s+/g,'_')+'.grafcet2';
   a.click();
-  toast('âœ“ Project exported (v3.0)');
+  toast('Project exported (v3.0)');
 }
 
 function exportHTML() {
-  if(!activeDiagramId){toast('âš  No active diagram');return;}
+  if(!activeDiagramId){toast('No active diagram');return;}
   flushState();
   const data=loadDiagramData(activeDiagramId);
   if(!data){return;}
@@ -222,7 +226,7 @@ function exportHTML() {
   const diagName=project.diagrams.find(d=>d.id===activeDiagramId)?.name||'Diagram';
   const html=`<!DOCTYPE html>
 <html lang="vi">
-<head><meta charset="UTF-8"><title>GRAFCET â€” ${diagName}</title>
+<head><meta charset="UTF-8"><title>GRAFCET Ã¢â‚¬â€ ${diagName}</title>
 <style>
 body{background:#0b0d11;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:100vh;font-family:monospace;color:#c8d0e0;padding:30px;}
 h1{font-size:13px;letter-spacing:4px;color:#f5a623;margin-bottom:6px;}
@@ -230,8 +234,8 @@ h1{font-size:13px;letter-spacing:4px;color:#f5a623;margin-bottom:6px;}
 svg{border:1px solid #222d44;background:#0b0d11;max-width:95vw;}
 </style></head>
 <body>
-<h1>GRAFCET â€” ${diagName.toUpperCase()}</h1>
-<div class="sub">IEC 60848 Â· ${project.name} Â· Exported ${new Date().toLocaleString('vi-VN')} Â· ${s2.steps.length} steps Â· ${s2.transitions.length} transitions</div>
+<h1>GRAFCET ${diagName.toUpperCase()}</h1>
+<div class="sub">IEC 60848 Ã‚Â· ${project.name} Ã‚Â· Exported ${new Date().toLocaleString('vi-VN')} Ã‚Â· ${s2.steps.length} steps Ã‚Â· ${s2.transitions.length} transitions</div>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" style="height:80vh;">${svgContent}</svg>
 <div style="margin-top:16px;font-size:9px;color:#222d44;letter-spacing:2px;">GENERATED BY GRAFCET STUDIO v2</div>
 </body></html>`;
@@ -240,7 +244,7 @@ svg{border:1px solid #222d44;background:#0b0d11;max-width:95vw;}
   const blob=new Blob([html],{type:'text/html'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=(safeProj?safeProj+'_':'')+safeDiag+'.html';a.click();
-  toast('âœ“ HTML exported');
+  toast('HTML exported');
 }
 
 function buildExportSVGContent(s2) {
@@ -275,7 +279,7 @@ function buildExportSVGContent(s2) {
         out.push(`<rect x="${s.x+SW+2}" y="${s.y+pad+lineH*i+1}" width="14" height="${lineH-3}" rx="2" fill="${qc}" opacity=".18"/>`);
         out.push(`<text x="${s.x+SW+9}" y="${y0-1}" text-anchor="middle" fill="${qc}" font-size="9" font-family="monospace" font-weight="bold">${esc(act.qualifier||'N')}</text>`);
         const vdisp=act.variable||(act.address?'@'+act.address:'');
-        out.push(`<text x="${s.x+SW+22}" y="${y0-1}" fill="#6a9fc0" font-size="10" font-family="monospace">${esc(vdisp.length>14?vdisp.slice(0,13)+'â€¦':vdisp)}</text>`);
+        out.push(`<text x="${s.x+SW+22}" y="${y0-1}" fill="#6a9fc0" font-size="10" font-family="monospace">${esc(vdisp.length>14?vdisp.slice(0,13)+'Ã¢¦':vdisp)}</text>`);
         if((act.qualifier==='L'||act.qualifier==='D')&&act.time) out.push(`<text x="${s.x+SW+ACT_W-3}" y="${y0-1}" text-anchor="end" fill="#22d3ee" font-size="8" font-family="monospace">${esc(act.time)}</text>`);
         if(i<al.length-1) out.push(`<line x1="${s.x+SW+1}" y1="${s.y+pad+lineH*(i+1)}" x2="${s.x+SW+ACT_W-1}" y2="${s.y+pad+lineH*(i+1)}" stroke="#1e3050" stroke-width="0.5"/>`);
       });
@@ -334,9 +338,8 @@ function getPortXYStatic(id, port, s2) {
   return null;
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
 //  HELPERS
-//  show / hide / toast / toastTimer / closeModal â†’ moved to src/js/modules/utils.js
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-function svgE(t){return document.createElementNS('http://www.w3.org/2000/svg',t);}
+//  show / hide / toast / toastTimer / closeModal Ã¢â€ â€™ moved to src/js/modules/utils.js
+// 
 

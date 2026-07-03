@@ -4,6 +4,7 @@ const getById = (id) => document.getElementById(id);
 const isEditableTarget = ({ target }) => ['INPUT', 'TEXTAREA'].includes(target.tagName);
 const getCanvasPoint = ({ clientX, clientY }) => w2s(clientX, clientY);
 const setAttrs = (el, attrs) => Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+const svgE = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
 
 // ═══════════════════════════════════════════════════════════
 //  MOUSE INTERACTIONS

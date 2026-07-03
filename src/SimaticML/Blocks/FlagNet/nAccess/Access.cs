@@ -1,4 +1,4 @@
-﻿using SimaticML.Enums;
+using SimaticML.Enums;
 using SimaticML.Enums.Utility;
 using SimaticML.XMLClasses;
 using System.Xml;
@@ -72,13 +72,53 @@ namespace SimaticML.Blocks.FlagNet.nAccess
 
         public void SetAddress(string address)
         {
-            var addressComponentList = SimaticMLUtil.SplitFullAddressIntoComponents(address);
+            var bitSlice = TryParseBitSliceAddress(address, out var pathWithoutSlice, out var sliceAccessModifier);
+            var addressComponentList = SimaticMLUtil.SplitFullAddressIntoComponents(bitSlice ? pathWithoutSlice : address);
 
             symbol.GetItems().Clear();
-            foreach (var component in Access.ParseAddressComponents(addressComponentList))
+            var parsedComponents = Access.ParseAddressComponents(addressComponentList);
+            if (bitSlice && parsedComponents.Count > 0)
+            {
+                parsedComponents[^1].SetSliceAccessModifier(sliceAccessModifier);
+            }
+
+            foreach (var component in parsedComponents)
             {
                 symbol.GetItems().Add(component);
             }
+        }
+
+        private static bool TryParseBitSliceAddress(string address, out string pathWithoutSlice, out string sliceAccessModifier)
+        {
+            pathWithoutSlice = address;
+            sliceAccessModifier = string.Empty;
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                return false;
+            }
+
+            var trimmed = address.Trim();
+            var lastDot = trimmed.LastIndexOf('.');
+            if (lastDot <= 0 || lastDot >= trimmed.Length - 1)
+            {
+                return false;
+            }
+
+            var suffix = trimmed[(lastDot + 1)..];
+            if (suffix.Length < 3 || suffix[0] != '%' || char.ToUpperInvariant(suffix[1]) != 'X')
+            {
+                return false;
+            }
+
+            var bitText = suffix[2..];
+            if (bitText.Length == 0 || !bitText.All(char.IsDigit))
+            {
+                return false;
+            }
+
+            pathWithoutSlice = trimmed[..lastDot];
+            sliceAccessModifier = "x" + bitText;
+            return !string.IsNullOrWhiteSpace(pathWithoutSlice);
         }
 
         public static List<Component> ParseAddressComponents(List<SimaticAddressComponent> addressComponentList)

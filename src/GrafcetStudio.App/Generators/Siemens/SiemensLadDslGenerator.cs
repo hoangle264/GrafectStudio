@@ -16,6 +16,17 @@ namespace GrafcetStudio.App.Generators.Siemens;
 
 public sealed class SiemensLadDslGenerator : ICodeGenerator
 {
+    private static readonly string SiemensLadDebugLogPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "debug.log"));
+    //private static void SiemensLadDebugLog(string message)
+    //{
+    //    try
+    //    {
+    //        File.AppendAllText(SiemensLadDebugLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}");
+    //    }
+    //    catch
+    //    {
+    //    }
+    //}
     private const string DefaultTemplatePath = "templates/siemens-lad/default.lad.hbs";
 
     public string Platform => "siemens-lad";
@@ -194,9 +205,78 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         }
 
         var source = File.ReadAllText(path);
+        //SiemensLadDebugLog("LoadTemplate path=" + path + ", flows=" + payload.Flows.Count + ", units=" + payload.Units.Count);
+        //SiemensLadDebugLog("Flow address summary: " + BuildFlowAddressSummary(payload));
         var rendered = RenderTemplateSource(source, payload, path);
+        var networkCount = rendered.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+            .Count(line => line.TrimStart().StartsWith("NETWORK ", StringComparison.OrdinalIgnoreCase));
+        //SiemensLadDebugLog("Rendered template networkCount=" + networkCount + ", renderedLength=" + rendered.Length + ", preview=" + rendered.Substring(0, Math.Min(600, rendered.Length)).Replace(Environment.NewLine, " "));
+        //SiemensLadDebugLog("Rendered network diagnostics:" + Environment.NewLine + BuildRenderedNetworkDiagnostics(rendered));
         return SiemensLadTextTemplateParser.Parse(rendered, path);
     }
+
+    private static string BuildFlowAddressSummary(CodegenPayload payload)
+    {
+        if (payload.Flows.Count == 0)
+        {
+            return "<no flows>";
+        }
+
+        return string.Join(" || ", payload.Flows.Select(flow =>
+        {
+            var steps = flow.Steps ?? [];
+            var transitions = flow.Transitions ?? [];
+            var stepSummary = string.Join(", ", steps.Select(step =>
+                (string.IsNullOrWhiteSpace(step.Id) ? "<no-id>" : step.Id)
+                + "#" + step.Number
+                + " exec=" + QuoteForLog(step.ExecAddress)
+                + " done=" + QuoteForLog(step.DoneAddress)));
+            var transitionSummary = string.Join(", ", transitions.Select(transition =>
+                (string.IsNullOrWhiteSpace(transition.Id) ? "<no-id>" : transition.Id)
+                + " cond=" + QuoteForLog(transition.Condition)));
+
+            return "flow=" + QuoteForLog(flow.Name ?? flow.Id)
+                + " unit=" + QuoteForLog(flow.Diagram?.UnitId)
+                + " activeWordTag=" + QuoteForLog(flow.Diagram?.ActiveWordTag)
+                + " completeWordTag=" + QuoteForLog(flow.Diagram?.CompleteWordTag)
+                + " steps=[" + stepSummary + "]"
+                + " transitions=[" + transitionSummary + "]";
+        }));
+    }
+
+    private static string BuildRenderedNetworkDiagnostics(string rendered)
+    {
+        var lines = rendered.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var output = new List<string>();
+        var currentNetwork = string.Empty;
+
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var lineNumber = index + 1;
+            var raw = lines[index];
+            var trimmed = raw.Trim();
+            if (trimmed.StartsWith("NETWORK ", StringComparison.OrdinalIgnoreCase))
+            {
+                currentNetwork = trimmed.Length > 8 ? trimmed[8..].Trim() : string.Empty;
+                output.Add($"line {lineNumber}: {trimmed}");
+                continue;
+            }
+
+            if (trimmed.StartsWith("EXPR", StringComparison.OrdinalIgnoreCase))
+            {
+                output.Add($"line {lineNumber}: network={QuoteForLog(currentNetwork)} expr={QuoteForLog(trimmed)} raw={QuoteForLog(raw)}");
+            }
+            else if (!string.IsNullOrWhiteSpace(currentNetwork) && (trimmed.StartsWith("COIL", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("SET_COIL", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("RESET_COIL", StringComparison.OrdinalIgnoreCase)))
+            {
+                output.Add($"line {lineNumber}: network={QuoteForLog(currentNetwork)} output={QuoteForLog(trimmed)}");
+            }
+        }
+
+        return output.Count == 0 ? "<no network diagnostics>" : string.Join(Environment.NewLine, output);
+    }
+
+    private static string QuoteForLog(string? value)
+        => value is null ? "<null>" : '"' + value.Replace("\r", "\\r").Replace("\n", "\\n") + '"';
 
     private static string RenderTemplateSource(string source, CodegenPayload payload, string path)
     {

@@ -326,6 +326,8 @@ function saveDiagPropsPanel() {
   d.baseMr = address.baseMr;
   d.activeWord = address.activeWord;
   d.completeWord = address.completeWord;
+  d.activeWordTag = address.activeWordTag;
+  d.completeWordTag = address.completeWordTag;
   saveProject(); renderTree(); renderTabs();
   document.getElementById('dp-title').textContent = d.name;
   dpUpdateCodePreview(d);

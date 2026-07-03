@@ -59,8 +59,54 @@ namespace GrafcetStudioCodegenPayload {
     width: number;
   }
 
+  function splitSiemensSymbolicPath(tagName: string): string[] {
+    const source = String(tagName || '').trim();
+    if (!source) throw new Error('Siemens symbolic tag name is required');
+
+    const components: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < source.length; index++) {
+      const char = source[index];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        current += char;
+        continue;
+      }
+
+      if (char === '.' && !inQuotes) {
+        const component = current.trim();
+        if (!component) throw new Error('Invalid Siemens symbolic path: ' + tagName);
+        components.push(component);
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (inQuotes) throw new Error('Invalid Siemens symbolic path: ' + tagName);
+
+    const last = current.trim();
+    if (!last) throw new Error('Invalid Siemens symbolic path: ' + tagName);
+    components.push(last);
+    return components;
+  }
+
+  function normalizeSiemensSymbolicComponent(component: string, index: number): string {
+    const value = String(component || '').trim();
+    if (!value) throw new Error('Invalid Siemens symbolic component');
+
+    const quotedMatch = value.match(/^"([^"]+)"$/);
+    if (quotedMatch) return '"' + quotedMatch[1] + '"';
+
+    return index === 0 ? '"' + value + '"' : value;
+  }
+
   function formatSiemensBitSlice(tagName: string, bit: number): string {
-    return '"' + String(tagName || '').trim() + '".%X' + bit;
+    const components = splitSiemensSymbolicPath(tagName);
+    return components.map((component, index) => normalizeSiemensSymbolicComponent(component, index)).join('.') + '.%X' + bit;
   }
 
   interface ParsedAddressBase {
@@ -518,5 +564,3 @@ namespace GrafcetStudioCodegenPayload {
 }
 
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
-
-

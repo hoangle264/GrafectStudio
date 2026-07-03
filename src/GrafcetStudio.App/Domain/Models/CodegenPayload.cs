@@ -76,7 +76,9 @@ public class DiagramInfo
     [JsonPropertyName("boolAddressMode")] public string? BoolAddressMode { get; set; }
     [JsonPropertyName("baseMr")] public string? BaseMr { get; set; }
     [JsonPropertyName("activeWord")] public string? ActiveWord { get; set; }
+    [JsonPropertyName("activeWordTag")] public string? ActiveWordTag { get; set; }
     [JsonPropertyName("completeWord")] public string? CompleteWord { get; set; }
+    [JsonPropertyName("completeWordTag")] public string? CompleteWordTag { get; set; }
 }
 
 public class OrchestratorConfig
@@ -112,4 +114,3 @@ public class FlowInfo
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
     [JsonPropertyName("macroPortVariable")] public DeviceVariable? MacroPortVariable { get; set; }
 }
-
