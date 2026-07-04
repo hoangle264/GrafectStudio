@@ -61,17 +61,6 @@ function cgUCLoadFile(inputId, onSuccess) {
   reader.readAsText(file);
 }
 
-function cgUCUpdateStatus() {
-  const el = document.getElementById('uc-status');
-  if (!el) return;
-  const parts = [];
-  parts.push(UC_UNIT_CONFIG ? 'Unit Config loaded' : 'Unit Config not loaded');
-  if (UC_CYLINDER_TYPES) parts.push('Cylinder Types loaded');
-  if (UC_RUNTIME_DEVICE_META) parts.push('Runtime Metadata loaded');
-  if (UC_DEVICE_COMMAND_LIBRARY) parts.push('Device Library loaded');
-  el.textContent = parts.join(' | ');
-}
-
 function ucBuildSyntheticConfig(selectedUnitId) {
   const units = (typeof project !== 'undefined' && project.units) || [];
   const unit = selectedUnitId && selectedUnitId !== '__none__'
