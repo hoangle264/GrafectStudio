@@ -43,10 +43,6 @@ function ucEnsureCylinderDeviceType() {
   return existing;
 }
 
-function ucLoadDeviceCommandLibrary(config) {
-  UC_DEVICE_COMMAND_LIBRARY = config || null;
-}
-
 function cgUCLoadFile(inputId, onSuccess) {
   const input = document.getElementById(inputId);
   const file = input && input.files && input.files[0];
