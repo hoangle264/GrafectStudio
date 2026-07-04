@@ -70,11 +70,6 @@ function toggleSubPanel(id) {
   panelState[id] = !panelState[id];
   savePanelState(); applyPanelState();
 }
-function pinSubPanel(id, e) {
-  if(e) e.stopPropagation();
-  toggleSubPanel(id);
-}
-
 function init() {
   loadPanelState();
   loadProject();
