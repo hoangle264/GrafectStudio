@@ -43,24 +43,6 @@ function ucEnsureCylinderDeviceType() {
   return existing;
 }
 
-function cgUCLoadFile(inputId, onSuccess) {
-  const input = document.getElementById(inputId);
-  const file = input && input.files && input.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function() {
-    try {
-      const data = JSON.parse(reader.result || '{}');
-      if (typeof onSuccess === 'function') onSuccess(data);
-    } catch (err) {
-      console.error('[unit-config] Invalid JSON:', err);
-      if (typeof toast === 'function') toast('Invalid JSON: ' + (err.message || err));
-    }
-  };
-  reader.readAsText(file);
-}
-
 function ucBuildSyntheticConfig(selectedUnitId) {
   const units = (typeof project !== 'undefined' && project.units) || [];
   const unit = selectedUnitId && selectedUnitId !== '__none__'
