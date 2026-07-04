@@ -62,7 +62,3 @@ function ucBuildSyntheticConfig(selectedUnitId) {
     devices: []
   };
 }
-
-function cgGenerateUnitConfig() {
-  return JSON.stringify(UC_UNIT_CONFIG || ucBuildSyntheticConfig(null) || {}, null, 2);
-}
