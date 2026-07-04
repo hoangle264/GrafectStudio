@@ -4,10 +4,6 @@ function eiGetParserApi() {
   return window.GrafcetStudio && window.GrafcetStudio.excelImport;
 }
 
-function eiValidateAddr(addr) {
-  return eiGetParserApi().validateAddress(addr);
-}
-
 function eiParseCSV(text) {
   return eiGetParserApi().parseCSV(text);
 }
