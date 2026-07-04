@@ -155,18 +155,3 @@ function receiveError(payload) {
   if (stat) stat.textContent = 'C# host error';
 }
 
-function cgUCHighlight(pre, profile) {
-  const commentPfx = profile ? profile.comment : ';';
-  const commentRe = commentPfx === '//' ? /^(\/\/.*)$/gm : /^(;.*)$/gm;
-  const escaped = pre.textContent.replace(/[&<>]/g, c =>
-    c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
-  pre.innerHTML = escaped
-    .replace(/^(;&lt;h1\/&gt;.*)$/gm, '<span style="color:var(--amber);font-weight:bold">$1</span>')
-    .replace(commentRe, '<span style="color:var(--text3)">$1</span>')
-    .replace(/\b(LDP|LDB|ANP|ANF|ALT|DIFU|ZRES|CON|MPS|MRD|MPP|LD|SET|RES|RST|OUT|AND|ANB|OR|ORL|ANL|ONDL|MOV)\b/g,
-      '<span style="color:var(--cyan)">$1</span>')
-    .replace(/@MR\d+/g, '<span style="color:var(--amber)">$&</span>')
-    .replace(/\bMR\d+\b/g, '<span style="color:#4ade80">$&</span>')
-    .replace(/\bLR\d+\b/g, '<span style="color:#f472b6">$&</span>');
-}
-
