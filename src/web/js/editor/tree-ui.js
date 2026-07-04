@@ -225,42 +225,6 @@ function makeUnitItem(u) {
   return wrap;
 }
 
-function makeModeGroup(u, m) {
-  const diagsInMode = project.diagrams.filter(d=>d.unitId===u.id && d.mode===m.key);
-  const key = `${u.id}_${m.key}`;
-  const isOpen = localStorage.getItem('gf2-mode-open-'+key) !== '0';
-
-  const wrap = document.createElement('div');
-  wrap.className = `tree-mode-group mode-${m.key.toLowerCase()}`;
-
-  const head = document.createElement('div');
-  head.className = 'tree-mode-head';
-  head.innerHTML = `
-    <span class="tree-mode-icon">${m.icon}</span>
-    <span class="tree-mode-name">${m.key}</span>
-    <button class="tree-mode-add" onclick="addDiagramInUnit('${u.id}','${m.key}');event.stopPropagation()" title="Add diagram">+</button>`;
-  head.addEventListener('click', ()=>{
-    const c=wrap.querySelector('.tree-mode-children');
-    const open=c.classList.toggle('hidden');
-    localStorage.setItem('gf2-mode-open-'+key, open?'0':'1');
-  });
-
-  const children = document.createElement('div');
-  children.className = 'tree-mode-children' + (isOpen?'':' hidden');
-
-  if(!diagsInMode.length){
-    const empty=document.createElement('div');
-    empty.style.cssText='padding:3px 8px 3px 28px;font-size:9px;color:var(--text3);font-style:italic;';
-    empty.textContent='empty';
-    children.appendChild(empty);
-  } else {
-    diagsInMode.forEach(d=>children.appendChild(makeDiagItem(d)));
-  }
-
-  wrap.appendChild(head); wrap.appendChild(children);
-  return wrap;
-}
-
 function makeDriversSection() {
   const wrap = document.createElement('div');
   wrap.className = 'tree-drivers';
