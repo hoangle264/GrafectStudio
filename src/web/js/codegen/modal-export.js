@@ -1,9 +1,4 @@
-// Status badge cho file load 
-
-//  Download / Copy 
-function cgDownloadCode() {
-  cgGenerateSelectedUnit();
-}
+// Status badge cho file load
 function cgExportViaHost(code, platform) {
   if (!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function')) {
     return false;
@@ -14,10 +9,4 @@ function cgExportViaHost(code, platform) {
   });
   toast('Export dialog opened');
   return true;
-}
-
-function cgCopyCode() {
-  const pre = document.getElementById('cg-preview');
-  if (!pre) return;
-  navigator.clipboard.writeText(pre.textContent).then(() => toast('✓ Copied to clipboard'));
 }
