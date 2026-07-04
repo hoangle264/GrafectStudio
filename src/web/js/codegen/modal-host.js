@@ -36,16 +36,6 @@ function cgBuildCSharpPayload(platform, unitId) {
   return cgGetPayloadApi().buildCSharpPayload(cgBuildPayloadContext(), platform, unitId || cgGetDefaultUnitId() || '');
 }
 
-function cgBuildCSharpFlow(diagId) {
-  return cgGetPayloadApi().buildCSharpFlow(cgBuildPayloadContext(), diagId);
-}
-
-function cgBuildCSharpUnitPayload(platform, unitId) {
-  return cgGetPayloadApi().buildCSharpUnitPayload(cgBuildPayloadContext(), platform, unitId);
-}
-function cgBuildCSharpProjectPayload(platform) {
-  return cgGetPayloadApi().buildCSharpProjectPayload(cgBuildPayloadContext(), platform);
-}
 function cgGenerateSelectedUnit() {
   const target = document.getElementById('cg-target')?.value || 'unit-config';
   const platform = cgResolveHostPlatform(target);
