@@ -30,10 +30,6 @@ function resolveStepAddress(step, flow) {
   return cgGetPayloadApi().resolveStepAddress(step, flow);
 }
 
-function cgValidateUnitAddressConfig(unitDiagrams) {
-  return cgGetPayloadApi().validateUnitAddressConfig(cgBuildPayloadContext(), unitDiagrams);
-}
-
 function cgBuildCSharpPayload(platform, unitId) {
   if (typeof gvtFlushFocusedAddressInput === 'function') gvtFlushFocusedAddressInput();
   if (activeDiagramId && typeof flushState === 'function') flushState();
