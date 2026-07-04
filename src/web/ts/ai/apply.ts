@@ -294,16 +294,17 @@
 
   function getFlowNodeY(index: number): number { return 120 + (index * 140); }
 
-  function normalizeFlowAction(action: GrafcetStudioProject.StepAction): GrafcetStudioProject.StepAction | null {
-    const raw = action as Record<string, unknown>;
+  function normalizeFlowAction(action: unknown): GrafcetStudioProject.StepAction | null {
+    const raw = (action || {}) as Record<string, unknown>;
     let variable = trimString(raw.variable);
     if (!variable && typeof raw.expression === 'string') variable = raw.expression.split('=')[0].trim();
     if (!variable) return null;
+    const qualifier = trimString(raw.qualifier) as GrafcetStudioProject.ActionQualifier;
     return {
-      qualifier: trimString(raw.qualifier) || 'N',
+      qualifier: qualifier || 'N',
       variable,
       address: raw.address == null ? '' : trimString(raw.address),
-      time: raw.time == null ? '' : trimString(raw.time)
+      timeMs: Number(raw.timeMs || raw.time || 0)
     };
   }
 

@@ -15,7 +15,7 @@ namespace GrafcetStudioProject {
   export type IOMappingStatus = 'matched' | 'mapped' | 'unmatched' | string;
   export type VariableKind = 'primitive' | 'struct' | string;
   export type VariableSource = 'csv' | 'manual' | 'excel' | string;
-  export type ActionQualifier = 'N' | 'S' | 'R' | 'L' | 'D' | 'P' | 'P0' | 'P1' | string;
+  export type ActionQualifier = 'N' | 'S' | 'R' | 'P' | 'P0' | 'L' | 'D' | 'SD' | 'DS' | 'SL';
 
   export interface Project {
     id: string;
@@ -85,32 +85,31 @@ namespace GrafcetStudioProject {
     number?: number;
     label?: string;
     initial?: boolean;
-    isInitial?: boolean;
+    kind?: StepKind;
+    macroFlowId?: string | null;
+    actions?: StepAction[];
+    execAddress?: string | null;
+    doneAddress?: string | null;
+    // canvas-only, không serialize sang C#
     x?: number;
     y?: number;
     w?: number;
     h?: number;
-    kind?: StepKind;
-    macroFlowId?: string | null;
-    actions?: StepAction[];
     connections?: Connection[];
-    execAddress?: string | null;
-    doneAddress?: string | null;
-    [key: string]: unknown;
   }
 
   export interface Transition {
     id: string;
     label?: string;
     condition?: string;
+    fromStepIds?: string[];
+    toStepIds?: string[];
+    // canvas-only, không serialize sang C#
     x?: number;
     y?: number;
     w?: number;
     h?: number;
-    fromStepIds?: string[];
-    toStepIds?: string[];
     connections?: Connection[];
-    [key: string]: unknown;
   }
 
   export interface Connection {
@@ -125,12 +124,12 @@ namespace GrafcetStudioProject {
   export interface StepAction {
     variable: string;
     address?: string | null;
-    qualifier?: ActionQualifier;
+    qualifier: ActionQualifier;
+    timeMs: number;
+    // UI-only, không serialize sang C#
     time?: number | string;
-    timeMs?: number;
     complete?: StepActionCompletion | null;
     sensorRef?: string | null;
-    [key: string]: unknown;
   }
 
   export interface StepActionCompletion {
@@ -164,11 +163,8 @@ namespace GrafcetStudioProject {
   export interface DeviceVariable {
     label: string;
     format: string;
-    dataType?: string;
-    structure?: string;
     address?: string | null;
     signalAddresses?: Record<string, string>;
-    [key: string]: unknown;
   }
 
   export interface ProjectVariable extends DeviceVariable {
@@ -236,18 +232,19 @@ namespace GrafcetStudioProject {
     files: CodegenFile[];
   }
 
-  export interface AppConfig {
-    platform?: string;
-    templateRootPath?: string;
-    deviceLibraryPath?: string;
-    outputPath?: string;
+  export interface CodegenPayload {
+    platform: string;
+    templateRootPath: string;
     project?: ProjectInfo;
     unit?: UnitInfo;
-    units?: UnitInfo[];
-    flows?: FlowInfo[];
-    variables?: DeviceVariable[];
-    deviceTypes?: DeviceType[];
-    [key: string]: unknown;
+    units: UnitInfo[];
+    flows: FlowInfo[];
+    variables: DeviceVariable[];
+    deviceTypes: DeviceType[];
+    deviceLibraryPath: string;
+    templateProfile: string;
+    // UI-only, không serialize sang C#
+    outputPath?: string;
   }
 
   export interface ProjectInfo {

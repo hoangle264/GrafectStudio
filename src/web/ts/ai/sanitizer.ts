@@ -162,7 +162,7 @@
     assignString(result, 'dataType', raw.dataType);
     assignString(result, 'source', raw.source || raw._source);
     if (!result.label || !result.format) return null;
-    return result as GrafcetStudioProject.ProjectVariable;
+    return result as unknown as GrafcetStudioProject.ProjectVariable;
   }
 
   function variableSources(raw: unknown): unknown[] {
@@ -261,7 +261,7 @@
     if (complete) result.complete = complete;
     assignNullableString(result, 'sensorRef', raw.sensorRef);
     if (!result.variable) return null;
-    return result as GrafcetStudioProject.StepAction;
+    return result as unknown as GrafcetStudioProject.StepAction;
   }
 
   export function sanitizeStep(raw: unknown): GrafcetStudioProject.Step | null {
@@ -280,7 +280,7 @@
     const actions = arrayFrom(raw.actions).map(sanitizeStepAction).filter(function(item): item is GrafcetStudioProject.StepAction { return item !== null; });
     if (actions.length) result.actions = actions;
     if (!result.id) return null;
-    return result as GrafcetStudioProject.Step;
+    return result as unknown as GrafcetStudioProject.Step;
   }
 
   function sanitizeTransition(raw: unknown): GrafcetStudioProject.Transition | null {
@@ -296,7 +296,7 @@
     assignStringArray(result, 'fromStepIds', raw.fromStepIds);
     assignStringArray(result, 'toStepIds', raw.toStepIds);
     if (!result.id) return null;
-    return result as GrafcetStudioProject.Transition;
+    return result as unknown as GrafcetStudioProject.Transition;
   }
 
   function sanitizeConnection(raw: unknown): GrafcetStudioProject.Connection | null {

@@ -1,7 +1,4 @@
 {
-  "dependencies": {
-    "@openai/codex-sdk": "^0.133.0"
-  },
   "devDependencies": {
     "typescript": "^6.0.3"
   },

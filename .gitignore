@@ -49,3 +49,8 @@ templates/**
 templates/siemens-lad/**
 !templates/siemens-lad/default.lad.json
 config/
+
+# Deadcode reports
+reports/deadcode/**
+!reports/deadcode/.gitignore
+

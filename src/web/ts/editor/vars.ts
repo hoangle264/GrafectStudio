@@ -163,7 +163,7 @@
   export function gvtEditVar(context: VarsContext, source: string, key: string | number, field: string, value: unknown): ResolveEntryResult {
     const hit = gvtResolveEntry(context, source, key);
     if (!hit.item) return hit;
-    (hit.item as Record<string, unknown>)[field] = value;
+    (hit.item as unknown as Record<string, unknown>)[field] = value;
     if (field === 'format') {
       hit.item.dataType = String(value || '');
       const devType = (context.project.devices || []).find(device => device.name === value);

@@ -113,7 +113,7 @@ namespace GrafcetStudioAIMockService {
           mode: 'Auto',
           steps: [
             { id: 'mock-step-idle', number: 1, label: 'Idle', initial: true, actions: [] },
-            { id: 'mock-step-run', number: 2, label: 'Run', initial: false, actions: [{ variable: 'Mock_StartCommand', qualifier: 'N', address: 'MR100' }] }
+            { id: 'mock-step-run', number: 2, label: 'Run', initial: false, actions: [{ variable: 'Mock_StartCommand', qualifier: 'N', address: 'MR100', timeMs: 0 }] }
           ],
           transitions: [
             { id: 'mock-trans-start', label: 'Start', condition: 'Mock_StartCommand', fromStepIds: ['mock-step-idle'], toStepIds: ['mock-step-run'] }

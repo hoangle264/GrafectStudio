@@ -11,7 +11,7 @@ namespace GrafcetStudioCodegenPayload {
   type ProjectVariable = GrafcetStudioProject.ProjectVariable;
   type DeviceVariable = GrafcetStudioProject.DeviceVariable;
   type FlowInfo = GrafcetStudioProject.FlowInfo;
-  type AppConfig = GrafcetStudioProject.AppConfig;
+  type CodegenPayload = GrafcetStudioProject.CodegenPayload;
   type UnitInfo = GrafcetStudioProject.UnitInfo;
 
   export interface CodegenAssets {
@@ -447,7 +447,7 @@ namespace GrafcetStudioCodegenPayload {
     platform: string,
     unit: UnitInfo | null | undefined,
     flowsWithVariables: FlowBuildResult[]
-  ): AppConfig {
+  ): CodegenPayload {
     const allVars: DeviceVariable[] = [];
     const seenVars = new Set<string>();
     const addVar = (variable: DeviceVariable): void => {
@@ -496,7 +496,7 @@ namespace GrafcetStudioCodegenPayload {
     };
   }
 
-  export function buildCSharpUnitPayload(context: PayloadContext, platform: string, unitId: string): AppConfig {
+  export function buildCSharpUnitPayload(context: PayloadContext, platform: string, unitId: string): CodegenPayload {
     const units = context.project.units || [];
     const selectedUnit = unitId && unitId !== '__none__'
       ? units.find(unit => unit.id === unitId)
@@ -516,7 +516,7 @@ namespace GrafcetStudioCodegenPayload {
     return buildCSharpPayloadCore(context, platform, unit, flowResults);
   }
 
-  export function buildCSharpProjectPayload(context: PayloadContext, platform: string): AppConfig {
+  export function buildCSharpProjectPayload(context: PayloadContext, platform: string): CodegenPayload {
     const allDiagrams = context.project.diagrams || [];
     const flowsByUnit = new Map<string, DiagramMeta[]>();
 
@@ -535,7 +535,7 @@ namespace GrafcetStudioCodegenPayload {
     return buildCSharpPayloadCore(context, platform, null, flowResults);
   }
 
-  export function buildCSharpPayload(context: PayloadContext, platform: string, unitId?: string): AppConfig {
+  export function buildCSharpPayload(context: PayloadContext, platform: string, unitId?: string): CodegenPayload {
     if (context.syncVariableSignalAddressesFromDeviceTypes && context.syncVariableSignalAddressesFromDeviceTypes()) {
       if (context.saveProject) context.saveProject();
     }
@@ -545,10 +545,10 @@ namespace GrafcetStudioCodegenPayload {
   }
 
   export interface CodegenPayloadApi {
-    buildCSharpPayload(context: PayloadContext, platform: string, unitId?: string): AppConfig;
+    buildCSharpPayload(context: PayloadContext, platform: string, unitId?: string): CodegenPayload;
     buildCSharpFlow(context: PayloadContext, diagramId: string): FlowBuildResult;
-    buildCSharpUnitPayload(context: PayloadContext, platform: string, unitId: string): AppConfig;
-    buildCSharpProjectPayload(context: PayloadContext, platform: string): AppConfig;
+    buildCSharpUnitPayload(context: PayloadContext, platform: string, unitId: string): CodegenPayload;
+    buildCSharpProjectPayload(context: PayloadContext, platform: string): CodegenPayload;
     validateUnitAddressConfig(context: PayloadContext, unitDiagrams: DiagramMeta[]): void;
     resolveStepAddress(step: Step, flow: DiagramMeta): ResolvedStepAddress;
   }
