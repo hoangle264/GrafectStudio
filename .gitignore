@@ -54,3 +54,8 @@ config/
 reports/deadcode/**
 !reports/deadcode/.gitignore
 
+# tsc build artifacts (source: src/web/ts/core/{utils,constants,graph-utils}.ts)
+src/web/js/core/utils.js
+src/web/js/core/constants.js
+src/web/js/core/graph-utils.js
+
