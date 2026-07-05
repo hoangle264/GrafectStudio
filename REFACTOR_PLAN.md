@@ -59,44 +59,49 @@
 
 ## Phase 1 — core thuần
 
-- [ ] **PHASE 1 HOÀN TẤT**
+- [x] **PHASE 1 HOÀN TẤT**
 
 **Input:** `src/web/js/core/constants.js` (42), `core/utils.js` (28), `core/graph-utils.js` (79)
 **Output:** `src/web/ts/core/{constants,utils,graph-utils}.ts`
 **Phụ thuộc:** Phase 0 (types)
 
 **Checklist con:**
-- [ ] Chuyển `core/utils.js` → `core/utils.ts` (hàm thuần, không đụng canvas global).
-- [ ] Chuyển `core/constants.js` → `core/constants.ts` (chỉ hằng số).
-- [ ] Chuyển `core/graph-utils.js` → `core/graph-utils.ts`, dùng type `Step/Transition/Connection` từ `GrafcetStudioProject`.
-- [ ] Trong các file TS khác đang `declare function` cho utils/graph-utils: thay bằng ref thật (bỏ `declare` nếu type đã có sẵn từ file mới).
-- [ ] KHÔNG di chuyển thứ tự thẻ `<script>` #2 (utils), #3 (graph-utils), #6 (constants) trong `index.html` — giữ nguyên.
-- [ ] Xóa 3 file `.js` nguồn cũ sau khi `.ts` build ra `.js` tương đương (hoặc để tsc ghi đè — theo **Q4**).
-- [ ] `npm run typecheck` PASS.
+- [x] Chuyển `core/utils.js` → `core/utils.ts` (hàm thuần, không đụng canvas global).
+- [x] Chuyển `core/constants.js` → `core/constants.ts` (chỉ hằng số hình học — 10 const nhóm 1; nhóm 2 biến runtime canvas KHÔNG đưa vào đây, xem ghi chú dưới).
+- [x] Chuyển `core/graph-utils.js` → `core/graph-utils.ts`, dùng type `Step/Connection` từ `GrafcetStudioProject`; `ParallelBar` định nghĩa cục bộ (chưa có type dùng chung).
+- [x] Không có `declare function` nào cho utils/graph-utils cần thay — không file TS nào tham chiếu `esc/esc2/show/hide/closeModal/toast/resolveStepsThrough/getParallelPortMetrics` trước Phase này.
+- [x] Thứ tự thẻ `<script>` utils/graph-utils/constants trong `index.html` giữ nguyên; chỉ thêm 1 thẻ mới `js/editor/canvas-state.js` (xem ghi chú dưới).
+- [x] Untrack 3 file `.js` build-artifact khỏi git (`git rm --cached`) + thêm vào `.gitignore` (phạm vi hẹp: chỉ 3 file, không phải `src/web/js/**` toàn bộ — xem Nhật ký).
+- [x] `npm run typecheck` PASS.
 
-**Tiêu chí done:** 3 file thành `.ts`; `declare` cho utils/graph-utils được thay ref thật; thứ tự script giữ nguyên; typecheck pass; bridge không đổi.
+**Tiêu chí done:** 3 file thành `.ts`; thứ tự script giữ nguyên cho 3 file gốc; typecheck pass; bridge không đổi.
 
 **Rủi ro + rollback:**
 - `utils.ts` emit `.js` khác chữ ký cũ → `events.js` (Tier D) gọi sai. Test: so diff `utils.js` trước/sau `tsc`, mở app thao tác canvas cơ bản. Rollback: `git checkout src/web/js/core/utils.js`; revert `.ts`.
 - Thứ tự script: `constants.js`(#6) sau `store.js`(#5), nếu ref constant tại parse-time → ReferenceError. Test: load `index.html`, xem console. Rollback: giữ nguyên thứ tự #5/#6.
 
+**Ghi chú phát sinh (ngoài dự kiến ban đầu của Phase, đã xác nhận với người dùng):**
+- `constants.js` gốc (42 dòng) không chỉ chứa hằng số — có 2 nhóm: (1) 10 hằng số hình học thuần `SW,SH,TW,TH,PH,GRID,ACT_W,SNAP_ENTER_THRESHOLD,SNAP_EXIT_THRESHOLD,PAR_PORT_INSET,PAR_PORT_MIN_INSET,PAR_PORT_MIN_USABLE` → convert vào `constants.ts`; (2) biến trạng thái runtime canvas `state,nextId,nextStepNum,viewX,viewY,viewScale,snapOn,tool,selIds,dragging,dragMap,dragSnapState,dragSnapCandidates,dragSnapPrimaryId,panning,panSX,panSY,connecting,connFrom,selBoxing,selBoxSX,selBoxSY,resizingBar,resizeStartX,resizeStartW,ctxTarget,renameMode` — đây chính là loại global bị Tier D (`canvas.js,events.js,elements.js,project.js,actions.js`) đọc/ghi liên tục. Convert nhóm (2) sang `.ts` gây `TS2451: Cannot redeclare block-scoped variable` với `declare let state/nextId/.../viewScale` đã có sẵn trong `store.ts` (Phase 0). Người dùng chọn **phương án A**: tách nhóm (2) sang file JS mới `src/web/js/editor/canvas-state.js` (giữ nguyên JS, KHÔNG convert, KHÔNG đụng `store.ts`), ghi nợ kỹ thuật xử lý cùng đợt quyết định chiến lược Tier D sau này.
+- `.gitignore`: Q4 gốc chốt ignore toàn bộ `src/web/js/**`, nhưng `canvas-state.js` (JS nguồn thật, không phải build artifact) cũng nằm trong thư mục này → nếu ignore cả thư mục sẽ không track được. Người dùng đồng ý thu hẹp phạm vi: chỉ ignore 3 file build-artifact cụ thể vừa convert (`src/web/js/core/{utils,constants,graph-utils}.js`), giữ track các file JS thật còn lại. Danh sách ignore sẽ tăng dần theo từng Phase.
+- **Nợ kỹ thuật:** nhóm biến runtime canvas trong `constants.js` cũ nay nằm ở `src/web/js/editor/canvas-state.js`, chưa type hoá — sẽ xử lý cùng đợt với quyết định chiến lược Tier D (Phase D) sau này, không xử lý lẻ ở Phase 1.
+
 ---
 
 ## Phase 2 — Tier B logic/data
 
-- [ ] **PHASE 2 HOÀN TẤT**
+- [x] **PHASE 2 HOÀN TẤT**
 
 **Input:** `src/web/js/editor/export.js` (345), `editor/change-manager.js` (16), `codegen/unit-config.js` (65 — **chỉ khi Q1 tick**)
 **Output:** `src/web/ts/editor/{export,change-manager}.ts`, `src/web/ts/codegen/unit-config.ts`
 **Phụ thuộc:** Phase 1; `unit-config` phụ thuộc **Q1** (git status sạch)
 
 **Checklist con:**
-- [ ] Chuyển `editor/change-manager.js` → `.ts` (16 dòng dirty-state, không đụng canvas geometry).
-- [ ] Chuyển `editor/export.js` → `.ts`, ref `store`(TS) đúng type, dùng `CodegenPayload`/`Project` từ namespace.
-- [ ] **KIỂM TRA Q1**: nếu `git diff src/web/js/codegen/unit-config.js` KHÔNG rỗng → DỪNG, bỏ qua file này, báo người dùng. Nếu rỗng → chuyển `codegen/unit-config.js` → `.ts`.
-- [ ] Không tạo dependency mới lên canvas render-globals.
-- [ ] `index.html`: đổi đuôi tham chiếu nếu cần (thực chất `.js` output không đổi tên → thường không cần sửa).
-- [ ] `npm run typecheck` PASS.
+- [x] Chuyển `editor/change-manager.js` → `.ts` (16 dòng dirty-state, không đụng canvas geometry).
+- [x] Chuyển `editor/export.js` → `.ts`, ref `store`(TS) đúng type, dùng `CodegenPayload`/`Project` từ namespace.
+- [x] **KIỂM TRA Q1**: `git diff src/web/js/codegen/unit-config.js` rỗng (Q1 đã tick từ trước) → chuyển `codegen/unit-config.js` → `.ts`.
+- [x] Không tạo dependency mới lên canvas render-globals.
+- [x] `index.html`: không cần sửa (đuôi tham chiếu `.js` không đổi tên).
+- [x] `npm run typecheck` PASS.
 
 **Tiêu chí done:** các file thành `.ts`; không đụng canvas globals mới; `store`(TS) ref đúng; typecheck pass; `unit-config` chỉ làm khi git sạch.
 
@@ -231,7 +236,7 @@
 | Ngày | Phase | typecheck | Vấn đề phát sinh / ghi chú | Người/Model làm |
 |------|-------|-----------|----------------------------|-----------------|
 | 2026-07-04 | 0 | PASS | Rename `AppConfig`→`CodegenPayload`; strict `ActionQualifier`; gỡ index signature khỏi Step/Transition/StepAction/DeviceVariable/CodegenPayload; vá 4 file phụ thuộc (`ai/apply.ts`, `ai/mock-service.ts`, `ai/sanitizer.ts`, `editor/vars.ts`). `index.html` không đổi. | Sonnet |
-|      |       |           |                            |                 |
-|      |       |           |                            |                 |
+| 2026-07-04 | 1 | PASS | Convert `utils.ts`,`graph-utils.ts` nguyên vẹn. `constants.ts` chỉ giữ 10 hằng số hình học; tách nhóm biến runtime canvas (`state,nextId,...,renameMode`) sang JS mới `editor/canvas-state.js` (nợ kỹ thuật, gộp xử lý cùng Tier D sau) — tránh `TS2451` redeclare với `store.ts`. Thêm 1 thẻ `<script>` cho `canvas-state.js` trong `index.html`. `.gitignore`: ignore hẹp 3 file `core/{utils,constants,graph-utils}.js` (build artifact), không ignore cả `src/web/js/**` như Q4 gốc vì `canvas-state.js` là JS nguồn thật. | Sonnet |
+| 2026-07-05 | 2 | PASS | Convert `change-manager.ts`, `export.ts`, `unit-config.ts` (Q1 vẫn sạch — không có diff chưa commit). `change-manager.ts` thêm `declare function render()` (Tier D global). `export.ts` dùng type `GrafcetStudioProject.*` cho import/export project JSON + HTML snapshot; `devCategories` không có trong type `Project` chuẩn (chưa migrate sang DTO C#) nên truy cập qua `as unknown as { devCategories?: ... }`. Đối chiếu output `tsc` với `.js` gốc: hành vi giống hệt, chỉ khác `unitId: null`→`undefined` (tương đương do luôn check falsy) và bỏ biến `idMap` chết (không dùng ở bản gốc). Untrack 3 file `.js` build-artifact khỏi git + thêm `.gitignore`. | Sonnet |
 |      |       |           |                            |                 |
 |      |       |           |                            |                 |

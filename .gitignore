@@ -59,3 +59,8 @@ src/web/js/core/utils.js
 src/web/js/core/constants.js
 src/web/js/core/graph-utils.js
 
+# tsc build artifacts (source: src/web/ts/editor/{change-manager,export}.ts, src/web/ts/codegen/unit-config.ts)
+src/web/js/editor/change-manager.js
+src/web/js/editor/export.js
+src/web/js/codegen/unit-config.js
+
