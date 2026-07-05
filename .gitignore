@@ -64,3 +64,8 @@ src/web/js/editor/change-manager.js
 src/web/js/editor/export.js
 src/web/js/codegen/unit-config.js
 
+# tsc build artifacts (source: src/web/ts/codegen/{modal,modal-selectors,modal-host}.ts, src/web/ts/editor/ai-chat-ui.ts)
+src/web/js/codegen/modal.js
+src/web/js/codegen/modal-selectors.js
+src/web/js/codegen/modal-host.js
+src/web/js/editor/ai-chat-ui.js

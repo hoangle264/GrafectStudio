@@ -159,21 +159,21 @@
 
 ## Phase 5 — Tier C: modal + ai-chat
 
-- [ ] **PHASE 5 HOÀN TẤT**
+- [x] **PHASE 5 HOÀN TẤT**
 
 **Input:** `src/web/js/codegen/{modal-selectors,modal-host,modal-assets,modal-export,modal}.js`, `editor/ai-chat-ui.js`
 **Output:** `src/web/ts/codegen/{modal,modal-selectors,modal-host}.ts` (gộp `modal-export`+`modal-assets`→`modal.ts` theo **Q5**), `src/web/ts/editor/ai-chat-ui.ts`
 **Phụ thuộc:** Phase 2 (`payload.ts`,`unit-config.ts`), Phase 0
 
 **Checklist con:**
-- [ ] Xác nhận **Q5** đã chốt mức gộp.
-- [ ] Chuyển `modal-selectors.js` → `.ts` (DOM query, type cụ thể).
-- [ ] Chuyển `modal-host.js` → `.ts`; **KHÔNG đổi shape message** `window.chrome.webview.postMessage`/tên field JSON gửi C#.
-- [ ] Gộp `modal-export.js` (12) + `modal-assets.js` (85) vào `modal.ts`; xóa 2 thẻ `<script>` tương ứng (#42, #43) khỏi `index.html`.
-- [ ] Chuyển `modal.js` → `.ts`; các file modal dùng chung namespace nếu tách.
-- [ ] Chuyển `ai-chat-ui.js` → `.ts`; **KHÔNG đổi behavior AI pipeline** (propose→confirm→apply), chỉ thêm type.
-- [ ] Đối chiếu thứ tự khởi tạo modal (selectors chạy sau DOM ready) vẫn đúng.
-- [ ] `npm run typecheck` PASS.
+- [x] Xác nhận **Q5** đã chốt mức gộp.
+- [x] Chuyển `modal-selectors.js` → `.ts` (DOM query, type cụ thể).
+- [x] Chuyển `modal-host.js` → `.ts`; **KHÔNG đổi shape message** `window.chrome.webview.postMessage`/tên field JSON gửi C#.
+- [x] Gộp `modal-export.js` (12) + `modal-assets.js` (85) vào `modal.ts`; xóa 2 thẻ `<script>` tương ứng (#42, #43) khỏi `index.html`.
+- [x] Chuyển `modal.js` → `.ts`; các file modal dùng chung namespace nếu tách.
+- [x] Chuyển `ai-chat-ui.js` → `.ts`; **KHÔNG đổi behavior AI pipeline** (propose→confirm→apply), chỉ thêm type.
+- [x] Đối chiếu thứ tự khởi tạo modal (selectors chạy sau DOM ready) vẫn đúng.
+- [x] `npm run typecheck` PASS.
 
 **Tiêu chí done:** gộp `modal-export`+`modal-assets`→`modal.ts`, đã xóa thẻ script tương ứng; bridge `modal-host`→C# giữ postMessage nguyên shape; AI pipeline behavior KHÔNG đổi; typecheck pass.
 
@@ -239,5 +239,6 @@
 | 2026-07-04 | 1 | PASS | Convert `utils.ts`,`graph-utils.ts` nguyên vẹn. `constants.ts` chỉ giữ 10 hằng số hình học; tách nhóm biến runtime canvas (`state,nextId,...,renameMode`) sang JS mới `editor/canvas-state.js` (nợ kỹ thuật, gộp xử lý cùng Tier D sau) — tránh `TS2451` redeclare với `store.ts`. Thêm 1 thẻ `<script>` cho `canvas-state.js` trong `index.html`. `.gitignore`: ignore hẹp 3 file `core/{utils,constants,graph-utils}.js` (build artifact), không ignore cả `src/web/js/**` như Q4 gốc vì `canvas-state.js` là JS nguồn thật. | Sonnet |
 | 2026-07-05 | 2 | PASS | Convert `change-manager.ts`, `export.ts`, `unit-config.ts` (Q1 vẫn sạch — không có diff chưa commit). `change-manager.ts` thêm `declare function render()` (Tier D global). `export.ts` dùng type `GrafcetStudioProject.*` cho import/export project JSON + HTML snapshot; `devCategories` không có trong type `Project` chuẩn (chưa migrate sang DTO C#) nên truy cập qua `as unknown as { devCategories?: ... }`. Đối chiếu output `tsc` với `.js` gốc: hành vi giống hệt, chỉ khác `unitId: null`→`undefined` (tương đương do luôn check falsy) và bỏ biến `idMap` chết (không dùng ở bản gốc). Untrack 3 file `.js` build-artifact khỏi git + thêm `.gitignore`. | Sonnet |
 | 2026-07-05 | 3+4 | PASS | Codex convert 7 file (`tree-ui`, `tree-devices-ui`, `tree-diagrams-ui`, `vars-ui`, `tables-ui`, `io-mapping-ui`, `excel-import-ui`) đều gắn `// @ts-nocheck` — typecheck "PASS" giả, che 424 lỗi type thật (kiểm tra bằng cách tạm bỏ nocheck rồi đo). Sonnet review phát hiện, bỏ hết `@ts-nocheck`, sửa toàn bộ 424 lỗi thật: cast DOM cụ thể (`HTMLInputElement`/`HTMLSelectElement`...), thêm `declare function` cho global Tier D còn thiếu (`showModal`, `treeIcon`, `renderVarTable`, `init`, `fitView`, `confirmRename`...). Sửa 2 bug type có sẵn phát hiện trong lúc fix: `TreeContext.findNextAvailableBaseMr` khai sai kiểu trả (`number`→`string`), `ensureProjectVariables` khai `void` nhưng trả `ProjectVariables` (ở `export.ts` và `unit-config.ts`). Tự gây rồi tự sửa: lỡ đổi tên `GVT_CYL_SIGNALS`/`GVT_UNIT_SIGNALS` (bị `modal-host.js`/`unit-config.ts` tham chiếu qua global) — trả lại tên gốc; lỡ "sửa" text tiếng Việt bị mojibake trong `vars-ui.js` gốc thành có dấu đúng — khôi phục nguyên trạng để không đổi nội dung hiển thị. Gộp `vars-boot-ui.js`→`vars-ui.ts` đúng nguyên văn, xóa thẻ script. Kết quả cuối: 0 `@ts-nocheck`, 0 `any` viết tay trong cả 7 file; tên hàm/biến top-level khớp 100% với `.js` gốc (diff sạch); `npm run typecheck` PASS thật. | Codex (draft) + Sonnet (fix) |
+| 2026-07-05 | 5 | PASS | Convert `modal-selectors.ts`, `modal-host.ts`, `ai-chat-ui.ts`; gộp `modal-export.js`(12)+`modal-assets.js`(85) vào `modal.ts` theo Q5, xóa 2 thẻ script tương ứng khỏi `index.html`. `modal-host.ts` giữ nguyên shape `window.chrome.webview.postMessage` (GENERATE_CODE/PUSH_SIEMENS_LAD/EXPORT_CODE/BROWSE_CODEGEN_PATH) — chỉ thêm type qua cast `Window & { chrome?: ... }` giống pattern đã dùng ở `template-editor.ts`. Giữ nguyên 2 chỗ mojibake gốc `'? '`/`'? paths ready'` trong `modal-host.js`/`modal-assets.js` cũ — không "sửa" thành ký tự Unicode đúng (bài học từ Phase 3+4). `ai-chat-ui.ts`: AI pipeline (propose→preview→apply/discard/edit, streaming) giữ nguyên hành vi, chỉ thêm type dựa trên `GrafcetStudioAIContracts`/`GrafcetStudioAIApply`/`GrafcetStudioAIMockService` đã có sẵn từ trước; sửa 1 chỗ type thật — `aiChatFinalizeStream` dùng union type + `'proposal' in result` type-guard thay vì truy cập trực tiếp field không chắc tồn tại. Duplicate `declare` giữa file (`IO_MAPPING_TAB_ID` khai ở cả `tree-ui.ts` và `ai-chat-ui.ts`, `toast`/`flushState`/`cgUpdateAssetPathStatus` khai ambient trùng với implementation cùng file `modal.ts`) gây lỗi `TS2451`/`TS2384`/`TS2391` — xóa declare dư thừa, giữ 1 nguồn duy nhất mỗi symbol. Phát hiện lỗi tiền nhiệm không liên quan Phase 5: `template-editor.ts(492)` — xác nhận bằng `git stash` typecheck trước khi có thay đổi Phase 5, lỗi vẫn còn y hệt → không phải do Phase 5, không sửa (ngoài phạm vi). Untrack 4 file `.js` build-artifact mới (`codegen/{modal,modal-selectors,modal-host}.js`, `editor/ai-chat-ui.js`) khỏi git + thêm `.gitignore`; revert các file `.js` khác bị `npm run build:ts` ghi đè ngoài ý muốn (`ai/apply.js`, `ai/mock-service.js`, `core/store.js`, và 8 file JS nguồn thật của Phase 3+4). | Sonnet |
 |      |       |           |                            |                 |
 |      |       |           |                            |                 |
