@@ -112,19 +112,19 @@
 
 ## Phase 3 — Tier C: nhóm tree
 
-- [ ] **PHASE 3 HOÀN TẤT**
+- [x] **PHASE 3 HOÀN TẤT**
 
 **Input:** `src/web/js/editor/{tree-ui,tree-devices-ui,tree-diagrams-ui}.js`
 **Output:** `src/web/ts/editor/{tree-ui,tree-devices-ui,tree-diagrams-ui}.ts`
 **Phụ thuộc:** Phase 1 (logic `tree.ts` đã có sẵn)
 
 **Checklist con:**
-- [ ] `grep -rn 'onclick=' src/web/index.html` + trong 3 file → liệt kê mọi handler gọi qua onclick.
-- [ ] Chuyển `tree-ui.js` → `.ts`; giữ nguyên mọi `window.xxx = xxx` cho handler onclick.
-- [ ] Chuyển `tree-devices-ui.js` → `.ts`; DOM dùng type cụ thể (`HTMLElement`/`HTMLInputElement`…), không `any`.
-- [ ] Chuyển `tree-diagrams-ui.js` → `.ts`; ref `tree.ts`, `store.ts` type đúng.
-- [ ] Đối chiếu từng handler onclick sau convert vẫn expose qua `window.`.
-- [ ] `npm run typecheck` PASS.
+- [x] `grep -rn 'onclick=' src/web/index.html` + trong 3 file → liệt kê mọi handler gọi qua onclick.
+- [x] Chuyển `tree-ui.js` → `.ts`; giữ nguyên mọi `window.xxx = xxx` cho handler onclick.
+- [x] Chuyển `tree-devices-ui.js` → `.ts`; DOM dùng type cụ thể (`HTMLElement`/`HTMLInputElement`…), không `any`.
+- [x] Chuyển `tree-diagrams-ui.js` → `.ts`; ref `tree.ts`, `store.ts` type đúng.
+- [x] Đối chiếu từng handler onclick sau convert vẫn expose qua `window.`.
+- [x] `npm run typecheck` PASS.
 
 **Tiêu chí done:** 3 file thành `.ts`; mọi hàm onclick expose qua `window.xxx` giữ nguyên; DOM type cụ thể; typecheck pass; mở/đóng cây thủ công OK.
 
@@ -135,19 +135,19 @@
 
 ## Phase 4 — Tier C: nhóm form
 
-- [ ] **PHASE 4 HOÀN TẤT**
+- [x] **PHASE 4 HOÀN TẤT**
 
 **Input:** `src/web/js/editor/{vars-ui,vars-boot-ui,tables-ui,io-mapping-ui,excel-import-ui}.js`
 **Output:** `src/web/ts/editor/{vars-ui,tables-ui,io-mapping-ui,excel-import-ui}.ts` (gộp `vars-boot-ui` vào `vars-ui`)
 **Phụ thuộc:** Phase 1 (logic `vars.ts`,`tables.ts`,`io-mapping.ts`,`excel-import.ts` đã TS)
 
 **Checklist con:**
-- [ ] Chuyển `vars-ui.js` → `.ts`; **gộp 11 dòng `vars-boot-ui.js` vào `vars-ui.ts`** (boot-shim là bước đời của chính module).
-- [ ] Xóa thẻ `<script>` của `vars-boot-ui.js` (#32) khỏi `index.html`; xóa file nguồn.
-- [ ] Chuyển `tables-ui.js`, `io-mapping-ui.js`, `excel-import-ui.js` → `.ts`.
-- [ ] Giữ nguyên mọi `window.*` handler onclick.
-- [ ] Nếu `vars-ui.ts` > 300 dòng sau khi bỏ boot-shim VÀ có ranh giới rõ (form vs table) → cân nhắc tách; nếu không rõ ràng thì KHÔNG tách.
-- [ ] `npm run typecheck` PASS.
+- [x] Chuyển `vars-ui.js` → `.ts`; **gộp 11 dòng `vars-boot-ui.js` vào `vars-ui.ts`** (boot-shim là bước đời của chính module).
+- [x] Xóa thẻ `<script>` của `vars-boot-ui.js` (#32) khỏi `index.html`; xóa file nguồn.
+- [x] Chuyển `tables-ui.js`, `io-mapping-ui.js`, `excel-import-ui.js` → `.ts`.
+- [x] Giữ nguyên mọi `window.*` handler onclick.
+- [x] Nếu `vars-ui.ts` > 300 dòng sau khi bỏ boot-shim VÀ có ranh giới rõ (form vs table) → cân nhắc tách; nếu không rõ ràng thì KHÔNG tách.
+- [x] `npm run typecheck` PASS.
 
 **Tiêu chí done:** gộp `vars-boot-ui`→`vars-ui.ts` xong, đã xóa thẻ script tương ứng; các `window.*` handler còn nguyên; typecheck pass.
 
@@ -238,5 +238,6 @@
 | 2026-07-04 | 0 | PASS | Rename `AppConfig`→`CodegenPayload`; strict `ActionQualifier`; gỡ index signature khỏi Step/Transition/StepAction/DeviceVariable/CodegenPayload; vá 4 file phụ thuộc (`ai/apply.ts`, `ai/mock-service.ts`, `ai/sanitizer.ts`, `editor/vars.ts`). `index.html` không đổi. | Sonnet |
 | 2026-07-04 | 1 | PASS | Convert `utils.ts`,`graph-utils.ts` nguyên vẹn. `constants.ts` chỉ giữ 10 hằng số hình học; tách nhóm biến runtime canvas (`state,nextId,...,renameMode`) sang JS mới `editor/canvas-state.js` (nợ kỹ thuật, gộp xử lý cùng Tier D sau) — tránh `TS2451` redeclare với `store.ts`. Thêm 1 thẻ `<script>` cho `canvas-state.js` trong `index.html`. `.gitignore`: ignore hẹp 3 file `core/{utils,constants,graph-utils}.js` (build artifact), không ignore cả `src/web/js/**` như Q4 gốc vì `canvas-state.js` là JS nguồn thật. | Sonnet |
 | 2026-07-05 | 2 | PASS | Convert `change-manager.ts`, `export.ts`, `unit-config.ts` (Q1 vẫn sạch — không có diff chưa commit). `change-manager.ts` thêm `declare function render()` (Tier D global). `export.ts` dùng type `GrafcetStudioProject.*` cho import/export project JSON + HTML snapshot; `devCategories` không có trong type `Project` chuẩn (chưa migrate sang DTO C#) nên truy cập qua `as unknown as { devCategories?: ... }`. Đối chiếu output `tsc` với `.js` gốc: hành vi giống hệt, chỉ khác `unitId: null`→`undefined` (tương đương do luôn check falsy) và bỏ biến `idMap` chết (không dùng ở bản gốc). Untrack 3 file `.js` build-artifact khỏi git + thêm `.gitignore`. | Sonnet |
+| 2026-07-05 | 3+4 | PASS | Codex convert 7 file (`tree-ui`, `tree-devices-ui`, `tree-diagrams-ui`, `vars-ui`, `tables-ui`, `io-mapping-ui`, `excel-import-ui`) đều gắn `// @ts-nocheck` — typecheck "PASS" giả, che 424 lỗi type thật (kiểm tra bằng cách tạm bỏ nocheck rồi đo). Sonnet review phát hiện, bỏ hết `@ts-nocheck`, sửa toàn bộ 424 lỗi thật: cast DOM cụ thể (`HTMLInputElement`/`HTMLSelectElement`...), thêm `declare function` cho global Tier D còn thiếu (`showModal`, `treeIcon`, `renderVarTable`, `init`, `fitView`, `confirmRename`...). Sửa 2 bug type có sẵn phát hiện trong lúc fix: `TreeContext.findNextAvailableBaseMr` khai sai kiểu trả (`number`→`string`), `ensureProjectVariables` khai `void` nhưng trả `ProjectVariables` (ở `export.ts` và `unit-config.ts`). Tự gây rồi tự sửa: lỡ đổi tên `GVT_CYL_SIGNALS`/`GVT_UNIT_SIGNALS` (bị `modal-host.js`/`unit-config.ts` tham chiếu qua global) — trả lại tên gốc; lỡ "sửa" text tiếng Việt bị mojibake trong `vars-ui.js` gốc thành có dấu đúng — khôi phục nguyên trạng để không đổi nội dung hiển thị. Gộp `vars-boot-ui.js`→`vars-ui.ts` đúng nguyên văn, xóa thẻ script. Kết quả cuối: 0 `@ts-nocheck`, 0 `any` viết tay trong cả 7 file; tên hàm/biến top-level khớp 100% với `.js` gốc (diff sạch); `npm run typecheck` PASS thật. | Codex (draft) + Sonnet (fix) |
 |      |       |           |                            |                 |
 |      |       |           |                            |                 |

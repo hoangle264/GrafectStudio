@@ -30,7 +30,7 @@ declare function saveProject(): void;
 declare function renderTree(): void;
 declare function renderTabs(): void;
 declare function openTab(id: string): void;
-declare function ensureProjectVariables(): void;
+declare function ensureProjectVariables(): GrafcetStudioProject.ProjectVariables;
 declare function upsertProjectVariable(bucket: string, variableDef: Partial<GrafcetStudioProject.ProjectVariable>): GrafcetStudioProject.ProjectVariable;
 declare function ensureProjectIOMapping(): void;
 declare function ensureFlowAddressConfig(diag: ExportDiagramMeta | null | undefined, assignUniqueBase: boolean): boolean;

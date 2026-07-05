@@ -9,7 +9,7 @@ namespace GrafcetStudioTree {
   export interface TreeContext {
     project: Project;
     now(): number;
-    findNextAvailableBaseMr?: (unitId?: string | null, excludeDiagId?: string) => number;
+    findNextAvailableBaseMr?: (unitId?: string | null, excludeDiagId?: string) => string;
     syncVariableSignalAddressesFromDeviceTypes?: () => boolean;
   }
 

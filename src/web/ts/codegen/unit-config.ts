@@ -5,8 +5,7 @@ type UcDeviceSignal = GrafcetStudioProject.DeviceSignal;
 type UcDeviceType = GrafcetStudioProject.DeviceType;
 type UcProjectVariable = GrafcetStudioProject.ProjectVariable;
 
-declare function ensureProjectVariables(): void;
-declare const GVT_CYL_SIGNALS: UcDeviceSignal[] | undefined;
+declare function ensureProjectVariables(): GrafcetStudioProject.ProjectVariables;
 
 let UC_UNIT_CONFIG: unknown = null;
 let UC_CYLINDER_TYPES: unknown = null;
