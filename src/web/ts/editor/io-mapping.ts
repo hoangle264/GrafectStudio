@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioIOMapping {
+namespace GrafcetStudioIOMapping {
   type Project = GrafcetStudioProject.Project;
   type IOMappingEntry = GrafcetStudioProject.IOMappingEntry;
   type DeviceSignal = GrafcetStudioProject.DeviceSignal;
@@ -44,9 +44,17 @@
         ? context.varsApi.gvtGetUnitSigList(context.varsContext)
         : context.varsApi.gvtGetSigList(context.varsContext, variable as ProjectVariable);
       const base = String((variable as ProjectVariable | UnitConfig).label || '').trim();
-      sigs.forEach(function(sig) {
-        const dir = sig.varType === 'Input' ? 'Input' : (sig.varType === 'Output' ? 'Output' : '');
-        if (!dir) return;
+      const directionalSigs = sigs.filter(function(sig) {
+        return sig.varType === 'Input' || sig.varType === 'Output';
+      });
+
+      if (!directionalSigs.length) {
+        if (base) out.push({ appVariable: base, direction: '', norm: ioNormalizeTag(base) });
+        return;
+      }
+
+      directionalSigs.forEach(function(sig) {
+        const dir = sig.varType === 'Input' ? 'Input' : 'Output';
         const appVariable = base ? (base + '.' + sig.name) : sig.name;
         out.push({ appVariable, direction: dir, norm: ioNormalizeTag(appVariable) });
       });
@@ -59,13 +67,14 @@
     const candidates = ioCollectCandidateVariables(context);
     io.entries = io.physicalIOs.map(function(physical) {
       const norm = ioNormalizeTag(physical.deviceTag);
-      const sameDir = candidates.filter(function(candidate) { return candidate.direction === physical.direction; });
       let best: IOMappingEntry | null = null;
       let bestScore = -1;
-      sameDir.forEach(function(candidate) {
+      candidates.forEach(function(candidate) {
         const score = candidate.norm === norm ? 1 : (candidate.norm.endsWith(norm) || norm.endsWith(candidate.norm) ? 0.7 : 0);
-        if (score > bestScore) {
-          bestScore = score;
+        const dirMatch = candidate.direction ? (candidate.direction === physical.direction ? 0.2 : 0) : 0.1;
+        const effectiveScore = score + dirMatch;
+        if (effectiveScore > bestScore) {
+          bestScore = effectiveScore;
           best = { physicalIOId: physical.id, appVariable: candidate.appVariable, status: score >= 1 ? 'matched' : 'unmatched', matchScore: score };
         }
       });
@@ -74,13 +83,17 @@
     });
     return io.entries;
   }
-
   export function ioBuildCandidateOptions(context: IOMappingContext, direction: string): string[] {
+    const seen = new Set<string>();
     return ioCollectCandidateVariables(context)
-      .filter(function(candidate) { return candidate.direction === direction; })
-      .map(function(candidate) { return candidate.appVariable; });
+      .filter(function(candidate) { return !candidate.direction || candidate.direction === direction; })
+      .map(function(candidate) { return candidate.appVariable; })
+      .filter(function(appVariable) {
+        if (!appVariable || seen.has(appVariable)) return false;
+        seen.add(appVariable);
+        return true;
+      });
   }
-
   function findEntryByLabel(entries: VarEntry[], label: string): VarEntry | null {
     return entries.find(function(entry) { return String((entry.data as ProjectVariable | UnitConfig)?.label || '') === label; }) || null;
   }
@@ -150,8 +163,6 @@
     entry.appVariable = appVariable || '';
     entry.status = entry.appVariable ? 'mapped' : 'unmatched';
     entry.matchScore = entry.appVariable ? 1 : 0;
-    const target = ioResolveVariableAddressTarget(context, entry.appVariable);
-    if (target) target.set(physical.plcAddress || '');
     return entry;
   }
 
@@ -159,8 +170,6 @@
     const io = ensureIO(context);
     const entry = (io.entries || []).find(function(item) { return item.physicalIOId === physicalIOId; });
     if (!entry) return null;
-    const target = ioResolveVariableAddressTarget(context, entry.appVariable);
-    if (target) target.set('');
     entry.appVariable = '';
     entry.status = 'unmatched';
     entry.matchScore = 0;
@@ -189,5 +198,6 @@
 }
 
 GrafcetStudioInterop.registerBridge('ioMapping', GrafcetStudioIOMapping.api);
+
 
 

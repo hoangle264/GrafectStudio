@@ -25,7 +25,11 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        await webView.EnsureCoreWebView2Async();
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "GrafcetStudio", "WebView2");
+        var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
+        await webView.EnsureCoreWebView2Async(environment);
         var bridge = ((App)System.Windows.Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
 

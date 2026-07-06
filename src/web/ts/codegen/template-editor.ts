@@ -489,7 +489,7 @@ namespace GrafcetStudioTemplateEditor {
     if (resolve) resolve(payload?.content || '');
   }
 
-  (window as Window & {
+  (window as unknown as Window & {
     GrafcetTemplateEditor?: TemplateEditorApi;
     receiveTemplateFile?: typeof receiveTemplateFile;
     openTemplateEditor?: typeof openTemplateEditor;

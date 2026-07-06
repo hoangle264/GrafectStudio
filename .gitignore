@@ -69,3 +69,33 @@ src/web/js/codegen/modal.js
 src/web/js/codegen/modal-selectors.js
 src/web/js/codegen/modal-host.js
 src/web/js/editor/ai-chat-ui.js
+
+# tsc build artifacts (source: src/web/ts/editor/panels.ts)
+src/web/js/editor/panels.js
+
+# tsc build artifacts (remaining .ts sources already converted, untracked as artifacts)
+src/web/js/ai/apply.js
+src/web/js/ai/bridge.js
+src/web/js/ai/context-builder.js
+src/web/js/ai/contracts.js
+src/web/js/ai/mock-service.js
+src/web/js/ai/parser.js
+src/web/js/ai/sanitizer.js
+src/web/js/codegen/payload.js
+src/web/js/codegen/template-editor.js
+src/web/js/core/interop.js
+src/web/js/core/store-persistence.js
+src/web/js/core/store.js
+src/web/js/editor/excel-import-ui.js
+src/web/js/editor/excel-import.js
+src/web/js/editor/io-mapping-ui.js
+src/web/js/editor/io-mapping.js
+src/web/js/editor/tables-ui.js
+src/web/js/editor/tables.js
+src/web/js/editor/tree-devices-ui.js
+src/web/js/editor/tree-diagrams-ui.js
+src/web/js/editor/tree-ui.js
+src/web/js/editor/tree.js
+src/web/js/editor/vars-ui.js
+src/web/js/editor/vars.js
+src/web/js/types/project.js

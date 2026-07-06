@@ -85,7 +85,7 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
   return { ok: true, message: 'Import thanh cong ' + parsed.vars.length + ' instance "' + selectedStructType + '".', added: parsed.vars.length };
 }
 // ── Modal ──────────────────────────────────────────────────────────────────
-function showExcelImportModal(): void {
+function showExcelImportModal(defaultType?: string): void {
   const existing = document.getElementById('modal-excel-import');
   if (existing) existing.remove();
 
@@ -96,6 +96,7 @@ function showExcelImportModal(): void {
 
   const unitCount = Object.keys(project.unitConfig || {}).length;
   const varCount  = (project.excelVars || []).length;
+  const initialType = defaultType === 'physical-io' || defaultType === 'unit' || defaultType === 'struct' ? defaultType : 'struct';
 
   const el = document.createElement('div');
   el.id = 'modal-excel-import';
@@ -127,18 +128,18 @@ function showExcelImportModal(): void {
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">LOẠI DỮ LIỆU</div>
           <div style="display:flex;gap:16px;">
             <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="radio" name="ei-import-type" value="unit" onchange="eiOnImportTypeChange()"> Unit Station
+              <input type="radio" name="ei-import-type" value="unit" ${initialType === 'unit' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Unit Station
             </label>
             <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="radio" name="ei-import-type" value="struct" checked onchange="eiOnImportTypeChange()"> Struct Data
+              <input type="radio" name="ei-import-type" value="struct" ${initialType === 'struct' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Struct Data
             </label>
             <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
-              <input type="radio" name="ei-import-type" value="physical-io" onchange="eiOnImportTypeChange()"> Physical IO
+              <input type="radio" name="ei-import-type" value="physical-io" ${initialType === 'physical-io' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Physical IO
             </label>
           </div>
         </div>
 
-        <div id="ei-struct-wrap" style="margin-bottom:14px;">
+        <div id="ei-struct-wrap" style="margin-bottom:14px;${initialType === 'struct' ? '' : 'display:none;'}">
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">STRUCT DATA TYPE</div>
           <select id="ei-struct-type"
             style="width:100%;font-size:10px;color:var(--cyan);background:var(--bg);
@@ -166,7 +167,7 @@ function showExcelImportModal(): void {
         </div>
 
         <div id="ei-schema-hint" style="font-size:9px;color:var(--text3);line-height:1.6;">
-          <b style="color:var(--cyan);">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...
+          ${eiGetSchemaHintHtml(initialType)}
         </div>
       </div>
 
@@ -179,6 +180,23 @@ function showExcelImportModal(): void {
     </div>`;
 
   document.body.appendChild(el);
+  eiOnImportTypeChange();
+}
+
+function eiGetSchemaHintHtml(type: string): string {
+  if (type === 'unit') {
+    return '<b style="color:var(--cyan);">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed';
+  }
+  if (type === 'physical-io') {
+    return '<b style="color:var(--cyan);">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in hoặc output/out';
+  }
+  return '<b style="color:var(--cyan);">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
+}
+
+function eiGetImportTypeLabel(type: string, structType?: string): string {
+  if (type === 'unit') return 'Unit Station';
+  if (type === 'physical-io') return 'Physical IO';
+  return 'Struct Data' + (structType ? ' (' + structType + ')' : '');
 }
 
 // ── Xử lý thay đổi loại import ────────────────────────────────────────────
@@ -190,16 +208,14 @@ function eiOnImportTypeChange(): void {
 
   if (structWrap) structWrap.style.display = type === 'struct' ? '' : 'none';
   if (schemaHint) {
-    schemaHint.innerHTML = type === 'unit'
-      ? '<b style="color:var(--cyan);">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed'
-      : '<b style="color:var(--cyan);">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
+    schemaHint.innerHTML = eiGetSchemaHintHtml(type);
   }
 
   if (_eiPendingText) {
     const rows = eiParseCSV(_eiPendingText);
     const st   = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
     const stat = document.getElementById('ei-stat');
-    if (stat) stat.textContent = 'Mode: ' + (type === 'unit' ? 'Unit Station' : 'Struct Data' + (st ? ' (' + st.value + ')' : '')) + '  (' + rows.length + ' dòng)';
+    if (stat) stat.textContent = 'Mode: ' + eiGetImportTypeLabel(type, st ? st.value : '') + '  (' + rows.length + ' dòng)';
   }
 }
 
@@ -231,7 +247,7 @@ function eiPreviewFile(inputEl: HTMLInputElement): void {
       const type   = radio ? radio.value : 'struct';
       const st     = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
       const rows   = eiParseCSV(_eiPendingText!);
-      const label  = type === 'unit' ? 'Unit Station' : 'Struct Data' + (st ? ' (' + st.value + ')' : '');
+      const label  = eiGetImportTypeLabel(type, st ? st.value : '');
       stat.textContent = 'Mode: ' + label + '  (' + rows.length + ' dòng)';
     }
   };
@@ -256,7 +272,7 @@ function eiDoImport(): void {
     if (typeof renderVarTable === 'function') renderVarTable();
     if (typeof renderTree === 'function') renderTree();
     _eiPendingText = null;
-    setTimeout(function () { closeModal('modal-excel-import'); showExcelImportModal(); }, 400);
+    setTimeout(function () { closeModal('modal-excel-import'); showExcelImportModal(csvType); }, 400);
   } else {
     if (typeof toast === 'function') toast('⚠ ' + result.message.split('\n')[0]);
     console.error('[excel-import]', result.message);

@@ -208,7 +208,7 @@
                 </div>
             </section>
             <section id="iomap-main-panel" class="virtual-panel is-hidden" aria-label="IO Mapping">
-                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ”Œ IO MAPPING</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import Physical IO">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="exportIOCode()" title="Export IO Mapping Code">â¬‡ Export Code</button> <button class="panel-head-btn" onclick="clearIOMappingImport()" title="Clear IO Mapping imported data">Clear Data</button> </div>
+                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ”Œ IO MAPPING</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal('physical-io')" title="Import Physical IO">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="exportIOCode()" title="Export IO Mapping Code">â¬‡ Export Code</button> <button class="panel-head-btn" onclick="clearIOMappingImport()" title="Clear IO Mapping imported data">Clear Data</button> </div>
                 <div class="gvt-toolbar"> <select id="iomap-filter" class="gvt-search-input iomap-filter" onchange="renderIOMappingTable(this.value)">
                         <option value="All">All</option>
                         <option value="Input">Input</option>
