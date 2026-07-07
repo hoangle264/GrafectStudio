@@ -253,7 +253,7 @@
   function cloneTransition(transition: Transition): Transition { return JSON.parse(JSON.stringify(transition)) as Transition; }
   function cloneConnection(connection: Connection): Connection { return JSON.parse(JSON.stringify(connection)) as Connection; }
 
-  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
+  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'DInt', 'UInt', 'UDInt', 'Real', 'LReal', 'Word', 'DWord', 'Byte', 'String', 'Time'];
   const allowedStructureVarTypes: readonly string[] = ['Input', 'Output', 'Var'];
   function normalizeStructureName(name: unknown): string { return typeof name === 'string' ? name.trim() : ''; }
   function makeSignalIdFromName(name: string): string {

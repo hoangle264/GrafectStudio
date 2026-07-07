@@ -6,6 +6,8 @@ namespace GrafcetStudioExcelImport {
   type PhysicalIO = GrafcetStudioProject.PhysicalIO;
   type UnitCSVParseResult = GrafcetStudioProject.UnitCSVParseResult;
   type StructCSVParseResult = GrafcetStudioProject.StructCSVParseResult;
+  type SiemensBlockCSVParseResult = GrafcetStudioProject.SiemensBlockCSVParseResult;
+  type PlcBlock = GrafcetStudioProject.PlcBlock;
   type PhysicalIOCSVParseResult = GrafcetStudioProject.PhysicalIOCSVParseResult;
 
   const KV_ADDRESS_RE = /^@?(MR|LR|DM|CR|AR|WR|HR)\d+$/i;
@@ -211,6 +213,91 @@ namespace GrafcetStudioExcelImport {
 
     return { vars, errors };
   }
+  function getHeaderValue(columns: string[], headerIndexMap: Record<string, number>, names: string[]): string {
+    for (let index = 0; index < names.length; index++) {
+      const headerIndex = headerIndexMap[names[index]];
+      if (headerIndex != null) return columns[headerIndex] || '';
+    }
+    return '';
+  }
+
+  function createBlockId(blockName: string): string {
+    return 'plc-block-' + blockName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  export function parseSiemensBlockCSV(rows: string[][], deviceTypes: DeviceType[]): SiemensBlockCSVParseResult {
+    const vars: ProjectVariable[] = [];
+    const blocks: PlcBlock[] = [];
+    const errors: string[] = [];
+    const blockMap = new Map<string, PlcBlock>();
+    const typeNames = new Set((deviceTypes || []).map(device => String(device && device.name || '').toLowerCase()).filter(Boolean));
+
+    const header = (rows[0] || []).map(normalizeHeader);
+    const hasHeader = header.includes('name') && (header.includes('datatype') || header.includes('type'));
+    const headerIndexMap: Record<string, number> = {};
+    if (hasHeader) {
+      header.forEach(function(name, index) {
+        if (name && headerIndexMap[name] == null) headerIndexMap[name] = index;
+      });
+    }
+
+    rows.forEach(function(columns, rowIndex) {
+      if (hasHeader && rowIndex === 0) return;
+      const name = (hasHeader ? getHeaderValue(columns, headerIndexMap, ['name']) : (columns[0] || '')).trim();
+      const dataType = (hasHeader ? getHeaderValue(columns, headerIndexMap, ['datatype', 'type']) : (columns[1] || '')).trim();
+      const comment = (hasHeader ? getHeaderValue(columns, headerIndexMap, ['comment', 'description']) : (columns[2] || '')).trim();
+      const blockName = (hasHeader ? getHeaderValue(columns, headerIndexMap, ['block', 'db', 'udt']) : (columns[3] || '')).trim();
+      if (!name && !dataType && !blockName) return;
+      if (!name || !dataType) {
+        errors.push('Dong ' + (rowIndex + 1) + ': thieu Name hoac DataType');
+        return;
+      }
+
+      let blockId = '';
+      if (blockName) {
+        const key = blockName.toLowerCase();
+        let block = blockMap.get(key);
+        if (!block) {
+          const upper = blockName.toUpperCase();
+          block = {
+            id: createBlockId(blockName),
+            name: blockName,
+            kind: upper.startsWith('UDT') ? 'UDT' : 'DB',
+            memberVarIds: [],
+            comment: 'Excel import'
+          };
+          blockMap.set(key, block);
+          blocks.push(block);
+        }
+        blockId = block.id;
+      }
+
+      const variableId = 'sb-' + rowIndex + '-' + Date.now();
+      if (blockId) {
+        const block = blocks.find(item => item.id === blockId);
+        if (block) {
+          if (!block.memberVarIds) block.memberVarIds = [];
+          block.memberVarIds.push(variableId);
+        }
+      }
+
+      vars.push({
+        id: variableId,
+        label: name,
+        format: dataType,
+        dataType: dataType,
+        address: '',
+        comment: comment || 'Siemens block import',
+        declarationMode: 'SymbolicBlock',
+        blockId: blockId,
+        kind: typeNames.has(dataType.toLowerCase()) ? 'struct' : 'primitive',
+        signalAddresses: {},
+        _source: 'excel'
+      });
+    });
+
+    return { vars, blocks, errors };
+  }
 
   export function parsePhysicalIOCSV(rows: string[][], normalizeDirection?: (value: string) => string): PhysicalIOCSVParseResult {
     const errors: string[] = [];
@@ -244,6 +331,7 @@ namespace GrafcetStudioExcelImport {
     parseCSV(text: string): string[][];
     parseUnitCSV(rows: string[][]): UnitCSVParseResult;
     parseStructCSV(rows: string[][], structTypeName: string, deviceTypes: DeviceType[]): StructCSVParseResult;
+    parseSiemensBlockCSV(rows: string[][], deviceTypes: DeviceType[]): SiemensBlockCSVParseResult;
     parsePhysicalIOCSV(rows: string[][], normalizeDirection?: (value: string) => string): PhysicalIOCSVParseResult;
     validateAddress(address: string): boolean;
   }
@@ -252,6 +340,7 @@ namespace GrafcetStudioExcelImport {
     parseCSV,
     parseUnitCSV,
     parseStructCSV,
+    parseSiemensBlockCSV,
     parsePhysicalIOCSV,
     validateAddress
   };

@@ -191,7 +191,7 @@
                 <div class="mini-map"><svg id="mini-svg"></svg></div>
             </div> <!-- Global Vars Tab Panel (virtual tab â€” shown when __vars__ tab is active) -->
             <section id="gvt-main-panel" class="virtual-panel is-hidden" aria-label="Variables">
-                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ“‹ VARIABLES</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import tá»« CSV/Excel">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="gvtAddUserVar()" title="Add user variable">+ User Var</button> </div>
+                <div class="sub-panel-head sub-panel-head-fixed"> <span class="sub-panel-title">ðŸ“‹ VARIABLES</span> <button class="panel-head-btn btn-cyan" onclick="showExcelImportModal()" title="Import tá»« CSV/Excel">ðŸ“¥ Import</button> <button class="panel-head-btn" onclick="gvtAddUserVar()" title="Add user variable">+ User Var</button> <button class="panel-head-btn" onclick="gvtOpenPlcBlockManager()" title="Manage PLC DB/UDT blocks">PLC Blocks</button> </div>
                 <div class="gvt-toolbar"> <input id="gvt-search" type="text" placeholder="ðŸ” Filter..." class="gvt-search-input" oninput="renderGlobalVarTable()"> <span id="gvt-count" class="muted-mini">0 struct data</span> </div>
                 <div class="panel-scroll">
                     <table class="vt-table table-full">

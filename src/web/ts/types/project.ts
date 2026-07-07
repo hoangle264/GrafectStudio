@@ -23,7 +23,7 @@ namespace GrafcetStudioProject {
     id: string;
     name: string;              // vd "DB_Motor", "UDT_Cylinder", "GVL_IO"
     kind: BlockKind;
-    memberVarIds?: string[];   // tham chiếu ProjectVariable.id thuộc block
+    memberVarIds?: string[];   // ProjectVariable.id references owned by this block
     comment?: string;
     [key: string]: unknown;
   }
@@ -101,7 +101,7 @@ namespace GrafcetStudioProject {
     actions?: StepAction[];
     execAddress?: string | null;
     doneAddress?: string | null;
-    // canvas-only, không serialize sang C#
+    // canvas-only, not serialized to C#
     x?: number;
     y?: number;
     w?: number;
@@ -115,7 +115,7 @@ namespace GrafcetStudioProject {
     condition?: string;
     fromStepIds?: string[];
     toStepIds?: string[];
-    // canvas-only, không serialize sang C#
+    // canvas-only, not serialized to C#
     x?: number;
     y?: number;
     w?: number;
@@ -137,7 +137,7 @@ namespace GrafcetStudioProject {
     address?: string | null;
     qualifier: ActionQualifier;
     timeMs: number;
-    // UI-only, không serialize sang C#
+    // UI-only, not serialized to C#
     time?: number | string;
     complete?: StepActionCompletion | null;
     sensorRef?: string | null;
@@ -177,8 +177,8 @@ namespace GrafcetStudioProject {
     format: string;
     address?: string | null;
     signalAddresses?: Record<string, string>;
-    declarationMode?: DeclarationMode;   // absent => AddressMapped (hành vi cũ)
-    blockId?: string;   // id PlcBlock; '' = không thuộc block
+    declarationMode?: DeclarationMode;   // absent => AddressMapped (legacy behavior)
+    blockId?: string;   // id PlcBlock; '' = no block
   }
 
   export interface ProjectVariable extends DeviceVariable {
@@ -254,10 +254,11 @@ namespace GrafcetStudioProject {
     units: UnitInfo[];
     flows: FlowInfo[];
     variables: DeviceVariable[];
+    blocks?: PlcBlock[];
     deviceTypes: DeviceType[];
     deviceLibraryPath: string;
     templateProfile: string;
-    // UI-only, không serialize sang C#
+    // UI-only, not serialized to C#
     outputPath?: string;
   }
 
@@ -335,6 +336,12 @@ namespace GrafcetStudioProject {
 
   export interface StructCSVParseResult {
     vars: ProjectVariable[];
+    errors: string[];
+  }
+
+  export interface SiemensBlockCSVParseResult {
+    vars: ProjectVariable[];
+    blocks: PlcBlock[];
     errors: string[];
   }
 

@@ -244,7 +244,7 @@
   }
 
 
-  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
+  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'DInt', 'UInt', 'UDInt', 'Real', 'LReal', 'Word', 'DWord', 'Byte', 'String', 'Time'];
   const allowedStructureVarTypes: readonly string[] = ['Input', 'Output', 'Var'];
 
   function validateSignalProposal(value: unknown, errors: string[], path: string): value is AiSignalProposal {

@@ -56,6 +56,7 @@ public partial class App : PrismApplication
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Omron.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Siemens.Id));
         containerRegistry.RegisterSingleton<ICodeGenerator, SiemensLadDslGenerator>();
+        containerRegistry.RegisterSingleton<ICodeGenerator, SiemensDbUdtGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, RuntimePlanGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
         containerRegistry.RegisterSingleton<UnitConfigGenerator>();
@@ -185,5 +186,3 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
     }
 }
-
-

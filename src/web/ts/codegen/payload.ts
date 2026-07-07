@@ -13,6 +13,7 @@ namespace GrafcetStudioCodegenPayload {
   type FlowInfo = GrafcetStudioProject.FlowInfo;
   type CodegenPayload = GrafcetStudioProject.CodegenPayload;
   type UnitInfo = GrafcetStudioProject.UnitInfo;
+  type PlcBlock = GrafcetStudioProject.PlcBlock;
 
   export interface CodegenAssets {
     deviceLibraryPath: string;
@@ -319,7 +320,9 @@ namespace GrafcetStudioCodegenPayload {
         label: variable.label,
         format: normalizeVariableFormat(variable as any),
         address: variable.address || null,
-        signalAddresses: signalAddresses
+        signalAddresses: signalAddresses,
+        declarationMode: variable.declarationMode,
+        blockId: variable.blockId || ''
       });
     };
 
@@ -428,6 +431,16 @@ namespace GrafcetStudioCodegenPayload {
     };
   }
 
+  function buildBlocksInfo(context: PayloadContext): PlcBlock[] {
+    return ((context.project && context.project.blocks) || []).map(block => ({
+      id: block.id || '',
+      name: block.name || block.id || '',
+      kind: block.kind || '',
+      memberVarIds: (block.memberVarIds || []).slice(),
+      comment: block.comment || ''
+    }));
+  }
+
   function buildUnitsInfo(context: PayloadContext): UnitInfo[] {
     const units = (context.project.units || []).map(unit => ({
       id: unit.id || '',
@@ -474,6 +487,8 @@ namespace GrafcetStudioCodegenPayload {
         macroPortVariable: (flow as any).macroPortVariable || null
       };
     });
+    getCSharpVariables(context, { steps: [], transitions: [], connections: [], vars: [] }).forEach(addVar);
+
 
     const assets = context.getAssets();
     const unitId = unit && unit.id ? unit.id : '';
@@ -492,6 +507,7 @@ namespace GrafcetStudioCodegenPayload {
       units: buildUnitsInfo(context),
       flows,
       variables: allVars,
+      blocks: buildBlocksInfo(context),
       deviceTypes: getCSharpDeviceTypes(context)
     };
   }

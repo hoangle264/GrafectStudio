@@ -44,6 +44,7 @@ function showGenerateCodeModal(): void {
             <option value="omron">OMRON</option>
             <option value="siemens">Siemens AWL</option>
             <option value="siemens-lad">Siemens LAD XML</option>
+            <option value="siemens-db">Siemens DB/UDT XML</option>
             <option value="twincat-st">TwinCAT ST</option>
             <option value="csharp-kv-5500">C# Keyence KV demo</option>
             <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
@@ -67,7 +68,7 @@ function showGenerateCodeModal(): void {
 
       <div id="cg-siemens-lad-panel" style="display:none;border-top:1px solid var(--border);background:var(--s2);padding:10px 20px;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">SIEMENS LAD MODE</span>
+          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">SIEMENS TIA MODE</span>
           <label style="font-size:10px;color:var(--text2);"><input type="radio" name="cg-siemens-lad-mode" value="preview" checked onchange="cgOnSiemensLadConfigChanged()"> Preview XML</label>
           <label style="font-size:10px;color:var(--text2);"><input type="radio" name="cg-siemens-lad-mode" value="push" onchange="cgOnSiemensLadConfigChanged()"> Push to TIA</label>
           <span id="cg-siemens-lad-status" style="font-size:10px;color:var(--text3);margin-left:auto;">Preview XML mode</span>
@@ -241,13 +242,13 @@ function cgUpdateSiemensLadPanel(): void {
   const panel = document.getElementById('cg-siemens-lad-panel');
   const config = document.getElementById('cg-siemens-tia-config');
   const status = document.getElementById('cg-siemens-lad-status');
-  const isSiemensLad = target === 'siemens-lad';
-  if (panel) panel.style.display = isSiemensLad ? '' : 'none';
-  if (!isSiemensLad) return;
+  const isSiemensTarget = target === 'siemens-lad' || target === 'siemens-db';
+  if (panel) panel.style.display = isSiemensTarget ? '' : 'none';
+  if (!isSiemensTarget) return;
   const isPush = cgGetSiemensLadMode() === 'push';
   if (config) (config as HTMLElement).style.display = isPush ? 'grid' : 'none';
   if (status && !cgPendingSiemensTiaPush) {
-    status.textContent = isPush ? 'Push mode: generate XML then import to TIA' : 'Preview XML mode';
+    status.textContent = isPush ? (target === 'siemens-db' ? 'Push mode: DB XML only; UDT files remain manual import' : 'Push mode: generate XML then import to TIA') : 'Preview XML mode';
     (status as HTMLElement).style.color = isPush ? 'var(--amber)' : 'var(--text3)';
   }
 }
@@ -260,7 +261,8 @@ function cgSetSiemensLadStatus(message: string, ok: boolean | null): void {
 }
 
 function cgShouldPushSiemensTia(): boolean {
-  return (document.getElementById('cg-target') as HTMLSelectElement | null)?.value === 'siemens-lad' && cgGetSiemensLadMode() === 'push';
+  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || '';
+  return (target === 'siemens-lad' || target === 'siemens-db') && cgGetSiemensLadMode() === 'push';
 }
 
 function receiveSiemensTiaPushResult(payload: { kind?: string; config?: typeof cgSavedSiemensTiaConfig; result?: { ok?: boolean; message?: string }; ok?: boolean; message?: string } | null): void {

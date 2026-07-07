@@ -61,9 +61,9 @@ public sealed class SiemensTiaPushOrchestrator
     {
         try
         {
-            var codegenOutput = GenerateSiemensLadXml(payload);
-            var xmlFile = SelectXmlFile(codegenOutput)
-                ?? throw new InvalidOperationException("Siemens LAD generator did not return an XML file.");
+            var codegenOutput = GenerateSiemensXml(payload);
+            var xmlFile = SelectXmlFile(codegenOutput, payload.Platform)
+                ?? throw new InvalidOperationException(BuildMissingXmlMessage(payload.Platform));
 
             var request = new SiemensPushRequest
             {
@@ -89,11 +89,11 @@ public sealed class SiemensTiaPushOrchestrator
         }
     }
 
-    private CodegenOutput GenerateSiemensLadXml(PushSiemensLadPayload message)
+    private CodegenOutput GenerateSiemensXml(PushSiemensLadPayload message)
     {
         SiemensDebugLog("PushAsync raw payload length=" + (message.RawJson?.Length ?? 0));
         var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson, PayloadJsonOptions)
-            ?? throw new InvalidOperationException("Invalid Siemens LAD codegen payload.");
+            ?? throw new InvalidOperationException("Invalid Siemens codegen payload.");
         SiemensDebugLog("Deserialized payload platform=" + payload.Platform
             + ", units=" + payload.Units.Count
             + ", flows=" + payload.Flows.Count
@@ -132,17 +132,32 @@ public sealed class SiemensTiaPushOrchestrator
 
         payload.EnrichVariables();
         var platform = string.IsNullOrWhiteSpace(message.Platform) ? "siemens-lad" : message.Platform;
-        if (!string.Equals(platform, "siemens-lad", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(platform, "siemens-lad", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(platform, "siemens-db", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Siemens LAD push requires platform 'siemens-lad'.");
+            throw new InvalidOperationException("Siemens push requires platform 'siemens-lad' or 'siemens-db'.");
         }
 
-        return codegen.Generate("siemens-lad", payload);
+        return codegen.Generate(platform, payload);
     }
 
-    private static CodegenFile? SelectXmlFile(CodegenOutput output)
-        => output.Files.FirstOrDefault(file => file.Path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+    private static CodegenFile? SelectXmlFile(CodegenOutput output, string? platform)
+    {
+        if (string.Equals(platform, "siemens-db", StringComparison.OrdinalIgnoreCase))
+        {
+            return output.Files.FirstOrDefault(file =>
+                file.Path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)
+                && (file.Content ?? string.Empty).Contains("SW.Blocks.GlobalDB", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return output.Files.FirstOrDefault(file => file.Path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
             ?? output.Files.FirstOrDefault();
+    }
+
+    private static string BuildMissingXmlMessage(string? platform)
+        => string.Equals(platform, "siemens-db", StringComparison.OrdinalIgnoreCase)
+            ? "Siemens DB generator did not return a Global DB XML file. UDT XML files are generated for manual import only and are not pushed through the bridge."
+            : "Siemens generator did not return an XML file.";
 
     private static string ExtractBlockName(CodegenFile file)
     {
@@ -203,4 +218,3 @@ public sealed class SiemensTiaPushOrchestrator
         };
     }
 }
-

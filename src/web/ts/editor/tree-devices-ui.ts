@@ -114,7 +114,7 @@ function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
     (dev.signals||[]).forEach(sig=>{
       const row=document.createElement('div');
       row.className='tree-dev-sig-row';
-      const tc=({Bool:'sig-bool',Int:'sig-int',Real:'sig-real',Word:'sig-word',DWord:'sig-word',Time:'sig-word'} as Record<string,string>)[sig.dataType]||'sig-bool';
+      const tc=({Bool:'sig-bool',Int:'sig-int',DInt:'sig-int',UInt:'sig-int',UDInt:'sig-int',Real:'sig-real',LReal:'sig-real',Word:'sig-word',DWord:'sig-word',Byte:'sig-word',String:'sig-word',Time:'sig-word'} as Record<string,string>)[sig.dataType]||'sig-bool';
       const vc=({Input:'vt-input',Output:'vt-output',Var:'vt-var'} as Record<string,string>)[sig.varType||'']||'vt-var';
       const vs=({Input:'IN',Output:'OUT',Var:'VAR'} as Record<string,string>)[sig.varType||'']||'VAR';
       row.innerHTML=`
@@ -325,7 +325,7 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
     <td><input class="dev-sig-input" placeholder="LSL" value="${esc2(sig?.name||'')}" data-f="name"></td>
     <td>
       <select class="dev-sig-select" data-f="dataType">
-        ${['Bool','Int','Real','Word','DWord','Time'].map(t=>`<option value="${t}" ${(sig?.dataType||'Bool')===t?'selected':''}>${t}</option>`).join('')}
+        ${['Bool','Int','DInt','UInt','UDInt','Real','LReal','Word','DWord','Byte','String','Time'].map(t=>`<option value="${t}" ${(sig?.dataType||'Bool')===t?'selected':''}>${t}</option>`).join('')}
       </select>
     </td>
     <td>

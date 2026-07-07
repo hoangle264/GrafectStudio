@@ -28,6 +28,9 @@ public class CodegenPayload
     [JsonPropertyName("variables")]
     public List<DeviceVariable> Variables { get; set; } = new();
 
+    [JsonPropertyName("blocks")]
+    public List<PlcBlock> Blocks { get; set; } = new();
+
     [JsonPropertyName("deviceTypes")]
     public List<DeviceType> DeviceTypes { get; set; } = new();
 

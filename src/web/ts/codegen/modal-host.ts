@@ -126,7 +126,7 @@ function cgGenerateViaHost(platform: string, diagId: string): boolean {
       chromeHost.webview.postMessage({
         type: 'PUSH_SIEMENS_LAD',
         payload: {
-          platform: 'siemens-lad',
+          platform: platform === 'siemens-db' ? 'siemens-db' : 'siemens-lad',
           templateRootPath: codegenPayload.templateRootPath || '',
           deviceLibraryPath: codegenPayload.deviceLibraryPath || '',
           outputPath: codegenPayload.outputPath || '',

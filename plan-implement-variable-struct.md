@@ -79,6 +79,10 @@ Task này **KHÔNG phải làm mới từ đầu**. Trên base hiện tại đã
 | **Q3** | Đệ quy struct lồng (Bước 5) | **Sửa trực tiếp hàm expand đang chạy** (`gvtGetSigList`). Bắt buộc verify struct 1 cấp output y hệt trước/sau. |
 | **Q4** | Phạm vi Bước 6 | **Mở rộng** — tạo generator khai báo DB/UDT mới. **Cập nhật theo explore:** tận dụng `SimaticML.BlockGlobalDB/BlockUDT` + push pipeline có sẵn, KHÔNG viết XML tay. |
 | **Q5** | `DeclarationMode` kiểu dữ liệu | **Giữ string** cả 2 phía. |
+| **Q6** | Import UDT vao TIA | **Chi push DB qua bridge.** UDT chi generate XML de import tay; khong sua `TiaBridge.V19`/reflection import `PlcTypeGroup.Types`. |
+| **Q7** | Web UI target `siemens-db` | **Lam luon UI trong modal Generate/Push.** Them target `Siemens DB/UDT XML`, dung panel TIA hien co; push mode chi day DB. |
+| **Q8** | Nguon/Quan ly `PlcBlock` tren UI | **Lam UI quan ly block** trong Global Variables: tao/sua/xoa DB/UDT va gan bien vao block, khong chi dua CSV import. |
+| **Q9** | Kieu du lieu DB/UDT | **Mo rong allow-list/type map** them `DInt`, `UInt`, `UDInt`, `LReal`, `Byte`, `String` ngoai cac kieu cu; ten DeviceType van xu ly nhu struct/nested. |
 
 ---
 
@@ -89,7 +93,7 @@ Task này **KHÔNG phải làm mới từ đầu**. Trên base hiện tại đã
 - [x] **Bước 3** — Model entity `PlcBlock` (DB / UDT / GVL) — TS trước
 - [x] **Bước 4** — Field liên kết biến ↔ Block (`blockId`, default `""`)
 - [x] **Bước 5** — Struct lồng struct (tối đa 3 cấp, `MaxNestingDepth` hằng số)
-- [ ] **Bước 6** — Generator khai báo DB/UDT (SimaticML) + payload + parser import + push
+- [x] **Bước 6** — Generator khai báo DB/UDT (SimaticML) + payload + parser import + push
 
 ---
 
@@ -344,13 +348,66 @@ containerRegistry.RegisterSingleton<ICodeGenerator, SiemensDbUdtGenerator>();
 
 ---
 
-## ❗ Câu hỏi mới phát sinh từ hạ tầng thật — cần xác nhận TRƯỚC/ TRONG Bước 6
+---
 
-- **Q6 — Import UDT vào TIA (rủi ro đã xác minh).** Bridge V19 (`TiaV19ImportService`) import block vào `PlcBlockGroup.Blocks`. Trong Openness, **UDT nằm ở `PlcTypeGroup.Types`** — collection khác. ⇒ Push **DB** khả năng chạy; push **UDT** có thể KHÔNG được bridge hiện tại nhận.
-  **Cần chốt:** lần này (a) chỉ làm **DB** cho luồng push (UDT chỉ generate ra file để import tay), hay (b) mở rộng cả `TiaBridge.V19` + `ReflectionSiemensTiaProjectService` để import UDT vào `Types`? (b) là việc lớn, đụng process bridge net48.
+## Phase Buoc 6 da thuc hien (cap nhat sau Q6-Q9)
 
-- **Q7 — Web UI target cho "siemens-db".** Hiện modal chỉ có luồng push `siemens-lad` (logic). Import variable→DB cần entry point UI mới (chọn block, chọn target DB/UDT). **Cần chốt:** Bước 6 làm luôn UI, hay chỉ làm backend generator + parser (giao/generate qua lệnh có sẵn), UI để phase sau?
+### Ket qua backend/generator
+- Tao `src/GrafcetStudio.App/Generators/Siemens/SiemensDbUdtGenerator.cs` voi `Platform => "siemens-db"`.
+- Dang ky DI tai `src/GrafcetStudio.App/App.xaml.cs`; registry co them `siemens-db`, khong de `siemens`/`siemens-lad` bi de key.
+- Generator sinh XML bang SimaticML:
+  - `kind="DB"` -> `BlockGlobalDB`, them member qua `AttributeList.STATIC.AddMember(...)`.
+  - `kind="UDT"` -> `BlockUDT`, them member qua `AttributeList.NONE.AddMember(...)`.
+- Generator chi lay bien co `DeclarationMode == "SymbolicBlock"` va `BlockId == block.Id`; bien `AddressMapped`/khong thuoc block bi bo qua.
+- Nested struct dung `DeviceType`/`DeviceSignal.NestedTypeId` va chan theo `StructLimits.MaxNestingDepth`.
+- Type map mo rong: `Bool/Boolean`, `Byte`, `USInt`, `Word`, `Int`, `UInt`, `DWord`, `DInt`, `UDInt`, `LWord`, `Real`, `LReal`, `Time/Timer`, `String/WString`, `Counter`; ten `DeviceType` duoc xu ly nhu struct/nested.
 
-- **Q8 — Nguồn của `PlcBlock` trên UI.** Người dùng tạo/gán block bằng cách nào ở phase này: (a) chỉ qua import CSV (`parseSiemensBlockCSV` tự sinh block), hay (b) cần UI quản lý block (tạo/sửa/xoá, gán biến)? Ảnh hưởng khối lượng Bước 3/6.
+### Payload/model da them
+- Tao DTO C# `src/GrafcetStudio.App/Domain/Models/PlcBlock.cs` khop TS `PlcBlock` (`id/name/kind/memberVarIds/comment`).
+- Them `CodegenPayload.Blocks` voi `[JsonPropertyName("blocks")]`.
+- TS `CodegenPayload` co `blocks?: PlcBlock[]`.
+- `src/web/ts/codegen/payload.ts` dinh `blocks`, dong thoi preserve `declarationMode` va `blockId` trong bien gui backend.
 
-- **Q9 — Map `dataType` → `SimaticDataType`.** AI allow-list hiện là `['Bool','Int','Real','Word','DWord','Time']` (`ai/contracts.ts:247`). SimaticML `SimaticDataType` có `BOOLEAN/INT/WORD/DWORD/DINT/REAL/LREAL/...`. **Cần chốt:** danh sách kiểu dữ liệu hỗ trợ cho DB/UDT lần này = đúng allow-list trên, hay mở rộng thêm (LReal, DInt, String, Time...)? Kiểu lạ (tên UDT) xử lý như nested/tham chiếu.
+### Parser import da them
+- `src/web/ts/editor/excel-import.ts` them `parseSiemensBlockCSV(rows, deviceTypes)`.
+- Parser doc `Name, DataType, [Comment], [Block]`, sinh `ProjectVariable[]`, `PlcBlock[]`, `errors[]`.
+- Bien import co `declarationMode='SymbolicBlock'`, `blockId`, `kind`.
+- Khong sua cac parser cu (`parseStructCSV`, `parseUnitCSV`, `parsePhysicalIOCSV`).
+
+### Push theo Q6
+- `src/GrafcetStudio.App/Services/Siemens/SiemensTiaPushOrchestrator.cs` whitelist them `siemens-db` va goi `codegen.Generate(platform, payload)`.
+- Voi `platform == "siemens-db"`, push chi chon XML `SW.Blocks.GlobalDB`.
+- UDT XML van duoc generate nhung **khong tu dong push qua bridge**; nguoi dung import tay vao TIA Types.
+- Khong sua `TiaBridge.V19`, `ReflectionSiemensTiaProjectService`, hay `ISiemensTiaProjectService`.
+
+### UI theo Q7/Q8
+- `src/web/ts/codegen/modal.ts` them target `Siemens DB/UDT XML`.
+- Panel TIA push hien co dung duoc cho `siemens-db`; status nhac ro `DB XML only; UDT files remain manual import`.
+- `src/web/ts/codegen/modal-host.ts` gui `platform:'siemens-db'` khi target la `siemens-db`.
+- `src/web/index.html` them nut `PLC Blocks` trong Global Variables.
+- `src/web/ts/editor/vars-ui.ts` them PLC Block Manager:
+  - tao/sua/xoa block `DB`/`UDT`;
+  - sua comment;
+  - gan bien vao block;
+  - khi gan: `declarationMode='SymbolicBlock'`, `blockId=<block.id>`;
+  - khi bo gan/xoa block: bien ve `AddressMapped`, `blockId=''`;
+  - dong bo `PlcBlock.memberVarIds`.
+
+### Allow-list/type UI theo Q9
+- Mo rong AI allow-list trong `src/web/ts/ai/contracts.ts` va `src/web/ts/ai/apply.ts`.
+- Mo rong dropdown/type display trong `src/web/ts/editor/tree-devices-ui.ts` va `src/web/ts/editor/vars-ui.ts`.
+
+### Verify da chay
+- `npm.cmd run typecheck` pass.
+- `dotnet build src\GrafcetStudio.App\GrafcetStudio.App.csproj -v:minimal` pass.
+- `npm.cmd run build` pass.
+- Luu y: `dotnet build` con 3 warning nullable hien huu, khong chan build.
+
+---
+
+## Cau hoi Q6-Q9 da chot
+
+- **Q6 - Import UDT vao TIA:** Chi push **DB** qua bridge. UDT khong tu dong push; chi generate XML de import tay. Khong sua bridge net48/Reflection import Types.
+- **Q7 - Web UI target `siemens-db`:** Lam luon UI trong modal Generate/Push, them target `Siemens DB/UDT XML`.
+- **Q8 - Nguon cua `PlcBlock` tren UI:** Lam UI quan ly block (tao/sua/xoa/gan bien), khong chi dua vao CSV import.
+- **Q9 - Map `dataType` -> `SimaticDataType`:** Mo rong allow-list/type map them `LReal`, `DInt`, `UInt`, `UDInt`, `Byte`, `String`...; kieu la khop `DeviceType` thi xu ly nhu struct/nested.
