@@ -10,13 +10,23 @@ namespace GrafcetStudioProject {
   export type StepKind = 'normal' | 'macro';
   export type AddressMode = 'bool' | 'word' | string;
   export type BoolAddressMode = 'linear' | 'block' | string;
-  export type SignalVarType = 'Input' | 'Output' | 'Var' | string;
+  export type SignalVarType = 'Input' | 'Output' | 'Var' | 'Instance' | string;
   export type IODirection = 'Input' | 'Output' | '' | string;
   export type IOMappingStatus = 'matched' | 'mapped' | 'unmatched' | string;
   export type VariableKind = 'primitive' | 'struct' | string;
   export type VariableSource = 'csv' | 'manual' | 'excel' | string;
+  export type DeclarationMode = 'AddressMapped' | 'SymbolicBlock' | string;
+  export type BlockKind = 'DB' | 'UDT' | 'GVL' | string;
   export type ActionQualifier = 'N' | 'S' | 'R' | 'P' | 'P0' | 'L' | 'D' | 'SD' | 'DS' | 'SL';
 
+  export interface PlcBlock {
+    id: string;
+    name: string;              // vd "DB_Motor", "UDT_Cylinder", "GVL_IO"
+    kind: BlockKind;
+    memberVarIds?: string[];   // tham chiếu ProjectVariable.id thuộc block
+    comment?: string;
+    [key: string]: unknown;
+  }
   export interface Project {
     id: string;
     name: string;
@@ -30,6 +40,7 @@ namespace GrafcetStudioProject {
     ioMapping: IOMapping;
     plcConfig?: PlcConfig;
     plcName?: string;
+    blocks?: PlcBlock[];
     [key: string]: unknown;
   }
 
@@ -157,6 +168,7 @@ namespace GrafcetStudioProject {
     address?: string;
     comment?: string;
     path?: string;
+    nestedTypeId?: string;   // nested DeviceType reference; optional, can be inferred from dataType
     [key: string]: unknown;
   }
 
@@ -165,6 +177,8 @@ namespace GrafcetStudioProject {
     format: string;
     address?: string | null;
     signalAddresses?: Record<string, string>;
+    declarationMode?: DeclarationMode;   // absent => AddressMapped (hành vi cũ)
+    blockId?: string;   // id PlcBlock; '' = không thuộc block
   }
 
   export interface ProjectVariable extends DeviceVariable {
@@ -341,8 +355,3 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 }
-
-
-
-
-

@@ -80,6 +80,7 @@ namespace GrafcetStudioStoreHelpers {
   }
 
   export const GF_ADDRESS_DEFAULT_BOOL_SPAN = 200;
+  export const MAX_NESTING_DEPTH = 3;
 
   function normalizeBoolAddressMode(mode: unknown): string {
     const value = String(mode || '').trim().toLowerCase();

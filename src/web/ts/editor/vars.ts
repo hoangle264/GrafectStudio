@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioVars {
+namespace GrafcetStudioVars {
   type Project = GrafcetStudioProject.Project;
   type ProjectVariable = GrafcetStudioProject.ProjectVariable;
   type DeviceSignal = GrafcetStudioProject.DeviceSignal;
@@ -114,11 +114,58 @@
     return devSigs.map(function(sig) { return Object.assign({}, sig, { path: unitPaths[sig.id] || sig.path || sig.id }); });
   }
 
+  function findNestedDeviceType(context: VarsContext, sig: DeviceSignal): GrafcetStudioProject.DeviceType | undefined {
+    const nestedTypeId = (sig.nestedTypeId || '').trim();
+    const dataType = (sig.dataType || '').trim();
+    return (context.project.devices || []).find(function(device) {
+      if (!device) return false;
+      if (nestedTypeId && device.id === nestedTypeId) return true;
+      return !!dataType && device.name === dataType;
+    });
+  }
+
+  function expandDeviceSignals(
+    context: VarsContext,
+    signals: DeviceSignal[],
+    depth: number,
+    parentPath: string,
+    visitedTypeIds: Record<string, boolean>
+  ): DeviceSignal[] {
+    const out: DeviceSignal[] = [];
+    (signals || []).forEach(function(sig) {
+      if (!sig) return;
+      const signalName = sig.name || sig.id || '';
+      const currentPath = parentPath && signalName ? parentPath + '.' + signalName : (parentPath || sig.path || signalName);
+      const nestedType = findNestedDeviceType(context, sig);
+      if (!nestedType) {
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      if (depth >= GrafcetStudioStoreHelpers.MAX_NESTING_DEPTH) {
+        console.warn('Struct nesting depth limit reached for signal:', currentPath, 'max:', GrafcetStudioStoreHelpers.MAX_NESTING_DEPTH);
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      if (nestedType.id && visitedTypeIds[nestedType.id]) {
+        console.warn('Struct nesting cycle skipped for signal:', currentPath, 'type:', nestedType.name || nestedType.id);
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      const nextVisited = Object.assign({}, visitedTypeIds);
+      if (nestedType.id) nextVisited[nestedType.id] = true;
+      out.push.apply(out, expandDeviceSignals(context, nestedType.signals || [], depth + 1, currentPath, nextVisited));
+    });
+    return out;
+  }
+
   export function gvtGetSigList(context: VarsContext, variable: ProjectVariable): DeviceSignal[] {
     const devType = (context.project.devices || []).find(device => device.name === (variable.format || ''));
     const devSigs = devType ? (devType.signals || []) : [];
     if (variable.format === 'Cylinder') return devSigs.length ? devSigs : CYL_SIGNALS;
-    return devSigs;
+    if (!devSigs.some(function(sig) { return !!findNestedDeviceType(context, sig); })) return devSigs;
+    const visitedTypeIds: Record<string, boolean> = {};
+    if (devType && devType.id) visitedTypeIds[devType.id] = true;
+    return expandDeviceSignals(context, devSigs, 1, '', visitedTypeIds);
   }
 
   export function gvtGetExcelSignalAddress(variable: ProjectVariable | null | undefined, sig: DeviceSignal | null | undefined): string {

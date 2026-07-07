@@ -18,6 +18,12 @@ public class DeviceVariable
     [JsonPropertyName("signalAddresses")]
     public IDictionary<string, string> SignalAddresses { get; set; } = new Dictionary<string, string>();
 
+    [JsonPropertyName("declarationMode")]
+    public string? DeclarationMode { get; init; }
+
+    [JsonPropertyName("blockId")]
+    public string BlockId { get; init; } = string.Empty;
+
     public string? GetSignalAddress(string signalId)
         => SignalAddresses.TryGetValue(signalId, out var address) ? address : null;
 
