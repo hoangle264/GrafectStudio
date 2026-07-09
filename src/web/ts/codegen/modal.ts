@@ -162,7 +162,7 @@ function cgDownloadSelectedFile(): void {
   const index = (window.GrafcetStudio && (window.GrafcetStudio as unknown as { codegenSelectedFileIndex?: number }).codegenSelectedFileIndex) || 0;
   const file = files[index];
   if (!file) return;
-  cgDownloadTextFile(cgSafeFilename(file.path || 'export.st'), file.content || '');
+  cgDownloadTextFile(cgSafeFilename(file.path || 'export.mnm'), file.content || '');
 }
 
 function cgCopyAllFiles(): void {
@@ -182,13 +182,13 @@ function cgDownloadTextFile(filename: string, content: string): void {
   const blob = new Blob([content || ''], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = filename || 'export.st';
+  a.download = filename || 'export.mnm';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function cgSafeFilename(path: string): string {
-  return String(path || 'export.st').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'export.st';
+  return String(path || 'export.mnm').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'export.mnm';
 }
 
 function cgCopyText(text: string): void {

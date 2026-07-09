@@ -6,26 +6,26 @@ using System.Linq;
 namespace GrafcetStudio.App.Generators;
 
 /// <summary>
-/// Composite generator for the unit-config platform.
-/// It converts the legacy single-file unit generator into a multi-file payload
+/// Composite generator for the Keyence mnemonic list platform.
+/// It converts the legacy single-file Keyence generator into a multi-file payload
 /// so the host/UI can preview each artifact independently.
 /// </summary>
 public sealed class MultiFileGenerator : ICodeGenerator
 {
-    private readonly KeyenceGenerator _unitConfig;
+    private readonly KeyenceGenerator _keyenceGenerator;
     private readonly IErrorGenerator _errorGenerator;
     private readonly IDeviceManagerGenerator _deviceManagerGenerator;
     private readonly ISystemControlGenerator _systemControlGenerator;
     private readonly IMapIOGenerator _mapIoGenerator;
 
     public MultiFileGenerator(
-        KeyenceGenerator unitConfig,
+        KeyenceGenerator keyenceGenerator,
         IErrorGenerator errorGenerator,
         IDeviceManagerGenerator deviceManagerGenerator,
         ISystemControlGenerator systemControlGenerator,
         IMapIOGenerator mapIoGenerator)
     {
-        _unitConfig = unitConfig;
+        _keyenceGenerator = keyenceGenerator;
         _errorGenerator = errorGenerator;
         _deviceManagerGenerator = deviceManagerGenerator;
         _systemControlGenerator = systemControlGenerator;
@@ -42,20 +42,20 @@ public sealed class MultiFileGenerator : ICodeGenerator
 
             yield return new CodegenFile
             {
-                Path = $"Units/Unit_{unitName}.st",
-                Content = _unitConfig.GenerateUnitContent(unitPayload)
+                Path = $"Units/Unit_{unitName}.mnm",
+                Content = _keyenceGenerator.GenerateUnitContent(unitPayload)
             };
         }
 
         yield return new CodegenFile
         {
-            Path = "Error.st",
+            Path = "Error.mnm",
             Content = _errorGenerator.Generate(payload)
         };
 
         yield return new CodegenFile
         {
-            Path = "System.st",
+            Path = "System.mnm",
             Content = _systemControlGenerator.GenerateSystem(payload)
         };
 
@@ -63,14 +63,14 @@ public sealed class MultiFileGenerator : ICodeGenerator
         {
             yield return new CodegenFile
             {
-                Path = "Orchestrator.st",
+                Path = "Orchestrator.mnm",
                 Content = _systemControlGenerator.GenerateOrchestrator(payload)
             };
         }
 
         yield return new CodegenFile
         {
-            Path = "Devices/DeviceManager.st",
+            Path = "Devices/DeviceManager.mnm",
             Content = _deviceManagerGenerator.Generate(payload)
         };
 
@@ -78,7 +78,7 @@ public sealed class MultiFileGenerator : ICodeGenerator
         {
             yield return new CodegenFile
             {
-                Path = "Devices/IOMapping.st",
+                Path = "Devices/IOMapping.mnm",
                 Content = _mapIoGenerator.Generate(payload, Array.Empty<GrafcetStudio.CodeGen.Runtime.Models.AggregatedOutputBinding>())
             };
         }
