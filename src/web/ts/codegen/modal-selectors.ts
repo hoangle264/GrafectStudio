@@ -116,9 +116,8 @@ function cgUpdatePreview(): void {
 // Syntax highlight cho Unit Config output
 function cgResolveHostPlatform(target: string): string {
   return ({
-    'csharp-kv-5500': 'kv-5500',
     'csharp-twincat-st': 'twincat-st'
-  } as Record<string, string>)[target] || target || 'kv-5500';
+  } as Record<string, string>)[target] || target || 'unit-config';
 }
 function cgGetDefaultUnitId(): string {
   const unitRadio = document.querySelector<HTMLInputElement>('#cg-unit-list input[name="cg-unit-radio"]:checked');

@@ -12,14 +12,14 @@ namespace GrafcetStudio.App.Generators;
 /// </summary>
 public sealed class MultiFileGenerator : ICodeGenerator
 {
-    private readonly UnitConfigGenerator _unitConfig;
+    private readonly KeyenceGenerator _unitConfig;
     private readonly IErrorGenerator _errorGenerator;
     private readonly IDeviceManagerGenerator _deviceManagerGenerator;
     private readonly ISystemControlGenerator _systemControlGenerator;
     private readonly IMapIOGenerator _mapIoGenerator;
 
     public MultiFileGenerator(
-        UnitConfigGenerator unitConfig,
+        KeyenceGenerator unitConfig,
         IErrorGenerator errorGenerator,
         IDeviceManagerGenerator deviceManagerGenerator,
         ISystemControlGenerator systemControlGenerator,

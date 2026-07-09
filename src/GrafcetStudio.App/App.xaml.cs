@@ -51,7 +51,6 @@ public partial class App : PrismApplication
         RegisterSiemensTiaServices(containerRegistry);
         containerRegistry.RegisterSingleton<ISequenceResolver, SequenceResolver>();
         containerRegistry.RegisterSingleton<ICodeGenerator, KeyenceMnemonicGenerator>();
-        containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Kv8000.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Melsec.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Omron.Id));
         containerRegistry.RegisterInstance<ICodeGenerator>(new ProfiledMnemonicGenerator(ProfileRegistry.Siemens.Id));
@@ -59,7 +58,7 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ICodeGenerator, SiemensDbUdtGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, RuntimePlanGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, TwinCatStGenerator>();
-        containerRegistry.RegisterSingleton<UnitConfigGenerator>();
+        containerRegistry.RegisterSingleton<KeyenceGenerator>();
         containerRegistry.RegisterSingleton<ISystemControlGenerator, SystemControlGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, MultiFileGenerator>();
         containerRegistry.RegisterSingleton<IMapIOGenerator, MapIOGenerator>();

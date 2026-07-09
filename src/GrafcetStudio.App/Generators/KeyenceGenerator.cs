@@ -12,7 +12,7 @@ using System.Text.Json;
 
 namespace GrafcetStudio.App.Generators;
 
-public class UnitConfigGenerator : LegacyCodeGeneratorBase
+public class KeyenceGenerator : LegacyCodeGeneratorBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly string[] SectionTemplateOrder =
@@ -34,7 +34,7 @@ public class UnitConfigGenerator : LegacyCodeGeneratorBase
     private readonly TemplateManager _templates;
     private readonly ISequenceResolver _sequenceResolver;
 
-    public UnitConfigGenerator(TemplateManager templates, ISequenceResolver sequenceResolver)
+    public KeyenceGenerator(TemplateManager templates, ISequenceResolver sequenceResolver)
     {
         _templates = templates;
         _sequenceResolver = sequenceResolver;
@@ -840,3 +840,4 @@ internal static class StepLabelExtensions
     public static string LabelOrId(this Step step) => !string.IsNullOrWhiteSpace(step.Label) ? step.Label : step.Id;
     private readonly record struct ParsedBoolBase(string Prefix, int Number, int Width);
 }
+

@@ -133,5 +133,5 @@ public class IlGenerator : ICodeGenerator
     private string PadAddress(string addr) => addr.PadRight(12);
 
     private string Map(string instruction)
-        => ProfileRegistry.Kv8000.InstructionMap.TryGetValue(instruction, out var mapped) ? mapped : instruction;
+        => instruction;
 }

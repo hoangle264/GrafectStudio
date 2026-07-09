@@ -36,10 +36,8 @@ function showGenerateCodeModal(): void {
         <div>
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">TARGET PLC</div>
           <select id="cg-target" onchange="cgOnTargetChanged()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;border-radius:3px;outline:none;">
-            <option value="unit-config">Unit Config JSON</option>
+            <option value="unit-config">Keyence Mnemonic List</option>
             <option value="runtime-plan">Runtime Plan [debug]</option>
-            <option value="kv-5500">Keyence KV-5500</option>
-            <option value="kv-8000">Keyence KV-8000</option>
             <option value="melsec">Mitsubishi MELSEC</option>
             <option value="omron">OMRON</option>
             <option value="siemens">Siemens AWL</option>

@@ -159,12 +159,11 @@ public class FileService : IFileService
 
     private static (string Ext, string Filter) MapPlatform(string platform) => platform?.ToLowerInvariant() switch
     {
-        "kv-5500" => (".mnm", "KV Mnemonic|*.mnm"),
-        "kv-8000" => (".mnm", "KV Mnemonic|*.mnm"),
         "melsec" => (".gxw", "MELSEC Program|*.gxw"),
         "omron" => (".cxp", "Omron Program|*.cxp"),
         "siemens" => (".awl", "Siemens STL|*.awl"),
         "twincat-st" => (".st", "Structured Text|*.st"),
+        "unit-config" => (".mnm", "KV Mnemonic|*.mnm"),
         _ => (".txt", "Text File|*.txt")
     };
 
