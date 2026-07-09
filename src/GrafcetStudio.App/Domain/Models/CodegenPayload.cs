@@ -40,6 +40,12 @@ public class CodegenPayload
     [JsonPropertyName("templateProfile")]
     public string TemplateProfile { get; set; } = "simple";
 
+    [JsonPropertyName("ioMapping")]
+    public IOMapping IOMapping { get; set; } = new();
+
+    [JsonPropertyName("unitConfig")]
+    public Dictionary<string, UnitConfig> UnitConfig { get; set; } = new();
+
     public void EnrichVariables()
     {
         // Signal IDs are stable keys from the web model; keep them unchanged for resolution.
@@ -116,4 +122,33 @@ public class FlowInfo
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
     [JsonPropertyName("macroPortVariable")] public DeviceVariable? MacroPortVariable { get; set; }
+}
+
+public class UnitConfig
+{
+    [JsonPropertyName("label")] public string Label { get; set; } = string.Empty;
+    [JsonPropertyName("signalAddresses")] public Dictionary<string, string> SignalAddresses { get; set; } = new();
+}
+
+public class IOMapping
+{
+    [JsonPropertyName("physicalIOs")] public List<PhysicalIO> PhysicalIOs { get; set; } = new();
+    [JsonPropertyName("entries")] public List<IOMappingEntry> Entries { get; set; } = new();
+}
+
+public class PhysicalIO
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+    [JsonPropertyName("deviceTag")] public string DeviceTag { get; set; } = string.Empty;
+    [JsonPropertyName("plcAddress")] public string PlcAddress { get; set; } = string.Empty;
+    [JsonPropertyName("direction")] public string Direction { get; set; } = string.Empty;
+    [JsonPropertyName("description")] public string? Description { get; set; }
+}
+
+public class IOMappingEntry
+{
+    [JsonPropertyName("physicalIOId")] public string PhysicalIOId { get; set; } = string.Empty;
+    [JsonPropertyName("appVariable")] public string AppVariable { get; set; } = string.Empty;
+    [JsonPropertyName("status")] public string Status { get; set; } = string.Empty;
+    [JsonPropertyName("matchScore")] public double MatchScore { get; set; }
 }

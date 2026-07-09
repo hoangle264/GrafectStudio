@@ -16,17 +16,20 @@ public sealed class MultiFileGenerator : ICodeGenerator
     private readonly IErrorGenerator _errorGenerator;
     private readonly IDeviceManagerGenerator _deviceManagerGenerator;
     private readonly ISystemControlGenerator _systemControlGenerator;
+    private readonly IMapIOGenerator _mapIoGenerator;
 
     public MultiFileGenerator(
         UnitConfigGenerator unitConfig,
         IErrorGenerator errorGenerator,
         IDeviceManagerGenerator deviceManagerGenerator,
-        ISystemControlGenerator systemControlGenerator)
+        ISystemControlGenerator systemControlGenerator,
+        IMapIOGenerator mapIoGenerator)
     {
         _unitConfig = unitConfig;
         _errorGenerator = errorGenerator;
         _deviceManagerGenerator = deviceManagerGenerator;
         _systemControlGenerator = systemControlGenerator;
+        _mapIoGenerator = mapIoGenerator;
     }
 
     public string Platform => "unit-config";
@@ -50,12 +53,18 @@ public sealed class MultiFileGenerator : ICodeGenerator
             Content = _errorGenerator.Generate(payload)
         };
 
+        yield return new CodegenFile
+        {
+            Path = "System.st",
+            Content = _systemControlGenerator.GenerateSystem(payload)
+        };
+
         if (payload.Flows.Any(flow => string.Equals(flow.Category, "orchestrator", StringComparison.OrdinalIgnoreCase)))
         {
             yield return new CodegenFile
             {
-                Path = "SystemControl.st",
-                Content = _systemControlGenerator.Generate(payload)
+                Path = "Orchestrator.st",
+                Content = _systemControlGenerator.GenerateOrchestrator(payload)
             };
         }
 
@@ -64,6 +73,15 @@ public sealed class MultiFileGenerator : ICodeGenerator
             Path = "Devices/DeviceManager.st",
             Content = _deviceManagerGenerator.Generate(payload)
         };
+
+        if ((payload.IOMapping?.PhysicalIOs?.Count ?? 0) > 0 || (payload.IOMapping?.Entries?.Count ?? 0) > 0)
+        {
+            yield return new CodegenFile
+            {
+                Path = "Devices/IOMapping.st",
+                Content = _mapIoGenerator.Generate(payload, Array.Empty<GrafcetStudio.CodeGen.Runtime.Models.AggregatedOutputBinding>())
+            };
+        }
     }
 
     private static IEnumerable<CodegenPayload> BuildUnitPayloads(CodegenPayload payload)
@@ -102,7 +120,9 @@ public sealed class MultiFileGenerator : ICodeGenerator
                 Variables = payload.Variables,
                 DeviceTypes = payload.DeviceTypes,
                 DeviceLibraryPath = payload.DeviceLibraryPath,
-                TemplateProfile = payload.TemplateProfile
+                TemplateProfile = payload.TemplateProfile,
+                IOMapping = payload.IOMapping,
+                UnitConfig = payload.UnitConfig
             };
         }
     }

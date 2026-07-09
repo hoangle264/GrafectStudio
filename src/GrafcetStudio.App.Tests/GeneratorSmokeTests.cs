@@ -60,10 +60,11 @@ public class GeneratorSmokeTests
             }
         });
 
-        var output = generator.Generate(payload);
-        Assert.Contains("SystemControl.st", output);
-        Assert.Contains("orchestratorFlows", output);
-        Assert.Contains("skeleton", output);
+        var orchestratorOutput = generator.GenerateOrchestrator(payload);
+        Assert.Contains("orchestratorFlows", orchestratorOutput);
+        Assert.Contains("skeleton", orchestratorOutput);
+        var systemOutput = generator.GenerateSystem(payload);
+        Assert.Contains("\"flows\"", systemOutput);
     }
 
 
@@ -821,6 +822,10 @@ public class GeneratorSmokeTests
         DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
     }
 }
+
+
+
+
 
 
 

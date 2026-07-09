@@ -258,7 +258,9 @@ namespace GrafcetStudioProject {
     deviceTypes: DeviceType[];
     deviceLibraryPath: string;
     templateProfile: string;
-    // UI-only, not serialized to C#
+    ioMapping?: IOMapping;
+    unitConfig?: Record<string, UnitConfig>;
+        // UI-only, not serialized to C#
     outputPath?: string;
   }
 
@@ -362,3 +364,5 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 }
+
+

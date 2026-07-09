@@ -508,7 +508,9 @@ namespace GrafcetStudioCodegenPayload {
       flows,
       variables: allVars,
       blocks: buildBlocksInfo(context),
-      deviceTypes: getCSharpDeviceTypes(context)
+      deviceTypes: getCSharpDeviceTypes(context),
+      ioMapping: JSON.parse(JSON.stringify((context.project && context.project.ioMapping) || { physicalIOs: [], entries: [] })),
+      unitConfig: JSON.parse(JSON.stringify((context.project && context.project.unitConfig) || {}))
     };
   }
 
@@ -580,3 +582,5 @@ namespace GrafcetStudioCodegenPayload {
 }
 
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
+
+

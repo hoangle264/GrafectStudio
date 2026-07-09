@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,14 +8,15 @@ namespace GrafcetStudio.App.Generators;
 
 public interface ISystemControlGenerator
 {
-    string Generate(CodegenPayload payload);
+    string GenerateOrchestrator(CodegenPayload payload);
+    string GenerateSystem(CodegenPayload payload);
 }
 
 public sealed class SystemControlGenerator : ISystemControlGenerator
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string Generate(CodegenPayload payload)
+    public string GenerateOrchestrator(CodegenPayload payload)
     {
         var orchestratorFlows = payload.Flows
             .Where(flow => string.Equals(flow.Category, "orchestrator", StringComparison.OrdinalIgnoreCase))
@@ -30,13 +31,24 @@ public sealed class SystemControlGenerator : ISystemControlGenerator
 
         var content = new
         {
-            file = "SystemControl.st",
             project = payload.Project,
             unit = payload.Unit,
             orchestratorFlows,
-            template = "orchestrator-flow-wrapper",
             phase = 1,
             skeleton = true
+        };
+
+        return JsonSerializer.Serialize(content, JsonOptions);
+    }
+
+    public string GenerateSystem(CodegenPayload payload)
+    {
+        var content = new
+        {
+            project = payload.Project,
+            unit = payload.Unit,
+            units = payload.Units ?? new List<UnitInfo>(),
+            flows = payload.Flows ?? new List<FlowInfo>()
         };
 
         return JsonSerializer.Serialize(content, JsonOptions);
