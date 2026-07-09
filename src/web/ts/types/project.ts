@@ -268,6 +268,13 @@ namespace GrafcetStudioProject {
     id?: string;
     name?: string;
     machineName?: string;
+    plc?: PlcPayloadInfo;
+    [key: string]: unknown;
+  }
+
+  export interface PlcPayloadInfo {
+    namePlc?: string;
+    deviceCode?: string;
     [key: string]: unknown;
   }
 
@@ -359,10 +366,13 @@ namespace GrafcetStudioProject {
   }
   export interface PlcConfig {
     name?: string;
+    deviceCode?: string | number;
     ip?: string;
     port?: string | number;
     [key: string]: unknown;
   }
 }
+
+
 
 

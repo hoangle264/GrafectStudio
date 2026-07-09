@@ -424,10 +424,15 @@ namespace GrafcetStudioCodegenPayload {
   }
 
   function buildProjectInfo(context: PayloadContext) {
+    const plcConfig = (context.project && context.project.plcConfig) || {};
     return {
       id: context.project.id || '',
       name: context.project.name || '',
-      machineName: context.project.machineName || ''
+      machineName: context.project.machineName || '',
+      plc: {
+        namePlc: String(plcConfig.type || plcConfig.name || context.project.plcName || context.project.machineName || '').trim(),
+        deviceCode: String(plcConfig.deviceCode ?? '').trim()
+      }
     };
   }
 
@@ -582,5 +587,10 @@ namespace GrafcetStudioCodegenPayload {
 }
 
 GrafcetStudioInterop.registerBridge('codegenPayload', GrafcetStudioCodegenPayload.api);
+
+
+
+
+
 
 

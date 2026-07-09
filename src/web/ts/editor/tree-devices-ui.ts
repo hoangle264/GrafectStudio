@@ -150,9 +150,22 @@ function openPlcConfigModal(): void {
   el.className = 'modal-bg';
   el.style.cssText = 'align-items:center;justify-content:center;';
 
-  const plcTypes = ['Siemens S7-1200', 'Siemens S7-1500', 'Modbus TCP', 'Omron', 'Mitsubishi'];
-  const currentType = cfg.type || 'Siemens S7-1200';
-  const plcOptions = plcTypes.map(t => `<option value="${esc2(t)}" ${currentType===t?'selected':''}>${esc2(t)}</option>`).join('');
+  const plcOptionsCatalog = [
+    { name: 'Siemens S7-1200', deviceCode: '' },
+    { name: 'Siemens S7-1500', deviceCode: '' },
+    { name: 'Modbus TCP', deviceCode: '' },
+    { name: 'Omron', deviceCode: '' },
+    { name: 'Mitsubishi', deviceCode: '' },
+    { name: 'KV-NC32', deviceCode: '128' },
+    { name: 'KV-N40', deviceCode: '133' },
+    { name: 'KV-NC60', deviceCode: '132' },
+    { name: 'KV-5500', deviceCode: '53' },
+    { name: 'KV-7500', deviceCode: '55' },
+    { name: 'KV-8000', deviceCode: '57' }
+  ];
+  const currentType = String(cfg.type || cfg.name || 'Siemens S7-1200');
+  const plcOptions = plcOptionsCatalog.map(item => `<option value="${esc2(item.name)}" data-device-code="${esc2(item.deviceCode)}" ${currentType===item.name?'selected':''}>${esc2(item.name)}${item.deviceCode ? ' (DEVICE:' + esc2(item.deviceCode) + ')' : ''}</option>`).join('');
+  const currentDeviceCode = String(cfg.deviceCode ?? (plcOptionsCatalog.find(item => item.name === currentType)?.deviceCode || '')).trim();
 
   el.innerHTML = `
     <div class="modal" style="width:520px;min-width:360px;max-width:92vw;display:flex;flex-direction:column;padding:0;overflow:hidden;">
@@ -171,6 +184,11 @@ function openPlcConfigModal(): void {
           <select id="plc-modal-type" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
             ${plcOptions}
           </select>
+        </div>
+        <div>
+          <div class="dev-field-lbl">Device code</div>
+          <input id="plc-modal-device-code" type="text" placeholder="e.g. 128" value="${esc2(currentDeviceCode)}"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
         </div>
         <div>
           <div class="dev-field-lbl">IP Address</div>
@@ -210,6 +228,15 @@ function openPlcConfigModal(): void {
     </div>`;
   document.body.appendChild(el);
   showModal('modal-plc-config');
+  const plcTypeEl = document.getElementById('plc-modal-type') as HTMLSelectElement | null;
+  const plcDeviceCodeEl = document.getElementById('plc-modal-device-code') as HTMLInputElement | null;
+  const syncPlcDeviceCode = (): void => {
+    if (!plcTypeEl || !plcDeviceCodeEl) return;
+    const selected = plcTypeEl.selectedOptions && plcTypeEl.selectedOptions[0];
+    const code = String(selected?.getAttribute('data-device-code') || '').trim();
+    if (code) plcDeviceCodeEl.value = code;
+  };
+  plcTypeEl?.addEventListener('change', syncPlcDeviceCode);
   setTimeout(()=>document.getElementById('plc-modal-name')?.focus(),80);
 }
 
@@ -218,6 +245,7 @@ function confirmPlcConfig(): void {
   project.plcConfig = {
     name,
     type: (document.getElementById('plc-modal-type') as HTMLSelectElement).value,
+    deviceCode: ((document.getElementById('plc-modal-device-code') as HTMLInputElement).value || '').trim(),
     ip: ((document.getElementById('plc-modal-ip') as HTMLInputElement).value || '').trim(),
     port: (document.getElementById('plc-modal-port') as HTMLInputElement).value,
     rack: (document.getElementById('plc-modal-rack') as HTMLInputElement).value,
@@ -242,7 +270,6 @@ function plcPingTest(): void {
   const ip = ((document.getElementById('plc-modal-ip') as HTMLInputElement | null)?.value || '').trim();
   toast(ip ? 'Ping Test: ' + ip : 'Ping Test: enter IP Address');
 }
-
 // -- Device type modal -------------------------------------
 let _devModalDevId: string | null = null;
 
@@ -379,3 +406,6 @@ function removeDeviceSignal(devId: string, sigId: string, e?: Event): void {
   d.signals=(d.signals||[]).filter(s=>s.id!==sigId);
   saveProject(); renderTree();
 }
+
+
+

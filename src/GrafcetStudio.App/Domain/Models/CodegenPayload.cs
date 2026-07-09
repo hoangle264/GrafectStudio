@@ -68,8 +68,15 @@ public class ProjectInfo
     [JsonPropertyName("id")] public string? Id { get; set; }
     [JsonPropertyName("name")] public string? Name { get; set; }
     [JsonPropertyName("machineName")] public string? MachineName { get; set; }
+    [JsonPropertyName("plc")] public PlcPayloadInfo? Plc { get; set; }
 }
 
+
+public class PlcPayloadInfo
+{
+    [JsonPropertyName("namePlc")] public string? NamePlc { get; set; }
+    [JsonPropertyName("deviceCode")] public string? DeviceCode { get; set; }
+}
 public class DiagramInfo
 {
     [JsonPropertyName("id")] public string? Id { get; set; }
@@ -152,3 +159,5 @@ public class IOMappingEntry
     [JsonPropertyName("status")] public string Status { get; set; } = string.Empty;
     [JsonPropertyName("matchScore")] public double MatchScore { get; set; }
 }
+
+

@@ -81,6 +81,8 @@ interface ImportRawProjectPayload {
   ioMapping?: GrafcetStudioProject.IOMapping;
   excelVars?: unknown[];
   unitConfig?: Record<string, GrafcetStudioProject.UnitConfig>;
+  plcConfig?: GrafcetStudioProject.PlcConfig;
+  plcName?: string;
   diagrams?: ImportRawDiagramEntry[];
 }
 
@@ -148,6 +150,8 @@ function handleImport(e: Event): void {
             ioMapping: JSON.parse(JSON.stringify(raw.ioMapping || { physicalIOs: [], entries: [] })),
             excelVars: (raw.excelVars || []).map(v => ({ ...(v as object) })) as GrafcetStudioProject.ProjectVariable[],
             unitConfig: JSON.parse(JSON.stringify(raw.unitConfig || {})),
+            plcConfig: JSON.parse(JSON.stringify(raw.plcConfig || {})),
+            plcName: raw.plcName || raw.plcConfig?.name || '',
             diagrams: []
           };
           if (raw.devCategories) (project as unknown as { devCategories?: unknown[] }).devCategories = raw.devCategories.map(c => ({ ...c }));
@@ -282,6 +286,8 @@ function exportProject(): void {
     variables: JSON.parse(JSON.stringify(project.variables || { imported: [], user: [] })),
     ioMapping: JSON.parse(JSON.stringify(project.ioMapping || { physicalIOs: [], entries: [] })),
     unitConfig: JSON.parse(JSON.stringify(project.unitConfig || {})),
+    plcConfig: JSON.parse(JSON.stringify(project.plcConfig || {})),
+    plcName: project.plcName || '',
     diagrams,
     version: '3.0',
     exported: new Date().toISOString()
@@ -441,3 +447,4 @@ function getPortXYStatic(id: string, port: string, s2: ExportDiagramState & { pa
 //  HELPERS
 //  show / hide / toast / toastTimer / closeModal → moved to core/utils.ts
 // ───────────────────────────────────────────────────────────
+
