@@ -1,4 +1,5 @@
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.App.Expressions;
 using HandlebarsDotNet;
 using SimaticML.API;
 using SimaticML.Blocks;
@@ -87,23 +88,10 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
     private static Dictionary<string, SimaticVariable> BuildVariables(BlockFC block, SiemensLadNetwork network)
     {
         var refs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        CollectRefs(network.Expression, refs);
+        LogicExpressionUtilities.CollectRefs(network.Expression, refs);
         if (!string.IsNullOrWhiteSpace(network.Output?.Ref)) refs.Add(network.Output.Ref);
 
         return refs.ToDictionary(reference => reference, reference => CreateVariable(block, reference), StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static void CollectRefs(SiemensLadExpression? expression, ISet<string> refs)
-    {
-        if (expression is null) return;
-        if (string.Equals(expression.Type, "TAG", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!string.IsNullOrWhiteSpace(expression.Ref)) refs.Add(expression.Ref);
-            return;
-        }
-
-        if (expression.Node is not null) CollectRefs(expression.Node, refs);
-        foreach (var child in expression.Nodes) CollectRefs(child, refs);
     }
 
     private static SimaticVariable CreateVariable(BlockFC block, string reference)
@@ -113,7 +101,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         return new SimaticGlobalVariable(reference);
     }
 
-    private static SimaticPart BuildExpression(SiemensLadExpression? expression, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
+    private static SimaticPart BuildExpression(LogicExpression? expression, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
     {
         if (expression is null)
         {
@@ -131,7 +119,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         };
     }
 
-    private static SimaticPart BuildAnd(IList<SiemensLadExpression> nodes, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
+    private static SimaticPart BuildAnd(IList<LogicExpression> nodes, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
     {
         if (nodes.Count == 0)
         {
@@ -143,7 +131,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         return root;
     }
 
-    private static SimaticPart BuildOr(IList<SiemensLadExpression> nodes, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
+    private static SimaticPart BuildOr(IList<LogicExpression> nodes, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
     {
         if (nodes.Count == 0)
         {
@@ -155,7 +143,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         return root;
     }
 
-    private static SimaticPart BuildNot(SiemensLadExpression? node, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
+    private static SimaticPart BuildNot(LogicExpression? node, IReadOnlyDictionary<string, SimaticVariable> variables, SiemensLadNetwork network)
     {
         if (node is null) throw new InvalidOperationException($"NOT expression in network '{network.Id}' is missing node.");
         if (string.Equals(node.Type, "TAG", StringComparison.OrdinalIgnoreCase)) return CreateContact(node.Ref, !node.Negated, variables, network);
@@ -411,9 +399,9 @@ public static class SiemensLadTextTemplateParser
                     current.ExpressionLine = lineNumber;
                     try
                     {
-                        current.Expression = SiemensLadExpressionParser.Parse(rest.Trim());
+                        current.Expression = LogicExpressionParser.Parse(rest.Trim(), SiemensLadTagTokenParser.TagToken, SiemensLadTagTokenParser.ParserOptions);
                     }
-                    catch (SiemensLadExpressionParseException ex)
+                    catch (LogicExpressionParseException ex)
                     {
                         throw Error(path, current.Id, lineNumber, ex.Message);
                     }
@@ -587,7 +575,7 @@ public sealed class SiemensLadNetwork
     [JsonPropertyName("repeat")] public string Repeat { get; set; } = "once";
     [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
     [JsonPropertyName("comment")] public string Comment { get; set; } = string.Empty;
-    [JsonPropertyName("expression")] public SiemensLadExpression? Expression { get; set; }
+    [JsonPropertyName("expression")] public LogicExpression? Expression { get; set; }
     [JsonPropertyName("output")] public SiemensLadOutput? Output { get; set; }
     public string Status { get; set; } = "ready";
     public int Line { get; set; }
@@ -597,17 +585,10 @@ public sealed class SiemensLadNetwork
     public string UnsupportedInstructionText { get; set; } = string.Empty;
 }
 
-public sealed class SiemensLadExpression
-{
-    [JsonPropertyName("type")] public string Type { get; set; } = "TAG";
-    [JsonPropertyName("ref")] public string? Ref { get; set; }
-    [JsonPropertyName("negated")] public bool Negated { get; set; }
-    [JsonPropertyName("node")] public SiemensLadExpression? Node { get; set; }
-    [JsonPropertyName("nodes")] public List<SiemensLadExpression> Nodes { get; set; } = [];
-}
-
 public sealed class SiemensLadOutput
 {
     [JsonPropertyName("type")] public string Type { get; set; } = "coil";
     [JsonPropertyName("ref")] public string Ref { get; set; } = string.Empty;
 }
+
+

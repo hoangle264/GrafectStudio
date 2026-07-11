@@ -1,9 +1,10 @@
+using GrafcetStudio.App.Expressions;
 using GrafcetStudio.App.Generators.Siemens;
 using Xunit;
 
 namespace GrafcetStudio.App.Tests;
 
-public class SiemensLadExpressionParserTests
+public class LogicExpressionParserTests
 {
     [Theory]
     [InlineData("a", "TAG(a)")]
@@ -22,7 +23,17 @@ public class SiemensLadExpressionParserTests
     [InlineData("a | (b | c)", "OR(TAG(a),TAG(b),TAG(c))")]
     public void Parse_HappyPathAndPrecedence_ReturnsNormalizedAst(string expr, string expected)
     {
-        var result = SiemensLadExpressionParser.Parse(expr);
+        var result = ParseSiemens(expr);
+
+        Assert.Equal(expected, ToDebug(result));
+    }
+
+    [Theory]
+    [InlineData("DB1.\"Motor State\".%X3", "TAG(DB1.\"Motor State\".%X3)")]
+    [InlineData("\"Root DB\".Nested[0].Flag", "TAG(\"Root DB\".Nested[0].Flag)")]
+    public void Parse_SiemensTagTokenGrammar_ReturnsTag(string expr, string expected)
+    {
+        var result = ParseSiemens(expr);
 
         Assert.Equal(expected, ToDebug(result));
     }
@@ -36,7 +47,7 @@ public class SiemensLadExpressionParserTests
     [InlineData("()", 1, "unexpected ')'; expected a tag or '(' after '('")]
     public void Parse_InvalidExpression_ThrowsHelpfulError(string expr, int expectedPosition, string expectedFragment)
     {
-        var ex = Assert.Throws<SiemensLadExpressionParseException>(() => SiemensLadExpressionParser.Parse(expr));
+        var ex = Assert.Throws<LogicExpressionParseException>(() => ParseSiemens(expr));
 
         Assert.Contains("Invalid ladder expression", ex.Message);
         Assert.Contains($"position {expectedPosition}", ex.Message);
@@ -44,7 +55,10 @@ public class SiemensLadExpressionParserTests
         Assert.Contains("Grammar:", ex.Message);
     }
 
-    private static string ToDebug(SiemensLadExpression expression)
+    private static LogicExpression ParseSiemens(string expr)
+        => LogicExpressionParser.Parse(expr, SiemensLadTagTokenParser.TagToken, SiemensLadTagTokenParser.ParserOptions);
+
+    private static string ToDebug(LogicExpression expression)
     {
         if (string.Equals(expression.Type, "TAG", System.StringComparison.OrdinalIgnoreCase))
         {
