@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.App.Generators.Keyence;
+using GrafcetStudio.App.Generators.Keyence;
 using GrafcetStudio.Domain.Models;
 using Xunit;
 
@@ -12,6 +12,7 @@ public class KeyenceMnemonicExpressionEmitterTests
     [InlineData("A|B", new[] { "LD   A", "OR   B" })]
     [InlineData("(A|B)&C", new[] { "LD   A", "OR   B", "AND  C" })]
     [InlineData("A&(B|C)", new[] { "LD   A", "LD   B", "OR   C", "ANL" })]
+    [InlineData("((A|B)&C)|D", new[] { "LD   A", "OR   B", "AND  C", "OR   D" })]
     [InlineData("(A&B)|(C&D)", new[] { "LD   A", "AND  B", "LD   C", "AND  D", "ORL" })]
     public void EmitCondition_BasicExpressions_ReturnsExpectedMnemonic(string expression, string[] expected)
     {
@@ -105,5 +106,15 @@ public class KeyenceMnemonicExpressionEmitterTests
         var refs = KeyenceMnemonicExpressionEmitter.CollectRefs(expression);
 
         Assert.Equal(new[] { "A", "B", "Motor.Run" }, refs.OrderBy(r => r, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Parse_InvalidExpression_ThrowsHelpfulKeyenceError()
+    {
+        var ex = Assert.Throws<GrafcetStudio.App.Expressions.LogicExpressionParseException>(
+            () => KeyenceMnemonicExpressionEmitter.Parse("A(B)"));
+
+        Assert.Contains("Invalid Keyence mnemonic expression", ex.Message);
+        Assert.Contains("position 1", ex.Message);
     }
 }

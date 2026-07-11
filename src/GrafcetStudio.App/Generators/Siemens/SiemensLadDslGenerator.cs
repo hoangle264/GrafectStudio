@@ -284,6 +284,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         {
             yield return Path.GetFullPath(Path.Combine(templateRootPath, "siemens-lad.hbs"));
             yield return Path.GetFullPath(Path.Combine(templateRootPath, "default.lad.hbs"));
+            yield break;
         }
 
         yield return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, DefaultTemplatePath));

@@ -17,7 +17,7 @@ public class GeneratorSmokeTests
         var generator = new MapIOGenerator();
         var payload = BuildPayload();
         var output = generator.Generate(payload, Array.Empty<AggregatedOutputBinding>());
-        Assert.Contains("deviceOutputGroups", output);
+        Assert.Contains("ioMapping", output);
         Assert.Contains("unit", output);
     }
 
@@ -438,10 +438,11 @@ public class GeneratorSmokeTests
     public void MultiFileGenerator_ProjectScopedPayload_EmitsOneUnitFilePerUnit()
     {
         var generator = new MultiFileGenerator(
-            new UnitConfigGenerator(new TemplateManager(Handlebars.Create()), new SequenceResolver()),
+            new KeyenceGenerator(new TemplateManager(Handlebars.Create()), new SequenceResolver()),
             new ErrorGenerator(),
             new DeviceManagerGenerator(),
-            new SystemControlGenerator());
+            new SystemControlGenerator(),
+            new MapIOGenerator());
 
         var payload = BuildPayload();
         payload.Unit = null;
@@ -472,8 +473,8 @@ public class GeneratorSmokeTests
 
         var files = generator.GenerateFiles(payload).ToList();
 
-        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_A.st");
-        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_B.st");
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_A.mnm");
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_B.mnm");
     }
 
     [Fact]
@@ -717,7 +718,7 @@ public class GeneratorSmokeTests
         };
 
 
-    private static UnitConfigGenerator BuildUnitConfigGenerator()
+    private static KeyenceGenerator BuildUnitConfigGenerator()
         => new(new TemplateManager(Handlebars.Create()), new SequenceResolver());
 
     private static CodegenPayload BuildMacroPayload()
