@@ -497,6 +497,14 @@ namespace GrafcetStudioCodegenPayload {
 
     const assets = context.getAssets();
     const unitId = unit && unit.id ? unit.id : '';
+    const units = unit
+      ? [{
+          id: unit.id || '',
+          name: unit.name || unit.id || '',
+          label: unit.label || unit.name || unit.id || ''
+        }]
+      : buildUnitsInfo(context);
+
     return {
       platform,
       deviceLibraryPath: assets.deviceLibraryPath,
@@ -509,7 +517,7 @@ namespace GrafcetStudioCodegenPayload {
         name: unit.name || unit.id || '',
         label: unit.label || unit.name || unit.id || ''
       } : undefined,
-      units: buildUnitsInfo(context),
+      units,
       flows,
       variables: allVars,
       blocks: buildBlocksInfo(context),
