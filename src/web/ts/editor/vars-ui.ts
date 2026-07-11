@@ -357,7 +357,7 @@ function renderGlobalVarTable(): void {
   if(filtered.length===0){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td colspan="4" class="vt-empty">${entries.length===0
-      ?'Cha c  import t  CSV/Excel'
+      ?'Change the filter or import a CSV/Excel file'
       :'No match for filter'}</td>`;
     tbody.appendChild(tr);
     return;

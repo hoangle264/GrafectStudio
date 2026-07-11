@@ -96,8 +96,8 @@ function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
     <span class="tree-dev-type-tag" title="${esc2(cat.name)}">${esc2(cat.name)}</span>
     <span class="tree-dev-type-meta">${(dev.signals||[]).length} sig</span>
     <div class="tree-dev-type-acts">
-      <button class="tree-dev-btn" onclick="openDeviceTypeModal('${dev.id}');event.stopPropagation()" title="Edit">+</button>
-      <button class="tree-dev-btn del" onclick="removeDeviceType('${dev.id}',event)">-</button>
+      <button class="tree-dev-btn" onclick="openDeviceTypeModal('${dev.id}');event.stopPropagation()" title="Edit">✎</button>
+      <button class="tree-dev-btn del" onclick="removeDeviceType('${dev.id}',event)">✕</button>
     </div>`;
 
   const children = document.createElement('div');
@@ -122,7 +122,7 @@ function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
         <span class="sdcol-type ${tc}">${esc2(sig.dataType||'Bool')}</span>
         <span class="sdcol-io ${vc}">${vs}</span>
         <span class="sdcol-cmt" title="${esc2(sig.comment||'')}">${esc2(sig.comment||'')}</span>
-        <button class="tree-dev-sig-del" onclick="removeDeviceSignal('${dev.id}','${sig.id}',event)" title="Remove">-</button>`;
+        <button class="tree-dev-sig-del" onclick="removeDeviceSignal('${dev.id}','${sig.id}',event)" title="Remove">✕</button>`;
       children.appendChild(row);
     });
   }
@@ -364,7 +364,7 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
     </td>
     <td><input class="dev-sig-input" placeholder="%IX0.0 / %QX0.0" value="${esc2(sig?.address||'')}" data-f="address" style="color:var(--amber);"></td>
     <td><input class="dev-sig-input" placeholder="e.g. Lower limit sensor" value="${esc2(sig?.comment||'')}" data-f="comment" style="color:var(--text2);"></td>
-    <td><button class="dev-del-row" onclick="this.closest('tr').remove()">-</button></td>`;
+    <td><button class="dev-del-row" onclick="this.closest('tr').remove()">✕</button></td>`;
   tbody.appendChild(tr);
 }
 

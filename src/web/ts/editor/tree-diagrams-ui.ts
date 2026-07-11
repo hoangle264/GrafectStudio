@@ -49,8 +49,8 @@ function makeDiagItem(d: TdDiagramMeta): HTMLElement {
     <span class="tree-item-name">${esc2(d.name)}</span>
     <span class="tree-item-type-badge" style="border-color:${typeColor};color:${typeColor};">${typeLbl}</span>
     <div class="tree-item-actions">
-      <button class="tree-item-btn" onclick="openDiagPropsPanel('${d.id}');event.stopPropagation()" title="Properties">P</button>
-      <button class="tree-item-btn del" onclick="removeDiagram('${d.id}',event)" title="Delete">-</button>
+      <button class="tree-item-btn" onclick="openDiagPropsPanel('${d.id}');event.stopPropagation()" title="Properties">⚙</button>
+      <button class="tree-item-btn del" onclick="removeDiagram('${d.id}',event)" title="Delete">✕</button>
     </div>`;
   item.addEventListener('click', e=>{ if(!(e.target as HTMLElement).closest('.tree-item-btn')) openTab(d.id); });
   item.addEventListener('dblclick', ()=>openDiagPropsPanel(d.id));

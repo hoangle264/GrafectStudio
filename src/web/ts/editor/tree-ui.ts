@@ -118,7 +118,7 @@ function renderTree(): void {
   editProjectRow.innerHTML = `
     ${treeIcon('folder','root')}
     <span class="tree-machine-name">${esc2(project.name)}</span>
-    <button class="tree-machine-edit" onclick="renameProject()" title="Edit project">+</button>`;
+    <button class="tree-machine-edit" onclick="renameProject()" title="Edit project">✎</button>`;
   body.appendChild(editProjectRow);
 
   // PLC branch.
@@ -221,8 +221,8 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
     <span class="tree-unit-name">${esc2(u.name)}</span>
     <div class="tree-unit-actions">
       <button class="tree-unit-btn" onclick="addDiagramInUnit('${u.id}','Auto');event.stopPropagation()" title="Add diagram">+</button>
-      <button class="tree-unit-btn" onclick="renameUnit('${u.id}');event.stopPropagation()" title="Rename">+</button>
-      <button class="tree-unit-btn del" onclick="removeUnit('${u.id}',event)" title="Delete">-</button>
+      <button class="tree-unit-btn" onclick="renameUnit('${u.id}');event.stopPropagation()" title="Rename">✎</button>
+      <button class="tree-unit-btn del" onclick="removeUnit('${u.id}',event)" title="Delete">✕</button>
     </div>`;
   head.addEventListener('click', ()=>toggleUnitOpen(u.id));
 
