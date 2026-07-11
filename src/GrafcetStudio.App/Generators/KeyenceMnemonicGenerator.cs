@@ -10,6 +10,11 @@ public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
 {
     public const string DefaultPlatform = "kv-5500";
 
+    private static readonly KeyenceExpressionEmitOptions ConditionEmitOptions = new()
+    {
+        Mode = KeyenceExpressionEmitMode.AndWithCurrent
+    };
+
     public override string Platform => DefaultPlatform;
 
     protected override string GenerateLegacy(CodegenPayload payload)
@@ -47,8 +52,7 @@ public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
     {
         if (!SkipCondition(condition))
         {
-            var resolved = AddressResolver.Resolve(condition!, vars);
-            sb.AppendLine($"AND  {resolved}");
+            KeyenceMnemonicExpressionEmitter.AppendCondition(sb, condition!.Trim(), vars, ConditionEmitOptions);
         }
 
         var instruction = KeyenceOutputInstruction.Create(KeyenceInstructionType.Set, target, comment: comment);
@@ -72,6 +76,6 @@ public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
 
     private static bool SkipCondition(string? condition)
         => string.IsNullOrWhiteSpace(condition)
-           || condition == "1"
-           || condition.Equals("true", StringComparison.OrdinalIgnoreCase);
+           || condition.Trim() == "1"
+           || condition.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
 }
