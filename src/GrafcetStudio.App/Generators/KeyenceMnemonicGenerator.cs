@@ -1,8 +1,7 @@
-﻿using GrafcetStudio.Domain.Enums;
+using GrafcetStudio.App.Generators.Keyence;
 using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace GrafcetStudio.App.Generators;
@@ -52,22 +51,17 @@ public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
             sb.AppendLine($"AND  {resolved}");
         }
 
-        sb.AppendLine($"SET  {target.PadRight(12)}; {comment}");
+        var instruction = KeyenceOutputInstruction.Create(KeyenceInstructionType.Set, target, comment: comment);
+        KeyenceMnemonicInstructionEmitter.AppendLine(sb, instruction, padTarget: true);
     }
 
     private static void EmitActions(StringBuilder sb, Step step, string exec, IReadOnlyList<DeviceVariable> vars)
     {
         foreach (var action in step.Actions)
         {
-            var addr = !string.IsNullOrWhiteSpace(action.Address) ? action.Address! : AddressResolver.Resolve(action.Variable, vars);
+            var instruction = KeyenceOutputInstruction.FromAction(action, vars);
             sb.AppendLine($"LD   {exec.PadRight(12)}; S{step.Number:D2} exec");
-            switch (action.Qualifier)
-            {
-                case ActionQualifier.N: sb.AppendLine($"OUT  {addr}"); break;
-                case ActionQualifier.S: sb.AppendLine($"SET  {addr}"); break;
-                case ActionQualifier.R: sb.AppendLine($"RST  {addr}"); break;
-                default: sb.AppendLine($"; [{action.Qualifier}] {addr} - not implemented"); break;
-            }
+            KeyenceMnemonicInstructionEmitter.AppendLine(sb, instruction);
         }
     }
 
@@ -81,5 +75,3 @@ public class KeyenceMnemonicGenerator : LegacyCodeGeneratorBase
            || condition == "1"
            || condition.Equals("true", StringComparison.OrdinalIgnoreCase);
 }
-
-
