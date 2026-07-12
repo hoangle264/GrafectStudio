@@ -4,7 +4,7 @@ namespace GrafcetStudio.App.Expressions;
 
 public static class LogicExpressionParser
 {
-    private const string Grammar = "Expr := OrExpr; OrExpr := AndExpr ('|' AndExpr)*; AndExpr := Primary ('&' Primary)*; Primary := TAG | '(' Expr ')'";
+    private const string Grammar = "Expr := OrExpr; OrExpr := AndExpr ('|' AndExpr)*; AndExpr := Unary ('&' Unary)*; Unary := '!' Unary | Primary; Primary := TAG | '(' Expr ')'";
 
     public static string GrammarDefinition => Grammar;
 
@@ -32,13 +32,19 @@ public static class LogicExpressionParser
     {
         Parser<LogicExpression> orExpression = default!;
         Parser<LogicExpression> andExpression = default!;
+        Parser<LogicExpression> unary = default!;
         Parser<LogicExpression> primary = default!;
         Parser<LogicExpression> parenthesizedExpression = default!;
 
         var tagToken = tagTokenParser.Token();
         var expression = Sprache.Parse.Ref(() => orExpression).End();
         orExpression = Chain(Sprache.Parse.Char('|').Token(), Sprache.Parse.Ref(() => andExpression), "OR");
-        andExpression = Chain(Sprache.Parse.Char('&').Token(), Sprache.Parse.Ref(() => primary), "AND");
+        andExpression = Chain(Sprache.Parse.Char('&').Token(), Sprache.Parse.Ref(() => unary), "AND");
+        unary =
+            (from not in Sprache.Parse.Char('!').Token()
+             from operand in Sprache.Parse.Ref(() => unary)
+             select LogicExpressionUtilities.CreateNot(operand))
+            .Or(Sprache.Parse.Ref(() => primary));
         primary = Sprache.Parse.Ref(() => parenthesizedExpression)
             .Or(tagToken.Select(tag => LogicExpressionUtilities.CreateTag(tag)));
         parenthesizedExpression =
@@ -104,7 +110,7 @@ public static class LogicExpressionParser
             var lastToken = trimmed.LastOrDefault();
             if (lastToken is '&' or '|')
             {
-                return "unexpected end of expression; expected a tag or '('";
+                return "unexpected end of expression; expected a tag, '!', or '('";
             }
 
             if (HasUnclosedParenthesis(trimmed))
@@ -122,7 +128,7 @@ public static class LogicExpressionParser
         if (ch == ')')
         {
             return position > 0 && expr[position - 1] == '('
-                ? "unexpected ')'; expected a tag or '(' after '('"
+                ? "unexpected ')'; expected a tag, '!', or '(' after '('"
                 : "unexpected ')'; expected '&', '|', or end of expression";
         }
 
@@ -133,7 +139,7 @@ public static class LogicExpressionParser
 
         if (ch == '&' || ch == '|')
         {
-            return $"unexpected '{ch}'; expected a tag or '('";
+            return $"unexpected '{ch}'; expected a tag, '!', or '('";
         }
 
         if (char.IsWhiteSpace(ch))
@@ -147,7 +153,7 @@ public static class LogicExpressionParser
             return "unexpected end of expression";
         }
 
-        return $"unexpected '{ch}'; expected a valid tag character ({tagDescription}), '&', '|', or ')'";
+        return $"unexpected '{ch}'; expected a valid tag character ({tagDescription}), '!', '&', '|', or ')'";
     }
 
     private static int FindNextNonWhitespace(string expr, int start)

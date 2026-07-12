@@ -25,6 +25,9 @@ public class LogicExpressionParserTests
     [InlineData("  a\t&\r\n( b | c )  ", "AND(TAG(a),OR(TAG(b),TAG(c)))")]
     [InlineData("a & (b & c)", "AND(TAG(a),TAG(b),TAG(c))")]
     [InlineData("a | (b | c)", "OR(TAG(a),TAG(b),TAG(c))")]
+    [InlineData("!a", "TAG(a!)")]
+    [InlineData("!(a|b)", "NOT(OR(TAG(a),TAG(b)))")]
+    [InlineData("a & !b", "AND(TAG(a),TAG(b!))")]
     public void Parse_HappyPathAndPrecedence_ReturnsNormalizedAst(string expr, string expected)
     {
         var result = ParseSiemens(expr);
@@ -45,14 +48,14 @@ public class LogicExpressionParserTests
     [Theory]
     [InlineData("", 0, "expression is empty")]
     [InlineData("   ", 0, "expression is empty")]
-    [InlineData("A|", 2, "unexpected end of expression; expected a tag or '('")]
-    [InlineData("|A", 0, "unexpected '|'; expected a tag or '('")]
+    [InlineData("A|", 2, "unexpected end of expression; expected a tag, '!', or '('")]
+    [InlineData("|A", 0, "unexpected '|'; expected a tag, '!', or '('")]
     [InlineData("(A&B", 4, "missing ')'")]
     [InlineData("(a | b", 6, "missing ')'")]
-    [InlineData("a &", 3, "unexpected end of expression; expected a tag or '('")]
+    [InlineData("a &", 3, "unexpected end of expression; expected a tag, '!', or '('")]
     [InlineData("A(B)", 1, "unexpected '('; expected '&', '|', or end of expression")]
     [InlineData("a $ b", 2, "unexpected '$'")]
-    [InlineData("()", 1, "unexpected ')'; expected a tag or '(' after '('")]
+    [InlineData("()", 1, "unexpected ')'; expected a tag, '!', or '(' after '('")]
     public void Parse_InvalidExpression_ThrowsHelpfulError(string expr, int expectedPosition, string expectedFragment)
     {
         var ex = Assert.Throws<LogicExpressionParseException>(() => ParseSiemens(expr));
@@ -135,7 +138,14 @@ public class LogicExpressionParserTests
     {
         if (string.Equals(expression.Type, "TAG", StringComparison.OrdinalIgnoreCase))
         {
-            return $"TAG({expression.Ref})";
+            return expression.Negated
+                ? $"TAG({expression.Ref}!)"
+                : $"TAG({expression.Ref})";
+        }
+
+        if (string.Equals(expression.Type, "NOT", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"NOT({ToDebug(expression.Node ?? new LogicExpression())})";
         }
 
         return $"{expression.Type}({string.Join(",", expression.Nodes.ConvertAll(ToDebug))})";

@@ -17,6 +17,13 @@ public static class LogicExpressionUtilities
             Nodes = nodes.ToList()
         };
 
+    public static LogicExpression CreateNot(LogicExpression node)
+        => new()
+        {
+            Type = "NOT",
+            Node = node
+        };
+
     public static LogicExpression Normalize(this LogicExpression expression)
     {
         var type = expression.Type?.Trim().ToUpperInvariant();
@@ -25,11 +32,7 @@ public static class LogicExpressionUtilities
             "TAG" => CreateTag(expression.Ref ?? string.Empty, expression.Negated),
             "AND" => NormalizeLogical("AND", expression.Nodes),
             "OR" => NormalizeLogical("OR", expression.Nodes),
-            "NOT" => new LogicExpression
-            {
-                Type = "NOT",
-                Node = expression.Node?.Normalize()
-            },
+            "NOT" => NormalizeNot(expression.Node),
             _ => expression
         };
     }
@@ -45,6 +48,27 @@ public static class LogicExpressionUtilities
 
         if (expression.Node is not null) CollectRefs(expression.Node, refs);
         foreach (var child in expression.Nodes) CollectRefs(child, refs);
+    }
+
+    private static LogicExpression NormalizeNot(LogicExpression? node)
+    {
+        var normalizedNode = node?.Normalize();
+        if (normalizedNode is null)
+        {
+            return new LogicExpression { Type = "NOT" };
+        }
+
+        if (string.Equals(normalizedNode.Type, "NOT", StringComparison.OrdinalIgnoreCase) && normalizedNode.Node is not null)
+        {
+            return normalizedNode.Node.Normalize();
+        }
+
+        if (string.Equals(normalizedNode.Type, "TAG", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateTag(normalizedNode.Ref ?? string.Empty, !normalizedNode.Negated);
+        }
+
+        return CreateNot(normalizedNode);
     }
 
     private static LogicExpression NormalizeLogical(string nodeType, IEnumerable<LogicExpression> nodes)

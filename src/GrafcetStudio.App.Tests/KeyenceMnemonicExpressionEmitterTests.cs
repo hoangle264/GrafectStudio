@@ -14,6 +14,8 @@ public class KeyenceMnemonicExpressionEmitterTests
     [InlineData("A&(B|C)", new[] { "LD   A", "LD   B", "OR   C", "ANL" })]
     [InlineData("((A|B)&C)|D", new[] { "LD   A", "OR   B", "AND  C", "OR   D" })]
     [InlineData("(A&B)|(C&D)", new[] { "LD   A", "AND  B", "LD   C", "AND  D", "ORL" })]
+    [InlineData("!A", new[] { "LDB  A" })]
+    [InlineData("A&!B", new[] { "LD   A", "ANB  B" })]
     public void EmitCondition_BasicExpressions_ReturnsExpectedMnemonic(string expression, string[] expected)
     {
         var lines = KeyenceMnemonicExpressionEmitter.EmitCondition(expression, Array.Empty<DeviceVariable>());

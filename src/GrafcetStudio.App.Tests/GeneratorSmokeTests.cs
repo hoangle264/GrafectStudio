@@ -5,7 +5,9 @@ using GrafcetStudio.App.Generators.Siemens;
 using GrafcetStudio.Domain.Resolution;
 using HandlebarsDotNet;
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Enums;
 using Xunit;
+using System.IO;
 
 namespace GrafcetStudio.App.Tests;
 
@@ -567,6 +569,219 @@ public class GeneratorSmokeTests
 
 
     [Fact]
+    public void KeyenceGenerator_Phase1_PopulatesStepMnemonicsInJsonContext()
+    {
+        var payload = new CodegenPayload
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>
+            {
+                new()
+                {
+                    Label = "Motor1",
+                    Format = "Motor",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["Run"] = "MR10",
+                        ["Done"] = "MR11"
+                    }
+                }
+            },
+            DeviceTypes = new List<DeviceType>
+            {
+                new() { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" }, new() { Id = "done", Name = "Done" } } }
+            },
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-1",
+                    Name = "AutoFlow",
+                    Type = "auto",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", BaseMr = "100" },
+                    Steps = new List<Step>
+                    {
+                        new()
+                        {
+                            Id = "s1",
+                            Number = 1,
+                            Label = "Start",
+                            IsInitial = true,
+                            ExecAddress = "@MR100",
+                            DoneAddress = "@MR101",
+                            Actions = new List<StepAction>
+                            {
+                                new() { Variable = "Motor1.Run", Qualifier = GrafcetStudio.Domain.Enums.ActionQualifier.N, Complete = new StepActionCompletion { Sensor = "Done", SensorLabel = "Motor1.Done", Address = "MR11" } }
+                            }
+                        }
+                    },
+                    Transitions = new List<Transition>
+                    {
+                        new() { Id = "t1", Label = "T1", Condition = "!MR20", FromStepIds = new List<string>{ "s1" }, ToStepIds = new List<string>() }
+                    }
+                }
+            }
+        };
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("\"activationMnemonic\": \"SET  @MR100\"", output);
+        Assert.Contains("LD   @MR100", output);
+        Assert.Contains("AND  MR11", output);
+        Assert.Contains("ANB  MR20", output);
+        Assert.Contains("SET  @MR101", output);
+        Assert.Contains("OUT  MR10", output);
+        Assert.Contains("\"doneMnemonic\"", output);
+        Assert.Contains("\"bodyMnemonic\"", output);
+    }
+
+    [Fact]
+    public void KeyenceGenerator_Phase2_PopulatesDeviceOutputMnemonicsInJsonContext()
+    {
+        var libraryPath = Path.Combine(Path.GetTempPath(), $"grafcet-device-library-{Guid.NewGuid():N}.json");
+        File.WriteAllText(libraryPath, """
+            {
+              "devices": [
+                {
+                  "deviceId": "Cylinder",
+                  "name": "Cylinder",
+                  "commands": {
+                    "CoilA": {
+                      "actionLabel": "Extend",
+                      "driveSignal": "CoilA",
+                      "interlock": {
+                        "signal": "LockA",
+                        "label": "Cylinder1.LockA",
+                        "requiredState": "1"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+            """);
+
+        try
+        {
+            var payload = new CodegenPayload
+            {
+                Project = new ProjectInfo { Name = "Demo" },
+                Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+                DeviceLibraryPath = libraryPath,
+                Variables = new List<DeviceVariable>
+                {
+                    new()
+                    {
+                        Label = "Main",
+                        Format = "Unit",
+                        SignalAddresses = new Dictionary<string, string>
+                        {
+                            ["flagAuto"] = "MR1",
+                            ["flagManual"] = "MR2",
+                            ["flagOrigin"] = "MR3"
+                        }
+                    },
+                    new()
+                    {
+                        Label = "Cylinder1",
+                        Format = "Cylinder",
+                        SignalAddresses = new Dictionary<string, string>
+                        {
+                            ["CoilA"] = "MR10",
+                            ["LockA"] = "MR20"
+                        }
+                    }
+                },
+                DeviceTypes = new List<DeviceType>
+                {
+                    new()
+                    {
+                        Name = "Cylinder",
+                        Signals = new List<DeviceSignal>
+                        {
+                            new() { Id = "coilA", Name = "CoilA" },
+                            new() { Id = "lockA", Name = "LockA" }
+                        }
+                    }
+                },
+                Flows = new List<FlowInfo>
+                {
+                    new()
+                    {
+                        Id = "flow-1",
+                        Name = "AutoFlow",
+                        Type = "auto",
+                        Mode = "auto",
+                        DiagramType = "Macro",
+                        Diagram = new DiagramInfo { Id = "flow-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", Mode = "auto", BaseMr = "100" },
+                        Steps = new List<Step>
+                        {
+                            new()
+                            {
+                                Id = "s1",
+                                Number = 1,
+                                Label = "AutoStep",
+                                IsInitial = true,
+                                ExecAddress = "MR100",
+                                DoneAddress = "MR101",
+                                Actions = new List<StepAction>
+                                {
+                                    new() { Variable = "Cylinder1.CoilA", Qualifier = ActionQualifier.N }
+                                }
+                            }
+                        }
+                    },
+                    new()
+                    {
+                        Id = "flow-2",
+                        Name = "OriginFlow",
+                        Type = "origin",
+                        Mode = "origin",
+                        DiagramType = "Macro",
+                        Diagram = new DiagramInfo { Id = "flow-2", Name = "OriginFlow", UnitId = "unit-1", Unit = "Main", Mode = "origin", BaseMr = "200" },
+                        Steps = new List<Step>
+                        {
+                            new()
+                            {
+                                Id = "s2",
+                                Number = 2,
+                                Label = "OriginStep",
+                                IsInitial = true,
+                                ExecAddress = "MR200",
+                                DoneAddress = "MR201",
+                                Actions = new List<StepAction>
+                                {
+                                    new() { Variable = "Cylinder1.CoilA", Qualifier = ActionQualifier.N }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+            Assert.Contains("\"mnemonic\"", output);
+            Assert.Contains("\"conditionMnemonic\"", output);
+            Assert.Contains("LD   MR1", output);
+            Assert.Contains("AND  MR100", output);
+            Assert.Contains("ANB  MR101", output);
+            Assert.Contains("LD   MR3", output);
+            Assert.Contains("AND  MR200", output);
+            Assert.Contains("ANB  MR201", output);
+            Assert.Contains("ORL", output);
+            Assert.Contains("AND  MR20", output);
+            Assert.Contains("OUT  MR10", output);
+        }
+        finally
+        {
+            if (File.Exists(libraryPath)) File.Delete(libraryPath);
+        }
+    }
+
+    [Fact]
     public void UnitConfigGenerator_OneMacroCallsOneMacroStep_GeneratesMacroPort()
     {
         var output = BuildUnitConfigGenerator().GenerateUnitContent(BuildMacroPayload());
@@ -823,6 +1038,9 @@ public class GeneratorSmokeTests
         DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
     }
 }
+
+
+
 
 
 

@@ -84,6 +84,12 @@ public class ResolvedStep
 
     public string BodyExpression => Expression.bodyExpression;
 
+    public string ActivationMnemonic => Expression.activationMnemonic;
+
+    public string DoneMnemonic => Expression.doneMnemonic;
+
+    public string BodyMnemonic => Expression.bodyMnemonic;
+
     public string OutputInstruction => Expression.outputInstruction;
 
     public string OutputTarget => Expression.outputTarget;
@@ -127,7 +133,35 @@ public class StepExpressionContext
 
     public string outputExpression { get; init; } = string.Empty;
 
+    public string conditionMnemonic { get; init; } = string.Empty;
+
+    public IList<string> conditionMnemonicLines { get; init; } = new List<string>();
+
+    public string activationMnemonic { get; init; } = string.Empty;
+
+    public IList<string> activationMnemonicLines { get; init; } = new List<string>();
+
+    public string holdMnemonic { get; init; } = string.Empty;
+
+    public IList<string> holdMnemonicLines { get; init; } = new List<string>();
+
+    public string doneMnemonic { get; init; } = string.Empty;
+
+    public IList<string> doneMnemonicLines { get; init; } = new List<string>();
+
+    public IList<string> doneConditionMnemonicLines { get; init; } = new List<string>();
+
+    public string outputMnemonic { get; init; } = string.Empty;
+
+    public IList<string> outputMnemonicLines { get; init; } = new List<string>();
+
+    public string bodyMnemonic { get; init; } = string.Empty;
+
+    public IList<string> bodyMnemonicLines { get; init; } = new List<string>();
+
     public IList<string> bodyExpressions { get; init; } = new List<string>();
+
+    public IList<string> bodyMnemonics { get; init; } = new List<string>();
 
     public IList<StepActionExpressionContext> actions { get; init; } = new List<StepActionExpressionContext>();
 
@@ -166,6 +200,10 @@ public class StepActionExpressionContext
 
     public string expression { get; init; } = string.Empty;
 
+    public string mnemonic { get; init; } = string.Empty;
+
+    public IList<string> mnemonicLines { get; init; } = new List<string>();
+
     public string completionExpression { get; init; } = string.Empty;
 
     public StepCompletionExpressionContext? completion { get; init; }
@@ -186,6 +224,10 @@ public class StepOutputExpressionContext
     public string target { get; init; } = string.Empty;
 
     public string expression { get; init; } = string.Empty;
+
+    public string mnemonic { get; init; } = string.Empty;
+
+    public IList<string> mnemonicLines { get; init; } = new List<string>();
 
     public string deviceLabel { get; init; } = string.Empty;
 

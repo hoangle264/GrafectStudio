@@ -69,6 +69,10 @@ public class DeviceCommandOutput
 
     public string expression { get; init; } = string.Empty;
 
+    public string mnemonic { get; init; } = string.Empty;
+
+    public IList<string> mnemonicLines { get; init; } = new List<string>();
+
     public string outputInstruction => instruction;
 
     public string outputTarget => target;
@@ -122,6 +126,10 @@ public class DeviceCommandFlowOutput
 
     public string conditionExpression { get; init; } = string.Empty;
 
+    public string conditionMnemonic { get; init; } = string.Empty;
+
+    public IList<string> conditionMnemonicLines { get; init; } = new List<string>();
+
     public string expression => conditionExpression;
 
     public bool hasCondition => !string.IsNullOrWhiteSpace(conditionExpression);
@@ -164,6 +172,10 @@ public class DeviceOutputIntent
     public string target { get; init; } = string.Empty;
 
     public string expression { get; init; } = string.Empty;
+
+    public string mnemonic { get; init; } = string.Empty;
+
+    public IList<string> mnemonicLines { get; init; } = new List<string>();
 
     public string outputInstruction => instruction;
 

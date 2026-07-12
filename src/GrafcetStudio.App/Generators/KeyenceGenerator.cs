@@ -1,3 +1,4 @@
+using GrafcetStudio.App.Generators.Keyence;
 using GrafcetStudio.CodeGen.Runtime;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
@@ -319,12 +320,19 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         var doneConditionExpression = BuildDoneConditionExpression(step, outTransitionExpression, actions);
         var doneInstruction = string.IsNullOrWhiteSpace(step.DoneAddress) ? string.Empty : "SET";
         var doneTarget = step.DoneAddress ?? string.Empty;
-        var doneExpression = BuildInstructionExpression(doneConditionExpression, doneInstruction, doneTarget);
+        var activationMnemonicLines = EmitConditionLines(activationExpression, variables);
+        var activationRungLines = EmitRungLines(activationExpression, "SET", step.ExecAddress ?? string.Empty, variables);
+        var holdMnemonicLines = EmitConditionLines(holdExpression, variables);
+        var doneConditionMnemonicLines = EmitConditionLines(doneConditionExpression, variables);
+        var doneMnemonicLines = EmitRungLines(doneConditionExpression, doneInstruction, doneTarget, variables);
         var outputExpression = string.Join(" ; ", outputs.Select(output => output.expression).Where(value => !string.IsNullOrWhiteSpace(value)));
+        var outputMnemonicBlocks = outputs.Select(output => output.mnemonic).Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+        var outputMnemonicLines = outputs.SelectMany(output => output.mnemonicLines).ToList();
         var bodyExpressions = BuildBodyExpressions(
             BuildInstructionExpression(activationExpression, "SET", step.ExecAddress ?? string.Empty),
             outputExpression,
-            doneExpression);
+            BuildInstructionExpression(doneConditionExpression, doneInstruction, doneTarget));
+        var bodyMnemonics = BuildBodyMnemonics(activationRungLines, outputs, doneMnemonicLines);
 
         return new StepExpressionContext
         {
@@ -336,12 +344,26 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             doneConditionExpression = doneConditionExpression,
             doneInstruction = doneInstruction,
             doneTarget = doneTarget,
-            doneExpression = doneExpression,
+            doneExpression = BuildInstructionExpression(doneConditionExpression, doneInstruction, doneTarget),
             bodyExpression = string.Join(" ; ", bodyExpressions),
             outputInstruction = outputs.FirstOrDefault()?.instruction ?? string.Empty,
             outputTarget = outputs.FirstOrDefault()?.target ?? string.Empty,
             outputExpression = outputExpression,
+            conditionMnemonic = JoinMnemonicLines(activationMnemonicLines),
+            conditionMnemonicLines = activationMnemonicLines,
+            activationMnemonic = JoinMnemonicLines(activationRungLines),
+            activationMnemonicLines = activationRungLines,
+            holdMnemonic = JoinMnemonicLines(holdMnemonicLines),
+            holdMnemonicLines = holdMnemonicLines,
+            doneMnemonic = JoinMnemonicLines(doneMnemonicLines),
+            doneMnemonicLines = doneMnemonicLines,
+            doneConditionMnemonicLines = doneConditionMnemonicLines,
+            outputMnemonic = JoinMnemonicBlocks(outputMnemonicBlocks),
+            outputMnemonicLines = outputMnemonicLines,
+            bodyMnemonic = JoinMnemonicBlocks(bodyMnemonics),
+            bodyMnemonicLines = bodyMnemonics.SelectMany(block => SplitMnemonicLines(block)).ToList(),
             bodyExpressions = bodyExpressions,
+            bodyMnemonics = bodyMnemonics,
             actions = actions,
             outputs = outputs,
             inTransition = BuildTransitionExpression(inTransition, inTransitionExpression),
@@ -403,6 +425,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                     instruction = instruction,
                     target = target,
                     expression = BuildInstructionExpression(conditionExpression, instruction, target),
+                    mnemonic = EmitRung(conditionExpression, instruction, target, variables),
+                    mnemonicLines = EmitRungLines(conditionExpression, instruction, target, variables),
                     completionExpression = completionExpression,
                     completion = completion
                 };
@@ -440,6 +464,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                     instruction = "OUT",
                     target = binding.PhysicalOutputRef,
                     expression = expression,
+                    mnemonic = EmitRung(conditionExpression, "OUT", binding.PhysicalOutputRef, variables),
+                    mnemonicLines = EmitRungLines(conditionExpression, "OUT", binding.PhysicalOutputRef, variables),
                     deviceLabel = binding.DeviceLabel,
                     deviceFormat = binding.DeviceFormat,
                     commandId = binding.CommandId,
@@ -482,6 +508,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             instruction = ResolveActionInstruction(action.Qualifier.ToString()),
             target = target,
             expression = BuildInstructionExpression(conditionExpression, ResolveActionInstruction(action.Qualifier.ToString()), target),
+            mnemonic = EmitRung(conditionExpression, ResolveActionInstruction(action.Qualifier.ToString()), target, variables),
+            mnemonicLines = EmitRungLines(conditionExpression, ResolveActionInstruction(action.Qualifier.ToString()), target, variables),
             commandId = action.Variable,
             actionLabel = action.Variable
         });
@@ -559,6 +587,91 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             : $"{conditionExpression} -> {instruction} {target}";
     }
 
+    private static string EmitRung(string condition, string instruction, string target, IList<DeviceVariable> vars)
+        => JoinMnemonicLines(EmitRungLines(condition, instruction, target, vars));
+
+    private static IList<string> EmitRungLines(string condition, string instruction, string target, IList<DeviceVariable> vars)
+    {
+        if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return new List<string>();
+
+        var keyenceInstruction = ToInstruction(instruction, target);
+        if (keyenceInstruction is null) return new List<string>();
+
+        if (string.IsNullOrWhiteSpace(condition))
+        {
+            return SplitMnemonicLines(KeyenceMnemonicInstructionEmitter.Format(keyenceInstruction));
+        }
+
+        try
+        {
+            return SplitMnemonicLines(KeyenceMnemonicExpressionEmitter.EmitExpressionAndInstruction(condition, vars.ToList(), keyenceInstruction));
+        }
+        catch
+        {
+            return SplitMnemonicLines(BuildInstructionExpression(condition, instruction, target));
+        }
+    }
+
+    private static IList<string> EmitConditionLines(string condition, IList<DeviceVariable> vars)
+    {
+        if (string.IsNullOrWhiteSpace(condition)) return new List<string>();
+
+        try
+        {
+            return KeyenceMnemonicExpressionEmitter.EmitCondition(condition, vars.ToList()).ToList();
+        }
+        catch
+        {
+            return new List<string> { condition };
+        }
+    }
+
+    private static KeyenceInstruction? ToInstruction(string instruction, string target)
+    {
+        if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return null;
+
+        return instruction.Trim().ToUpperInvariant() switch
+        {
+            "OUT" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Out, target),
+            "SET" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Set, target),
+            "RST" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Rst, target),
+            "RES" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Res, target),
+            _ => null
+        };
+    }
+
+    private static string JoinMnemonicLines(IEnumerable<string> lines)
+        => string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+
+    private static string JoinMnemonicBlocks(IEnumerable<string> blocks)
+        => string.Join(Environment.NewLine, blocks.Where(block => !string.IsNullOrWhiteSpace(block)));
+
+    private static IList<string> SplitMnemonicLines(string text)
+        => string.IsNullOrWhiteSpace(text)
+            ? new List<string>()
+            : text.Replace("\r", string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+    private static IList<string> BuildBodyMnemonics(
+        IList<string> activationRungLines,
+        IList<StepOutputExpressionContext> outputs,
+        IList<string> doneMnemonicLines)
+    {
+        var blocks = new List<string>();
+        var activationBlock = JoinMnemonicLines(activationRungLines);
+        if (!string.IsNullOrWhiteSpace(activationBlock)) blocks.Add(activationBlock);
+
+        foreach (var output in outputs)
+        {
+            if (!string.IsNullOrWhiteSpace(output.mnemonic)) blocks.Add(output.mnemonic);
+        }
+
+        var doneBlock = JoinMnemonicLines(doneMnemonicLines);
+        if (!string.IsNullOrWhiteSpace(doneBlock)) blocks.Add(doneBlock);
+        return blocks
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static void AddConditionTerm(IList<string> terms, string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "1", StringComparison.OrdinalIgnoreCase)) return;
@@ -576,7 +689,24 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         if (string.IsNullOrWhiteSpace(expression)) return string.Empty;
 
         var value = expression.Trim();
-        return value.StartsWith("!", StringComparison.Ordinal) ? value[1..] : $"!({value})";
+        if (value.StartsWith("!", StringComparison.Ordinal))
+        {
+            return value[1..];
+        }
+
+        return IsSimpleOperand(value) ? $"!{value}" : $"!({value})";
+    }
+
+    private static bool IsSimpleOperand(string expression)
+    {
+        var value = expression.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        if (value.Contains('&', StringComparison.Ordinal) || value.Contains('|', StringComparison.Ordinal) || value.Contains('(', StringComparison.Ordinal) || value.Contains(')', StringComparison.Ordinal) || value.Contains(' ', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static (string MinAddress, string MaxAddress, string SequenceEnd) BuildFlowStepAddressRange(FlowInfo flow)
@@ -865,7 +995,10 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                         var originConditionExpression = JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(command => command.conditionExpression), aggregationMode);
                         var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
                         var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
-                        var driveConditionExpression = JoinAnd(new[] { sourceConditionExpression, interlockExpression });
+                        var gatedSourceConditionExpression = !string.IsNullOrWhiteSpace(interlockExpression)
+                            ? WrapConditionTerm(sourceConditionExpression)
+                            : sourceConditionExpression;
+                        var driveConditionExpression = JoinAnd(new[] { gatedSourceConditionExpression, interlockExpression });
                         var instruction = ResolveOutputInstruction(commandGroup.Select(item => item.Source.Qualifier));
                         var expression = BuildInstructionExpression(driveConditionExpression, instruction, physicalOutputRef);
                         var feedbackSignals = commandGroup
@@ -873,6 +1006,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                             .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
                             .Select(signalGroup => signalGroup.First())
                             .ToList();
+                        var mnemonicLines = EmitRungLines(driveConditionExpression, instruction, physicalOutputRef, variables);
+                        var mnemonic = JoinMnemonicLines(mnemonicLines);
                         var outputIntent = new DeviceOutputIntent
                         {
                             index = commandIndex,
@@ -893,6 +1028,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                             instruction = instruction,
                             target = physicalOutputRef,
                             expression = expression,
+                            mnemonic = mnemonic,
+                            mnemonicLines = mnemonicLines,
                             sources = flowCommands,
                             feedbackSignals = feedbackSignals
                         };
@@ -942,7 +1079,9 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                             driveConditionExpression = driveConditionExpression,
                             instruction = instruction,
                             target = physicalOutputRef,
-                            expression = expression
+                            expression = expression,
+                            mnemonic = mnemonic,
+                            mnemonicLines = mnemonicLines
                         };
                     })
                     .ToList();
@@ -1007,7 +1146,9 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                     modeFlagAddress = modeFlagAddress,
                     executeExpression = executeExpression,
                     doneGuardExpression = doneGuardExpression,
-                    conditionExpression = conditionExpression
+                    conditionExpression = conditionExpression,
+                    conditionMnemonic = string.Empty,
+                    conditionMnemonicLines = new List<string>()
                 };
             })
             .OrderBy(command => command.IsAuto)
@@ -1018,30 +1159,36 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             .ToList();
 
         return commands
-            .Select((command, index) => new DeviceCommandFlowOutput
+            .Select((command, index) =>
             {
-                Id = command.Id,
-                Name = command.Name,
-                FlowType = command.FlowType,
-                IsOrigin = command.IsOrigin,
-                IsAuto = command.IsAuto,
-                CommandId = command.CommandId,
-                ActionLabel = command.ActionLabel,
-                SourceStep = command.SourceStep,
-                SourceExecuteBit = command.SourceExecuteBit,
-                SourceDoneBit = command.SourceDoneBit,
-                actionSymbol = command.actionSymbol,
-                qualifier = command.qualifier,
-                modeFlagAddress = command.modeFlagAddress,
-                executeExpression = command.executeExpression,
-                doneGuardExpression = command.doneGuardExpression,
-                conditionExpression = command.conditionExpression,
-                Index = index,
-                Number = index + 1,
-                TotalCount = commands.Count,
-                IsFirst = index == 0,
-                IsLast = index == commands.Count - 1,
-                IsSingle = commands.Count == 1
+                var conditionMnemonicLines = EmitConditionLines(command.conditionExpression, Array.Empty<DeviceVariable>());
+                return new DeviceCommandFlowOutput
+                {
+                    Id = command.Id,
+                    Name = command.Name,
+                    FlowType = command.FlowType,
+                    IsOrigin = command.IsOrigin,
+                    IsAuto = command.IsAuto,
+                    CommandId = command.CommandId,
+                    ActionLabel = command.ActionLabel,
+                    SourceStep = command.SourceStep,
+                    SourceExecuteBit = command.SourceExecuteBit,
+                    SourceDoneBit = command.SourceDoneBit,
+                    actionSymbol = command.actionSymbol,
+                    qualifier = command.qualifier,
+                    modeFlagAddress = command.modeFlagAddress,
+                    executeExpression = command.executeExpression,
+                    doneGuardExpression = command.doneGuardExpression,
+                    conditionExpression = command.conditionExpression,
+                    conditionMnemonic = JoinMnemonicLines(conditionMnemonicLines),
+                    conditionMnemonicLines = conditionMnemonicLines,
+                    Index = index,
+                    Number = index + 1,
+                    TotalCount = commands.Count,
+                    IsFirst = index == 0,
+                    IsLast = index == commands.Count - 1,
+                    IsSingle = commands.Count == 1
+                };
             })
             .ToList();
     }
@@ -1108,6 +1255,13 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         return value.Contains(" & ", StringComparison.Ordinal) || value.Contains(" | ", StringComparison.Ordinal)
             ? $"({value})"
             : value;
+    }
+    private static string WrapConditionTerm(string expression)
+    {
+        var value = expression.Trim();
+        return string.IsNullOrWhiteSpace(value) || IsSimpleOperand(value)
+            ? value
+            : $"({value})";
     }
 
     private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
