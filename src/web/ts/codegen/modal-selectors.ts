@@ -95,7 +95,7 @@ function cgSelectAll(val: boolean): void {
 
 //  Live preview
 function cgUpdatePreview(): void {
-  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'unit-config';
+  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence';
   const unitId = cgGetDefaultUnitId();
   const selectedDiagramIds = cgGetSelectedDiagramIds();
 
@@ -115,9 +115,7 @@ function cgUpdatePreview(): void {
 
 // Syntax highlight cho Unit Config output
 function cgResolveHostPlatform(target: string): string {
-  return ({
-    'csharp-twincat-st': 'twincat-st'
-  } as Record<string, string>)[target] || target || 'unit-config';
+  return target || 'Keyence';
 }
 function cgGetDefaultUnitId(): string {
   const unitRadio = document.querySelector<HTMLInputElement>('#cg-unit-list input[name="cg-unit-radio"]:checked');

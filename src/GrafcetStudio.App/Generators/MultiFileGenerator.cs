@@ -32,7 +32,7 @@ public sealed class MultiFileGenerator : ICodeGenerator
         _mapIoGenerator = mapIoGenerator;
     }
 
-    public string Platform => "unit-config";
+    public string Platform => "Keyence";
 
     public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
     {

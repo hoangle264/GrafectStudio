@@ -23,8 +23,20 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         "uc.auto"
     ];
 
+    private static readonly string[] ExpressionSectionTemplateOrder =
+    [
+        "uc.main",
+        "uc.flows"
+    ];
+
     private static readonly (string TemplateId, string PartialName)[] KnownPartials =
     [
+        ("uc.flow", "flow"),
+        ("uc.step", "step"),
+        ("uc.stepExpression", "step_expression"),
+        ("uc.actionExpression", "action_expression"),
+        ("uc.outputExpression", "output_expression"),
+        ("uc.transitionExpression", "transition_expression"),
         ("uc.stepBody", "step_body"),
         ("uc.deviceCylinder", "device_cylinder"),
         ("uc.deviceServo", "device_servo"),
@@ -40,7 +52,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         _sequenceResolver = sequenceResolver;
     }
 
-    public override string Platform => "unit-config";
+    public override string Platform => "Keyence";
     public string GenerateUnitContent(CodegenPayload payload) => GenerateLegacy(payload);
     protected override string GenerateLegacy(CodegenPayload payload)
     {
@@ -59,12 +71,29 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
     private IEnumerable<string> ResolveSectionTemplateNames()
     {
-        foreach (var templateName in SectionTemplateOrder)
+        if (_templates.IsTemplateLoaded("uc.main"))
         {
-            if (_templates.IsTemplateLoaded(templateName)) yield return templateName;
+            yield return "uc.main";
+            yield break;
         }
 
-        if (_templates.IsTemplateLoaded("uc.mainOutput"))
+        if (_templates.IsTemplateLoaded("uc.flows"))
+        {
+            yield return "uc.flows";
+        }
+        else
+        {
+            foreach (var templateName in SectionTemplateOrder)
+            {
+                if (_templates.IsTemplateLoaded(templateName)) yield return templateName;
+            }
+        }
+
+        if (_templates.IsTemplateLoaded("uc.outputs"))
+        {
+            yield return "uc.outputs";
+        }
+        else if (_templates.IsTemplateLoaded("uc.mainOutput"))
         {
             yield return "uc.mainOutput";
         }
@@ -76,6 +105,11 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
     private void RegisterPartials()
     {
+        foreach (var templateName in ExpressionSectionTemplateOrder)
+        {
+            RegisterPartialIfLoaded(templateName, templateName[3..]);
+        }
+
         foreach (var (templateId, partialName) in KnownPartials)
         {
             RegisterPartialIfLoaded(templateId, partialName);
@@ -130,6 +164,21 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         var macroStepFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)).ToList();
         var autoFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
+        var flowGroups = new[]
+        {
+            BuildFlowGroup("auto", autoFlows),
+            BuildFlowGroup("origin", originFlows),
+            BuildFlowGroup("macro", macroFlows),
+            BuildFlowGroup("macroStep", macroStepFlows)
+        };
+        var templateContract = new
+        {
+            name = "keyence-step-expression",
+            version = 1,
+            flowBased = true,
+            stepBody = "expression",
+            stepExpressionPath = "flow.steps[].expression"
+        };
 
         var deviceTypesByName = payload.DeviceTypes.ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
         var devices = payload.Variables.Select(variable =>
@@ -171,6 +220,9 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
             devices,
+            templateContract,
+            flows = resolvedFlows,
+            flowGroups,
             autoFlows,
             originFlows,
             macroFlows,
@@ -192,17 +244,26 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         var sequence = _sequenceResolver.Resolve(state);
         var callerBindings = macroBindings.Where(binding => string.Equals(binding.callerFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
         var calleeBindings = macroBindings.Where(binding => string.Equals(binding.calleeFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
-        var resolvedSteps = sequence.Select((entry, index) => new ResolvedStep
+        var resolvedSteps = sequence.Select((entry, index) =>
         {
-            Index = index,
-            IsFirst = index == 0,
-            Step = EnrichStepActions(entry.Step, variables, library),
-            MacroBinding = callerBindings.FirstOrDefault(binding => string.Equals(binding.callerStepId, entry.Step.Id, StringComparison.OrdinalIgnoreCase)),
-            PreviousStep = index > 0 ? sequence[index - 1].Step : null,
-            NextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null,
-            InTransition = entry.InTransition,
-            OutTransition = entry.OutTransition,
-            BranchType = entry.BranchType
+            var step = EnrichStepActions(entry.Step, variables, library);
+            var previousStep = index > 0 ? sequence[index - 1].Step : null;
+            var nextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null;
+            var macroBinding = callerBindings.FirstOrDefault(binding => string.Equals(binding.callerStepId, step.Id, StringComparison.OrdinalIgnoreCase));
+
+            return new ResolvedStep
+            {
+                Index = index,
+                IsFirst = index == 0,
+                Step = step,
+                MacroBinding = macroBinding,
+                PreviousStep = previousStep,
+                NextStep = nextStep,
+                InTransition = entry.InTransition,
+                OutTransition = entry.OutTransition,
+                BranchType = entry.BranchType,
+                Expression = BuildStepExpressionContext(step, previousStep, nextStep, entry.InTransition, entry.OutTransition, index == 0, variables, library)
+            };
         }).ToList();
         var flowStepRange = BuildFlowStepAddressRange(flow);
 
@@ -226,6 +287,296 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             callerMacroBindings = callerBindings,
             calleeMacroBindings = calleeBindings
         };
+    }
+
+    private static object BuildFlowGroup(string key, IList<ResolvedFlow> flows)
+        => new
+        {
+            key,
+            name = key,
+            flows,
+            count = flows.Count,
+            hasFlows = flows.Count > 0,
+            isEmpty = flows.Count == 0
+        };
+
+    private static StepExpressionContext BuildStepExpressionContext(
+        Step step,
+        Step? previousStep,
+        Step? nextStep,
+        Transition? inTransition,
+        Transition? outTransition,
+        bool isFirstStep,
+        IList<DeviceVariable> variables,
+        DeviceLibraryRoot library)
+    {
+        var inTransitionExpression = BuildConditionExpression(inTransition?.Condition);
+        var outTransitionExpression = BuildConditionExpression(outTransition?.Condition);
+        var activationExpression = BuildActivationExpression(step, previousStep, inTransitionExpression, isFirstStep);
+        var holdExpression = BuildHoldExpression(step, outTransitionExpression);
+        var actions = BuildStepActionExpressions(step, variables);
+        var outputs = BuildStepOutputExpressions(step, variables, library);
+        var doneConditionExpression = BuildDoneConditionExpression(step, outTransitionExpression, actions);
+        var doneInstruction = string.IsNullOrWhiteSpace(step.DoneAddress) ? string.Empty : "SET";
+        var doneTarget = step.DoneAddress ?? string.Empty;
+        var doneExpression = BuildInstructionExpression(doneConditionExpression, doneInstruction, doneTarget);
+        var outputExpression = string.Join(" ; ", outputs.Select(output => output.expression).Where(value => !string.IsNullOrWhiteSpace(value)));
+        var bodyExpressions = BuildBodyExpressions(
+            BuildInstructionExpression(activationExpression, "SET", step.ExecAddress ?? string.Empty),
+            outputExpression,
+            doneExpression);
+
+        return new StepExpressionContext
+        {
+            conditionExpression = activationExpression,
+            activationExpression = activationExpression,
+            holdExpression = holdExpression,
+            inTransitionExpression = inTransitionExpression,
+            outTransitionExpression = outTransitionExpression,
+            doneConditionExpression = doneConditionExpression,
+            doneInstruction = doneInstruction,
+            doneTarget = doneTarget,
+            doneExpression = doneExpression,
+            bodyExpression = string.Join(" ; ", bodyExpressions),
+            outputInstruction = outputs.FirstOrDefault()?.instruction ?? string.Empty,
+            outputTarget = outputs.FirstOrDefault()?.target ?? string.Empty,
+            outputExpression = outputExpression,
+            bodyExpressions = bodyExpressions,
+            actions = actions,
+            outputs = outputs,
+            inTransition = BuildTransitionExpression(inTransition, inTransitionExpression),
+            outTransition = BuildTransitionExpression(outTransition, outTransitionExpression)
+        };
+    }
+
+    private static string BuildActivationExpression(Step step, Step? previousStep, string inTransitionExpression, bool isFirstStep)
+    {
+        var terms = new List<string>();
+        if (!isFirstStep && !step.IsInitial && !string.IsNullOrWhiteSpace(previousStep?.DoneAddress))
+        {
+            terms.Add(previousStep!.DoneAddress!);
+        }
+
+        AddConditionTerm(terms, inTransitionExpression);
+        return JoinAnd(terms);
+    }
+
+    private static string BuildHoldExpression(Step step, string outTransitionExpression)
+    {
+        var terms = new List<string>();
+        AddConditionTerm(terms, step.ExecAddress);
+        AddConditionTerm(terms, NegateExpression(outTransitionExpression));
+        return JoinAnd(terms);
+    }
+
+    private static string BuildDoneConditionExpression(Step step, string outTransitionExpression, IList<StepActionExpressionContext> actions)
+    {
+        var terms = new List<string>();
+        AddConditionTerm(terms, step.ExecAddress);
+        foreach (var action in actions)
+        {
+            AddConditionTerm(terms, action.completionExpression);
+        }
+        AddConditionTerm(terms, outTransitionExpression);
+        return JoinAnd(terms);
+    }
+
+    private static IList<StepActionExpressionContext> BuildStepActionExpressions(Step step, IList<DeviceVariable> variables)
+        => step.Actions
+            .Select((action, index) =>
+            {
+                var target = ResolveActionTarget(action, variables);
+                var instruction = ResolveActionInstruction(action.Qualifier.ToString());
+                var conditionExpression = step.ExecAddress ?? string.Empty;
+                var completion = BuildCompletionExpression(action.Complete);
+                var completionExpression = completion?.address ?? string.Empty;
+
+                return new StepActionExpressionContext
+                {
+                    index = index,
+                    number = index + 1,
+                    variable = action.Variable,
+                    address = action.Address ?? string.Empty,
+                    qualifier = action.Qualifier.ToString(),
+                    timeMs = action.TimeMs,
+                    conditionExpression = conditionExpression,
+                    instruction = instruction,
+                    target = target,
+                    expression = BuildInstructionExpression(conditionExpression, instruction, target),
+                    completionExpression = completionExpression,
+                    completion = completion
+                };
+            })
+            .ToList();
+
+    private static IList<StepOutputExpressionContext> BuildStepOutputExpressions(
+        Step step,
+        IList<DeviceVariable> variables,
+        DeviceLibraryRoot library)
+    {
+        var outputs = new List<StepOutputExpressionContext>();
+        for (var actionIndex = 0; actionIndex < step.Actions.Count; actionIndex++)
+        {
+            var action = step.Actions[actionIndex];
+            var resolved = DeviceCommandResolver.Resolve(action, step.ExecAddress ?? string.Empty, variables, library);
+            if (resolved is null || resolved.OutputBindings.Count == 0)
+            {
+                AddDirectActionOutput(outputs, action, actionIndex, step, variables);
+                continue;
+            }
+
+            foreach (var binding in resolved.OutputBindings)
+            {
+                if (string.IsNullOrWhiteSpace(binding.PhysicalOutputRef)) continue;
+
+                var interlockExpression = BuildInterlockExpression(binding);
+                var conditionExpression = JoinAnd(new[] { step.ExecAddress ?? string.Empty, interlockExpression });
+                var expression = BuildInstructionExpression(conditionExpression, "OUT", binding.PhysicalOutputRef);
+                outputs.Add(new StepOutputExpressionContext
+                {
+                    index = outputs.Count,
+                    number = outputs.Count + 1,
+                    conditionExpression = conditionExpression,
+                    instruction = "OUT",
+                    target = binding.PhysicalOutputRef,
+                    expression = expression,
+                    deviceLabel = binding.DeviceLabel,
+                    deviceFormat = binding.DeviceFormat,
+                    commandId = binding.CommandId,
+                    actionLabel = binding.ActionLabel,
+                    driveSignal = binding.DriveSignal,
+                    interlockExpression = interlockExpression,
+                    feedbackSignals = binding.FeedbackSignals
+                        .Select(signal => new StepFeedbackExpressionContext
+                        {
+                            signalName = signal.SignalName,
+                            label = signal.Label,
+                            address = signal.PhysicalAddress
+                        })
+                        .ToList()
+                });
+            }
+        }
+
+        return outputs;
+    }
+
+    private static void AddDirectActionOutput(
+        IList<StepOutputExpressionContext> outputs,
+        StepAction action,
+        int actionIndex,
+        Step step,
+        IList<DeviceVariable> variables)
+    {
+        var target = !string.IsNullOrWhiteSpace(action.Address)
+            ? action.Address!
+            : SignalResolver.ResolveAddress(action.Variable, variables) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(target)) return;
+
+        var conditionExpression = step.ExecAddress ?? string.Empty;
+        outputs.Add(new StepOutputExpressionContext
+        {
+            index = outputs.Count,
+            number = outputs.Count + 1,
+            conditionExpression = conditionExpression,
+            instruction = ResolveActionInstruction(action.Qualifier.ToString()),
+            target = target,
+            expression = BuildInstructionExpression(conditionExpression, ResolveActionInstruction(action.Qualifier.ToString()), target),
+            commandId = action.Variable,
+            actionLabel = action.Variable
+        });
+    }
+
+    private static StepTransitionExpressionContext? BuildTransitionExpression(Transition? transition, string expression)
+        => transition is null
+            ? null
+            : new StepTransitionExpressionContext
+            {
+                id = transition.Id,
+                label = transition.Label,
+                condition = transition.Condition,
+                expression = expression
+            };
+
+    private static StepCompletionExpressionContext? BuildCompletionExpression(StepActionCompletion? completion)
+        => completion is null
+            ? null
+            : new StepCompletionExpressionContext
+            {
+                sensor = completion.Sensor,
+                sensorLabel = completion.SensorLabel,
+                address = completion.Address
+            };
+
+    private static string ResolveActionTarget(StepAction action, IList<DeviceVariable> variables)
+    {
+        if (!string.IsNullOrWhiteSpace(action.Address)) return action.Address!;
+
+        var resolved = SignalResolver.ResolveAddress(action.Variable, variables);
+        return string.IsNullOrWhiteSpace(resolved) ? action.Variable : resolved!;
+    }
+
+    private static string ResolveActionInstruction(string qualifier)
+        => qualifier.ToUpperInvariant() switch
+        {
+            "S" or "SD" or "SL" => "SET",
+            "R" => "RST",
+            _ => "OUT"
+        };
+
+    private static string BuildConditionExpression(string? condition)
+    {
+        var value = (condition ?? string.Empty).Trim();
+        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ? string.Empty : value;
+    }
+
+    private static string BuildInterlockExpression(OutputBinding binding)
+    {
+        if (string.IsNullOrWhiteSpace(binding.InterlockAddress)) return string.Empty;
+
+        var requiredState = (binding.InterlockRequiredState ?? string.Empty).Trim();
+        return IsFalseState(requiredState) ? NegateExpression(binding.InterlockAddress) : binding.InterlockAddress;
+    }
+
+    private static bool IsFalseState(string value)
+        => string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "low", StringComparison.OrdinalIgnoreCase);
+
+    private static IList<string> BuildBodyExpressions(params string[] expressions)
+        => expressions
+            .Where(expression => !string.IsNullOrWhiteSpace(expression))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static string BuildInstructionExpression(string conditionExpression, string instruction, string target)
+    {
+        if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return string.Empty;
+
+        return string.IsNullOrWhiteSpace(conditionExpression)
+            ? $"{instruction} {target}"
+            : $"{conditionExpression} -> {instruction} {target}";
+    }
+
+    private static void AddConditionTerm(IList<string> terms, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "1", StringComparison.OrdinalIgnoreCase)) return;
+        terms.Add(value.Trim());
+    }
+
+    private static string JoinAnd(IEnumerable<string?> terms)
+        => string.Join(" & ", terms
+            .Where(term => !string.IsNullOrWhiteSpace(term) && !string.Equals(term.Trim(), "1", StringComparison.OrdinalIgnoreCase))
+            .Select(term => term!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+
+    private static string NegateExpression(string? expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression)) return string.Empty;
+
+        var value = expression.Trim();
+        return value.StartsWith("!", StringComparison.Ordinal) ? value[1..] : $"!({value})";
     }
 
     private static (string MinAddress, string MaxAddress, string SequenceEnd) BuildFlowStepAddressRange(FlowInfo flow)
@@ -374,7 +725,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     {
         if (string.Equals(prefix, "MR", StringComparison.OrdinalIgnoreCase))
         {
-            if (TryParseAddressBase(diagram?.BaseMr, out var baseMr) && string.Equals(diagram.BoolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
+            if (TryParseAddressBase(diagram?.BaseMr, out var baseMr) && string.Equals(diagram?.BoolAddressMode, "block", StringComparison.OrdinalIgnoreCase))
             {
                 var relative = number - baseMr.Number;
                 if (relative >= 0)
@@ -467,6 +818,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 var firstSource = deviceGroup.Select(item => item.Source).First();
                 variablesByLabel.TryGetValue(deviceGroup.Key, out var variable);
                 deviceTypesByName.TryGetValue(firstSource.DeviceFormat, out var deviceType);
+                var deviceKind = NormalizeDeviceKind(firstSource.DeviceFormat);
 
                 var signals = variable is null || deviceType is null
                     ? new List<object>()
@@ -482,41 +834,81 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 var commands = deviceGroup
                     .Where(item => !string.IsNullOrWhiteSpace(item.Source.CommandId))
                     .GroupBy(item => item.Source.CommandId, StringComparer.OrdinalIgnoreCase)
-                    .Select(commandGroup =>
+                    .OrderBy(commandGroup => commandGroup.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select((commandGroup, commandIndex) =>
                     {
                         var commandSource = commandGroup.Select(item => item.Source).First();
-                        var commandBindings = commandGroup.Select(item => item.Binding);
-
-                        var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source));
+                        var commandBindings = commandGroup.Select(item => item.Binding).ToList();
+                        var aggregationMode = commandGroup
+                            .Select(item => item.Binding.AggregationMode)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "OR";
+                        var physicalOutputRef = commandGroup
+                            .Select(item => item.Binding.PhysicalOutputRef)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                        var interlockSignal = commandGroup
+                            .Select(item => item.Source.InterlockSignal)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                        var interlockAddress = commandGroup
+                            .Select(item => item.Source.InterlockAddress)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                        var interlockLabel = commandGroup
+                            .Select(item => item.Source.InterlockLabel)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                        var interlockRequiredState = commandGroup
+                            .Select(item => item.Source.InterlockRequiredState)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                        var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), unitAddresses);
                         var originCommandCount = flowCommands.Count(command => command.IsOrigin);
                         var autoCommandCount = flowCommands.Count(command => command.IsAuto);
+                        var sourceConditionExpression = JoinByAggregationMode(flowCommands.Select(command => command.conditionExpression), aggregationMode);
+                        var autoConditionExpression = JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(command => command.conditionExpression), aggregationMode);
+                        var originConditionExpression = JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(command => command.conditionExpression), aggregationMode);
+                        var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
+                        var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
+                        var driveConditionExpression = JoinAnd(new[] { sourceConditionExpression, interlockExpression });
+                        var instruction = ResolveOutputInstruction(commandGroup.Select(item => item.Source.Qualifier));
+                        var expression = BuildInstructionExpression(driveConditionExpression, instruction, physicalOutputRef);
+                        var feedbackSignals = commandGroup
+                            .SelectMany(item => item.Source.FeedbackSignals)
+                            .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
+                            .Select(signalGroup => signalGroup.First())
+                            .ToList();
+                        var outputIntent = new DeviceOutputIntent
+                        {
+                            index = commandIndex,
+                            number = commandIndex + 1,
+                            deviceLabel = deviceGroup.Key,
+                            deviceFormat = firstSource.DeviceFormat,
+                            deviceKind = deviceKind,
+                            commandId = commandSource.CommandId,
+                            actionLabel = commandSource.ActionLabel,
+                            driveSignal = commandSource.DriveSignal,
+                            conditionExpression = driveConditionExpression,
+                            sourceConditionExpression = sourceConditionExpression,
+                            autoConditionExpression = autoConditionExpression,
+                            originConditionExpression = originConditionExpression,
+                            manualConditionExpression = manualConditionExpression,
+                            interlockExpression = interlockExpression,
+                            driveConditionExpression = driveConditionExpression,
+                            instruction = instruction,
+                            target = physicalOutputRef,
+                            expression = expression,
+                            sources = flowCommands,
+                            feedbackSignals = feedbackSignals
+                        };
 
                         return new DeviceCommandOutput
                         {
                             CommandId = commandSource.CommandId,
                             ActionLabel = commandSource.ActionLabel,
                             DriveSignal = commandSource.DriveSignal,
-                            InterlockSignal = commandGroup
-                                .Select(item => item.Source.InterlockSignal)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                            InterlockAddress = commandGroup
-                                .Select(item => item.Source.InterlockAddress)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                            InterlockLabel = commandGroup
-                                .Select(item => item.Source.InterlockLabel)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                            InterlockRequiredState = commandGroup
-                                .Select(item => item.Source.InterlockRequiredState)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                            HasInterlock = commandGroup.Any(item =>
-                                !string.IsNullOrWhiteSpace(item.Source.InterlockSignal)
-                                || !string.IsNullOrWhiteSpace(item.Source.InterlockAddress)),
-                            PhysicalOutputRef = commandGroup
-                                .Select(item => item.Binding.PhysicalOutputRef)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                            AggregationMode = commandGroup
-                                .Select(item => item.Binding.AggregationMode)
-                                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "OR",
+                            InterlockSignal = interlockSignal,
+                            InterlockAddress = interlockAddress,
+                            InterlockLabel = interlockLabel,
+                            InterlockRequiredState = interlockRequiredState,
+                            HasInterlock = !string.IsNullOrWhiteSpace(interlockExpression),
+                            PhysicalOutputRef = physicalOutputRef,
+                            AggregationMode = aggregationMode,
                             SourceSteps = commandBindings
                                 .SelectMany(binding => binding.SourceSteps)
                                 .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -538,26 +930,35 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                             AutoCommandCount = autoCommandCount,
                             HasOriginCommands = originCommandCount > 0,
                             HasAutoCommands = autoCommandCount > 0,
-                            FeedbackSignals = commandGroup
-                                .SelectMany(item => item.Source.FeedbackSignals)
-                                .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
-                                .Select(signalGroup => signalGroup.First())
-                                .ToList()
+                            FeedbackSignals = feedbackSignals,
+                            output = outputIntent,
+                            sources = flowCommands,
+                            conditionExpression = driveConditionExpression,
+                            sourceConditionExpression = sourceConditionExpression,
+                            autoConditionExpression = autoConditionExpression,
+                            originConditionExpression = originConditionExpression,
+                            manualConditionExpression = manualConditionExpression,
+                            interlockExpression = interlockExpression,
+                            driveConditionExpression = driveConditionExpression,
+                            instruction = instruction,
+                            target = physicalOutputRef,
+                            expression = expression
                         };
                     })
-                    .OrderBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
                     .ToList();
+                var outputs = commands.Select(command => command.output).ToList();
 
                 return new DeviceOutputGroup
                 {
                     DeviceLabel = deviceGroup.Key,
                     DeviceFormat = firstSource.DeviceFormat,
-                    DeviceKind = NormalizeDeviceKind(firstSource.DeviceFormat),
+                    DeviceKind = deviceKind,
                     Address = variable?.Address,
                     SignalAddresses = variable?.SignalAddresses ?? new Dictionary<string, string>(),
                     UnitAddresses = new Dictionary<string, string>(unitAddresses, StringComparer.OrdinalIgnoreCase),
                     Signals = signals,
-                    Commands = commands
+                    Commands = commands,
+                    outputs = outputs
                 };
             })
             .OrderBy(group => group.DeviceLabel, StringComparer.OrdinalIgnoreCase)
@@ -573,15 +974,21 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     }
 
 
-    private static IList<DeviceCommandFlowOutput> BuildCommandFlowOutputs(IEnumerable<OutputBindingSource> sources)
+    private static IList<DeviceCommandFlowOutput> BuildCommandFlowOutputs(
+        IEnumerable<OutputBindingSource> sources,
+        IDictionary<string, string> unitAddresses)
     {
         var commands = sources
             .Where(source => !string.IsNullOrWhiteSpace(source.SourceExecuteBitRef) || !string.IsNullOrWhiteSpace(source.SourceDoneBitRef))
-            .GroupBy(source => $"{source.FlowType}\u001F{source.FlowId}\u001F{source.FlowName}\u001F{source.CommandId}\u001F{source.ActionLabel}\u001F{source.SourceStep}\u001F{source.SourceExecuteBitRef}\u001F{source.SourceDoneBitRef}", StringComparer.OrdinalIgnoreCase)
+            .GroupBy(source => $"{source.FlowType}\u001F{source.FlowId}\u001F{source.FlowName}\u001F{source.CommandId}\u001F{source.ActionLabel}\u001F{source.SourceStep}\u001F{source.SourceExecuteBitRef}\u001F{source.SourceDoneBitRef}\u001F{source.ActionSymbol}\u001F{source.Qualifier}", StringComparer.OrdinalIgnoreCase)
             .Select(commandGroup =>
             {
                 var source = commandGroup.First();
                 var flowType = string.Equals(source.FlowType, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
+                var modeFlagAddress = ResolveModeFlagAddress(flowType, unitAddresses);
+                var executeExpression = source.SourceExecuteBitRef ?? string.Empty;
+                var doneGuardExpression = NegateExpression(source.SourceDoneBitRef);
+                var conditionExpression = JoinAnd(new[] { modeFlagAddress, executeExpression, doneGuardExpression });
 
                 return new DeviceCommandFlowOutput
                 {
@@ -590,11 +997,17 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                     FlowType = flowType,
                     IsOrigin = string.Equals(flowType, "origin", StringComparison.OrdinalIgnoreCase),
                     IsAuto = string.Equals(flowType, "auto", StringComparison.OrdinalIgnoreCase),
-                    CommandId = source.CommandId,
-                    ActionLabel = source.ActionLabel,
-                    SourceStep = source.SourceStep,
-                    SourceExecuteBit = source.SourceExecuteBitRef,
-                    SourceDoneBit = source.SourceDoneBitRef
+                    CommandId = source.CommandId ?? string.Empty,
+                    ActionLabel = source.ActionLabel ?? string.Empty,
+                    SourceStep = source.SourceStep ?? string.Empty,
+                    SourceExecuteBit = source.SourceExecuteBitRef ?? string.Empty,
+                    SourceDoneBit = source.SourceDoneBitRef ?? string.Empty,
+                    actionSymbol = source.ActionSymbol ?? string.Empty,
+                    qualifier = source.Qualifier ?? string.Empty,
+                    modeFlagAddress = modeFlagAddress,
+                    executeExpression = executeExpression,
+                    doneGuardExpression = doneGuardExpression,
+                    conditionExpression = conditionExpression
                 };
             })
             .OrderBy(command => command.IsAuto)
@@ -617,6 +1030,12 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 SourceStep = command.SourceStep,
                 SourceExecuteBit = command.SourceExecuteBit,
                 SourceDoneBit = command.SourceDoneBit,
+                actionSymbol = command.actionSymbol,
+                qualifier = command.qualifier,
+                modeFlagAddress = command.modeFlagAddress,
+                executeExpression = command.executeExpression,
+                doneGuardExpression = command.doneGuardExpression,
+                conditionExpression = command.conditionExpression,
                 Index = index,
                 Number = index + 1,
                 TotalCount = commands.Count,
@@ -626,6 +1045,71 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             })
             .ToList();
     }
+    private static string BuildInterlockExpression(string? interlockAddress, string? requiredState)
+    {
+        if (string.IsNullOrWhiteSpace(interlockAddress)) return string.Empty;
+
+        return IsFalseState((requiredState ?? string.Empty).Trim())
+            ? NegateExpression(interlockAddress)
+            : interlockAddress.Trim();
+    }
+
+    private static string ResolveOutputInstruction(IEnumerable<string?> qualifiers)
+    {
+        var first = qualifiers.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        return string.IsNullOrWhiteSpace(first) ? "OUT" : ResolveActionInstruction(first!);
+    }
+
+    private static string ResolveModeFlagAddress(string flowType, IDictionary<string, string> unitAddresses)
+    {
+        var key = string.Equals(flowType, "origin", StringComparison.OrdinalIgnoreCase)
+            ? "flagOrigin"
+            : string.Equals(flowType, "manual", StringComparison.OrdinalIgnoreCase)
+                ? "flagManual"
+                : "flagAuto";
+
+        return TryGetAddress(unitAddresses, key, out var address) ? address : string.Empty;
+    }
+
+    private static bool TryGetAddress(IDictionary<string, string> addresses, string key, out string address)
+    {
+        if (addresses.TryGetValue(key, out address!) && !string.IsNullOrWhiteSpace(address))
+        {
+            address = address.Trim();
+            return true;
+        }
+
+        var match = addresses.FirstOrDefault(pair => string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase));
+        address = match.Value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(address)) return false;
+
+        address = address.Trim();
+        return true;
+    }
+
+    private static string JoinByAggregationMode(IEnumerable<string?> expressions, string? aggregationMode)
+    {
+        var values = expressions
+            .Where(expression => !string.IsNullOrWhiteSpace(expression) && !string.Equals(expression.Trim(), "1", StringComparison.OrdinalIgnoreCase))
+            .Select(expression => expression!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (values.Count == 0) return string.Empty;
+        if (values.Count == 1) return values[0];
+
+        var separator = string.Equals(aggregationMode, "AND", StringComparison.OrdinalIgnoreCase) ? " & " : " | ";
+        return string.Join(separator, values.Select(WrapCompoundExpression));
+    }
+
+    private static string WrapCompoundExpression(string expression)
+    {
+        var value = expression.Trim();
+        if (value.StartsWith("(", StringComparison.Ordinal) && value.EndsWith(")", StringComparison.Ordinal)) return value;
+        return value.Contains(" & ", StringComparison.Ordinal) || value.Contains(" | ", StringComparison.Ordinal)
+            ? $"({value})"
+            : value;
+    }
+
     private static IList<AggregatedOutputBinding> MergeOutputBindings(IEnumerable<AggregatedOutputBinding> bindings)
     {
         return bindings
@@ -840,4 +1324,5 @@ internal static class StepLabelExtensions
     public static string LabelOrId(this Step step) => !string.IsNullOrWhiteSpace(step.Label) ? step.Label : step.Id;
     private readonly record struct ParsedBoolBase(string Prefix, int Number, int Width);
 }
+
 

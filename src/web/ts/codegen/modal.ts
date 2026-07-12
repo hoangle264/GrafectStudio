@@ -36,17 +36,10 @@ function showGenerateCodeModal(): void {
         <div>
           <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">TARGET PLC</div>
           <select id="cg-target" onchange="cgOnTargetChanged()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;border-radius:3px;outline:none;">
-            <option value="unit-config">Keyence Mnemonic List</option>
-            <option value="runtime-plan">Runtime Plan [debug]</option>
-            <option value="melsec">Mitsubishi MELSEC</option>
-            <option value="omron">OMRON</option>
-            <option value="siemens">Siemens AWL</option>
+            <option value="Keyence">Keyence Mnemonic List</option>
             <option value="siemens-lad">Siemens LAD XML</option>
             <option value="siemens-db">Siemens DB/UDT XML</option>
-            <option value="twincat-st">TwinCAT ST</option>
-            <option value="csharp-kv-5500">C# Keyence KV demo</option>
-            <option value="csharp-twincat-st">C# TwinCAT ST demo</option>
-          </select>
+                                  </select>
         </div>
 
         <div id="cg-base-mr-wrap">
@@ -173,7 +166,7 @@ function cgCopyAllFiles(): void {
 
 function cgDownloadAllFiles(): void {
   const files = (window.GrafcetStudio && (window.GrafcetStudio as unknown as { codegenLastFiles?: MdCodegenFile[] }).codegenLastFiles) || [];
-  const platform = cgResolveHostPlatform((document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'unit-config');
+  const platform = cgResolveHostPlatform((document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence');
   if (!files.length) return;
   if (!cgExportViaHost(files, platform)) toast('Host export is unavailable');
 }

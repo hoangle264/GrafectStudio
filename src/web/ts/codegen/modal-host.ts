@@ -66,7 +66,7 @@ function cgBuildCSharpPayload(platform: string, unitId?: string): MhCodegenPaylo
 }
 
 function cgGenerateSelectedUnit(): boolean {
-  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'unit-config';
+  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence';
   const platform = cgResolveHostPlatform(target);
   const unitId = cgGetDefaultUnitId();
   if (!unitId) {
@@ -79,7 +79,7 @@ function cgGenerateSelectedUnit(): boolean {
   return cgGenerateViaHost(platform, unitId);
 }
 function cgGenerateAllUnits(): boolean {
-  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'unit-config';
+  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence';
   const platform = cgResolveHostPlatform(target);
   return cgGenerateViaHost(platform, '__all__');
 }

@@ -157,13 +157,12 @@ public class FileService : IFileService
         public IntPtr Handle { get; }
     }
 
+
     private static (string Ext, string Filter) MapPlatform(string platform) => platform?.ToLowerInvariant() switch
     {
-        "melsec" => (".gxw", "MELSEC Program|*.gxw"),
-        "omron" => (".cxp", "Omron Program|*.cxp"),
-        "siemens" => (".awl", "Siemens STL|*.awl"),
-        "twincat-st" => (".st", "Structured Text|*.st"),
-        "unit-config" => (".mnm", "KV Mnemonic|*.mnm"),
+        "keyence" => (".mnm", "KV Mnemonic|*.mnm"),
+        "siemens-lad" => (".xml", "Siemens LAD XML|*.xml"),
+        "siemens-db" => (".xml", "Siemens DB/UDT XML|*.xml"),
         _ => (".txt", "Text File|*.txt")
     };
 

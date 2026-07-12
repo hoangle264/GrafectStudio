@@ -386,7 +386,7 @@ public class GeneratorSmokeTests
             new DiagramMeta { Id = "diag-legacy", Name = "Legacy", Mode = "Main", UnitId = "unit-1" }
         }));
 
-        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-1");
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
 
         Assert.Single(payload.Flows);
         Assert.Equal("Auto", payload.Flows[0].ControlState);
@@ -405,8 +405,8 @@ public class GeneratorSmokeTests
             new Unit { Id = "unit-b", Name = "Unit B" }
         }));
 
-        var payloadA = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-a");
-        var payloadB = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-b");
+        var payloadA = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-a");
+        var payloadB = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-b");
 
         Assert.Single(payloadA.Flows);
         Assert.Single(payloadB.Flows);
@@ -426,7 +426,7 @@ public class GeneratorSmokeTests
             new Unit { Id = "unit-b", Name = "Unit B" }
         }));
 
-        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "__all__");
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "__all__");
 
         Assert.Equal(2, payload.Units.Count);
         Assert.Equal(2, payload.Flows.Count);
@@ -496,7 +496,7 @@ public class GeneratorSmokeTests
             }
         }));
 
-        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-1");
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
 
         Assert.Single(payload.Flows);
         Assert.Equal("orchestrator", payload.Flows[0].Category);
@@ -528,7 +528,7 @@ public class GeneratorSmokeTests
             }
         };
 
-        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-1");
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
         var flow = Assert.Single(payload.Flows);
         var step = Assert.Single(flow.Steps);
 
@@ -560,7 +560,7 @@ public class GeneratorSmokeTests
             }
         };
 
-        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "twincat-st", "unit-1");
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
 
         Assert.Equal(2, payload.DeviceTypes.Count);
     }
