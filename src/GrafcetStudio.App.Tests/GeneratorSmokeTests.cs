@@ -637,6 +637,82 @@ public class GeneratorSmokeTests
         Assert.Contains("\"bodyMnemonic\"", output);
     }
 
+
+    [Fact]
+    public void KeyenceGenerator_TemplateExpressionStylePostProcessesSingleOutputRungsToMnemonic()
+    {
+        var templates = new TemplateManager(Handlebars.Create());
+        templates.LoadTemplate("uc.auto", """
+        ; Expression-style template keeps HBS readable
+        {{#each autoFlows}}
+        {{#each steps}}
+        {{expression.activationExpression}} -> SET {{ExecAddress}}
+        {{#each expression.outputs}}
+        {{expression}}
+        {{/each}}
+        {{expression.doneExpression}}
+        {{/each}}
+        {{/each}}
+        """);
+
+        var payload = new CodegenPayload
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>
+            {
+                new()
+                {
+                    Label = "Motor1",
+                    Format = "Motor",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["Run"] = "MR10"
+                    }
+                }
+            },
+            DeviceTypes = new List<DeviceType>
+            {
+                new() { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" } } }
+            },
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-1",
+                    Name = "AutoFlow",
+                    Type = "auto",
+                    Mode = "auto",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", BaseMr = "100" },
+                    Steps = new List<Step>
+                    {
+                        new()
+                        {
+                            Id = "s1",
+                            Number = 1,
+                            Label = "Start",
+                            IsInitial = true,
+                            ExecAddress = "MR100",
+                            DoneAddress = "MR101",
+                            Actions = new List<StepAction>
+                            {
+                                new() { Variable = "Motor1.Run", Qualifier = ActionQualifier.N }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var output = new KeyenceGenerator(templates, new SequenceResolver()).GenerateUnitContent(payload);
+
+        Assert.Contains("LD   MR100", output);
+        Assert.Contains("OUT  MR10", output);
+        Assert.Contains("SET  MR101", output);
+        Assert.DoesNotContain("->", output);
+        Assert.DoesNotContain("MR100 -> OUT MR10", output);
+    }
     [Fact]
     public void KeyenceGenerator_Phase2_PopulatesDeviceOutputMnemonicsInJsonContext()
     {

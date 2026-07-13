@@ -1,4 +1,4 @@
-using GrafcetStudio.App.Generators.Keyence;
+﻿using GrafcetStudio.App.Generators.Keyence;
 using GrafcetStudio.CodeGen.Runtime;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
@@ -65,9 +65,125 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             .Where(section => !string.IsNullOrWhiteSpace(section))
             .ToList();
 
-        return renderedSections.Count == 0
-            ? JsonSerializer.Serialize(context, JsonOptions)
-            : string.Join(Environment.NewLine, renderedSections);
+        if (renderedSections.Count == 0)
+        {
+            return JsonSerializer.Serialize(context, JsonOptions);
+        }
+
+        var rendered = string.Join(Environment.NewLine, renderedSections);
+        return RenderedOutputLooksExpressionBased(rendered)
+            ? ConvertRenderedPseudoExpressionToMnemonic(rendered, payload.Variables)
+            : rendered;
+    }
+
+
+    private static bool RenderedOutputLooksExpressionBased(string rendered)
+    {
+        if (string.IsNullOrWhiteSpace(rendered)) return false;
+
+        return rendered.Contains(" -> ", StringComparison.Ordinal)
+            || rendered.Contains("->", StringComparison.Ordinal)
+            || rendered.Contains("{{expression", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ConvertRenderedPseudoExpressionToMnemonic(string rendered, IList<DeviceVariable> vars)
+    {
+        if (string.IsNullOrWhiteSpace(rendered)) return rendered;
+
+        var normalized = rendered.Replace("\r", string.Empty);
+        var lines = normalized.Split('\n');
+        var output = new List<string>(lines.Length);
+
+        foreach (var rawLine in lines)
+        {
+            output.AddRange(ConvertRenderedLineToMnemonic(rawLine, vars));
+        }
+
+        return string.Join(Environment.NewLine, output);
+    }
+
+    private static IEnumerable<string> ConvertRenderedLineToMnemonic(string rawLine, IList<DeviceVariable> vars)
+    {
+        if (rawLine is null)
+        {
+            yield return string.Empty;
+            yield break;
+        }
+
+        var trimmed = rawLine.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith(";", StringComparison.Ordinal) || !trimmed.Contains("->", StringComparison.Ordinal))
+        {
+            yield return rawLine;
+            yield break;
+        }
+
+        var segments = SplitPseudoExpressionSegments(trimmed);
+        var converted = new List<string>();
+        foreach (var segment in segments)
+        {
+            if (TryConvertPseudoExpressionSegment(segment, vars, out var mnemonicLines))
+            {
+                converted.AddRange(mnemonicLines);
+                continue;
+            }
+
+            if (LooksLikeSingleTargetInstruction(segment))
+            {
+                converted.Add(segment.Trim());
+                continue;
+            }
+
+            yield return rawLine;
+            yield break;
+        }
+
+        if (converted.Count == 0)
+        {
+            yield return rawLine;
+            yield break;
+        }
+
+        foreach (var line in converted)
+        {
+            yield return line;
+        }
+    }
+
+    private static IList<string> SplitPseudoExpressionSegments(string line)
+        => line.Split(new[] { " ; " }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static bool TryConvertPseudoExpressionSegment(string segment, IList<DeviceVariable> vars, out IList<string> mnemonicLines)
+    {
+        mnemonicLines = new List<string>();
+        if (string.IsNullOrWhiteSpace(segment) || !segment.Contains("->", StringComparison.Ordinal)) return false;
+
+        var arrowIndex = segment.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex < 0 || arrowIndex >= segment.Length - 2) return false;
+
+        var condition = segment[..arrowIndex].Trim();
+        var instructionPart = segment[(arrowIndex + 2)..].Trim();
+        var instructionSplit = instructionPart.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+        if (instructionSplit.Length < 2) return false;
+
+        var instruction = instructionSplit[0].Trim();
+        var target = instructionSplit[1].Trim();
+        if (string.IsNullOrWhiteSpace(instruction)
+            || string.IsNullOrWhiteSpace(target)
+            || target.Contains("->", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        mnemonicLines = EmitRungLines(condition, instruction, target, vars);
+        return mnemonicLines.Count > 0;
+    }
+
+    private static bool LooksLikeSingleTargetInstruction(string value)
+    {
+        var parts = value.Trim().Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2) return false;
+
+        return ToInstruction(parts[0], parts[1]) is not null;
     }
 
     private IEnumerable<string> ResolveSectionTemplateNames()
@@ -1478,5 +1594,6 @@ internal static class StepLabelExtensions
     public static string LabelOrId(this Step step) => !string.IsNullOrWhiteSpace(step.Label) ? step.Label : step.Id;
     private readonly record struct ParsedBoolBase(string Prefix, int Number, int Width);
 }
+
 
 
