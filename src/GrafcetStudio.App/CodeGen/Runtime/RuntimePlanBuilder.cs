@@ -23,7 +23,7 @@ public static class RuntimePlanBuilder
             }
 
             var resolverResults = step.Actions
-                .Select(action => DeviceCommandResolver.Resolve(action, step.ExecAddress, variables, library))
+                .Select(action => action.DeviceCommandResolutionAttempted ? action.ResolvedCommand : DeviceCommandResolver.Resolve(action, step.ExecAddress, variables, library))
                 .Where(result => result is not null)
                 .Cast<ActionResolveResult>()
                 .ToList();

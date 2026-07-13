@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using GrafcetStudio.Domain.Enums;
 using GrafcetStudio.Domain.Resolution;
+using GrafcetStudio.CodeGen.Runtime.Models;
 
 namespace GrafcetStudio.Domain.Models;
 
@@ -28,6 +29,12 @@ public class StepAction
     [JsonPropertyName("sensorRef")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SensorRef { get; init; }
+
+    [JsonIgnore]
+    public bool DeviceCommandResolutionAttempted { get; init; }
+
+    [JsonIgnore]
+    public ActionResolveResult? ResolvedCommand { get; init; }
 
     public string ToPhysicalAddress(IList<DeviceVariable> vars)
         => !string.IsNullOrWhiteSpace(Address)

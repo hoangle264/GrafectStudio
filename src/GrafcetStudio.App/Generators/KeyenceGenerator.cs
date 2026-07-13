@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.App.Generators.Keyence;
+using GrafcetStudio.App.Generators.Keyence;
 using GrafcetStudio.CodeGen.Runtime;
 using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.CodeGen.Template;
@@ -78,90 +78,44 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
 
     private static bool RenderedOutputLooksExpressionBased(string rendered)
-    {
-        if (string.IsNullOrWhiteSpace(rendered)) return false;
-
-        return rendered.Contains(" -> ", StringComparison.Ordinal)
-            || rendered.Contains("->", StringComparison.Ordinal)
-            || rendered.Contains("{{expression", StringComparison.OrdinalIgnoreCase);
-    }
+        => !string.IsNullOrWhiteSpace(rendered)
+            && (rendered.Contains("->", StringComparison.Ordinal)
+                || rendered.Contains("-&gt;", StringComparison.OrdinalIgnoreCase));
 
     private static string ConvertRenderedPseudoExpressionToMnemonic(string rendered, IList<DeviceVariable> vars)
     {
         if (string.IsNullOrWhiteSpace(rendered)) return rendered;
 
-        var normalized = rendered.Replace("\r", string.Empty);
-        var lines = normalized.Split('\n');
+        var lines = rendered.Replace("\r", string.Empty).Split('\n');
         var output = new List<string>(lines.Length);
 
         foreach (var rawLine in lines)
         {
-            output.AddRange(ConvertRenderedLineToMnemonic(rawLine, vars));
+            if (TryConvertPseudoExpressionLine(rawLine, vars, out var mnemonicLines))
+            {
+                output.AddRange(mnemonicLines);
+                continue;
+            }
+
+            output.Add(rawLine);
         }
 
         return string.Join(Environment.NewLine, output);
     }
 
-    private static IEnumerable<string> ConvertRenderedLineToMnemonic(string rawLine, IList<DeviceVariable> vars)
-    {
-        if (rawLine is null)
-        {
-            yield return string.Empty;
-            yield break;
-        }
-
-        var trimmed = rawLine.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith(";", StringComparison.Ordinal) || !trimmed.Contains("->", StringComparison.Ordinal))
-        {
-            yield return rawLine;
-            yield break;
-        }
-
-        var segments = SplitPseudoExpressionSegments(trimmed);
-        var converted = new List<string>();
-        foreach (var segment in segments)
-        {
-            if (TryConvertPseudoExpressionSegment(segment, vars, out var mnemonicLines))
-            {
-                converted.AddRange(mnemonicLines);
-                continue;
-            }
-
-            if (LooksLikeSingleTargetInstruction(segment))
-            {
-                converted.Add(segment.Trim());
-                continue;
-            }
-
-            yield return rawLine;
-            yield break;
-        }
-
-        if (converted.Count == 0)
-        {
-            yield return rawLine;
-            yield break;
-        }
-
-        foreach (var line in converted)
-        {
-            yield return line;
-        }
-    }
-
-    private static IList<string> SplitPseudoExpressionSegments(string line)
-        => line.Split(new[] { " ; " }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-    private static bool TryConvertPseudoExpressionSegment(string segment, IList<DeviceVariable> vars, out IList<string> mnemonicLines)
+    private static bool TryConvertPseudoExpressionLine(string? rawLine, IList<DeviceVariable> vars, out IList<string> mnemonicLines)
     {
         mnemonicLines = new List<string>();
-        if (string.IsNullOrWhiteSpace(segment) || !segment.Contains("->", StringComparison.Ordinal)) return false;
+        if (string.IsNullOrWhiteSpace(rawLine)) return false;
 
-        var arrowIndex = segment.IndexOf("->", StringComparison.Ordinal);
-        if (arrowIndex < 0 || arrowIndex >= segment.Length - 2) return false;
+        var trimmed = System.Net.WebUtility.HtmlDecode(rawLine).Trim();
+        if (trimmed.StartsWith(";", StringComparison.Ordinal) || !trimmed.Contains("->", StringComparison.Ordinal)) return false;
 
-        var condition = segment[..arrowIndex].Trim();
-        var instructionPart = segment[(arrowIndex + 2)..].Trim();
+        var arrowIndex = trimmed.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex < 0 || arrowIndex >= trimmed.Length - 2) return false;
+
+        var condition = trimmed[..arrowIndex].Trim();
+        var instructionPart = trimmed[(arrowIndex + 2)..].Trim();
         var instructionSplit = instructionPart.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
         if (instructionSplit.Length < 2) return false;
 
@@ -177,15 +131,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         mnemonicLines = EmitRungLines(condition, instruction, target, vars);
         return mnemonicLines.Count > 0;
     }
-
-    private static bool LooksLikeSingleTargetInstruction(string value)
-    {
-        var parts = value.Trim().Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2) return false;
-
-        return ToInstruction(parts[0], parts[1]) is not null;
-    }
-
     private IEnumerable<string> ResolveSectionTemplateNames()
     {
         if (_templates.IsTemplateLoaded("uc.main"))
@@ -256,9 +201,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 : payload.Project?.Name ?? "Unit";
         var flows = payload.Flows ?? new();
         var library = LoadDeviceLibrary(payload.DeviceLibraryPath);
-        ValidateMacroStepRules(flows);
-        ValidateMacroPortVariables(flows, payload.Variables);
-        var macroBindings = BuildMacroBindings(flows);
+        var macroBindings = AnalyzeMacroFlows(flows, payload.Variables);
         var macroPorts = macroBindings
             .Select(binding => new
             {
@@ -270,8 +213,9 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 binding.variable
             })
             .ToList();
-        var resolvedFlows = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library, macroBindings)).ToList();
-        var runtimePlans = flows.Select(flow => RuntimePlanBuilder.Build(flow, payload.Variables, library)).ToList();
+        var resolvedFlowResults = flows.Select(flow => BuildResolvedFlow(flow, payload.Variables, library, macroBindings)).ToList();
+        var resolvedFlows = resolvedFlowResults.Select(result => result.Flow).ToList();
+        var runtimePlans = resolvedFlowResults.Select(result => result.RuntimePlan).ToList();
         var outputBindings = MergeOutputBindings(runtimePlans.SelectMany(plan => plan.OutputBindingPlan.Bindings));
         var unitVariable = FindUnitVariable(payload.Variables, unitLabel);
         var unitAddresses = unitVariable?.SignalAddresses ?? new Dictionary<string, string>();
@@ -288,15 +232,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             BuildFlowGroup("macro", macroFlows),
             BuildFlowGroup("macroStep", macroStepFlows)
         };
-        var templateContract = new
-        {
-            name = "keyence-step-expression",
-            version = 1,
-            flowBased = true,
-            stepBody = "expression",
-            stepExpressionPath = "flow.steps[].expression"
-        };
-
         var deviceTypesByName = payload.DeviceTypes.ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
         var devices = payload.Variables.Select(variable =>
         {
@@ -337,7 +272,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
             devices,
-            templateContract,
             flows = resolvedFlows,
             flowGroups,
             autoFlows,
@@ -355,7 +289,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
 
 
-    private ResolvedFlow BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables, DeviceLibraryRoot library, IList<MacroBindingContext> macroBindings)
+    private ResolvedFlowBuildResult BuildResolvedFlow(FlowInfo flow, IList<DeviceVariable> variables, DeviceLibraryRoot library, IList<MacroBindingContext> macroBindings)
     {
         var state = flow.ToDiagramState(variables);
         var sequence = _sequenceResolver.Resolve(state);
@@ -379,12 +313,11 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 InTransition = entry.InTransition,
                 OutTransition = entry.OutTransition,
                 BranchType = entry.BranchType,
-                Expression = BuildStepExpressionContext(step, previousStep, nextStep, entry.InTransition, entry.OutTransition, index == 0, variables, library)
+                Expression = BuildStepExpressionContext(step, previousStep, nextStep, entry.InTransition, entry.OutTransition, index == 0, variables)
             };
         }).ToList();
         var flowStepRange = BuildFlowStepAddressRange(flow);
-
-        return new ResolvedFlow
+        var resolvedFlow = new ResolvedFlow
         {
             id = flow.Id,
             name = flow.Name,
@@ -404,8 +337,25 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             callerMacroBindings = callerBindings,
             calleeMacroBindings = calleeBindings
         };
-    }
 
+        var runtimePlan = RuntimePlanBuilder.Build(new FlowInfo
+        {
+            Id = flow.Id,
+            Name = flow.Name,
+            Type = flow.Type,
+            Mode = flow.Mode,
+            DiagramType = flow.DiagramType,
+            ControlState = flow.ControlState,
+            Category = flow.Category,
+            OrchestratorConfig = flow.OrchestratorConfig,
+            Diagram = flow.Diagram,
+            MacroPortVariable = flow.MacroPortVariable,
+            Steps = resolvedSteps.Select(step => step.Step).ToList(),
+            Transitions = flow.Transitions
+        }, variables, library);
+
+        return new ResolvedFlowBuildResult(resolvedFlow, runtimePlan);
+    }
     private static object BuildFlowGroup(string key, IList<ResolvedFlow> flows)
         => new
         {
@@ -424,15 +374,14 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         Transition? inTransition,
         Transition? outTransition,
         bool isFirstStep,
-        IList<DeviceVariable> variables,
-        DeviceLibraryRoot library)
+        IList<DeviceVariable> variables)
     {
         var inTransitionExpression = BuildConditionExpression(inTransition?.Condition);
         var outTransitionExpression = BuildConditionExpression(outTransition?.Condition);
         var activationExpression = BuildActivationExpression(step, previousStep, inTransitionExpression, isFirstStep);
         var holdExpression = BuildHoldExpression(step, outTransitionExpression);
         var actions = BuildStepActionExpressions(step, variables);
-        var outputs = BuildStepOutputExpressions(step, variables, library);
+        var outputs = BuildStepOutputExpressions(step, variables);
         var doneConditionExpression = BuildDoneConditionExpression(step, outTransitionExpression, actions);
         var doneInstruction = string.IsNullOrWhiteSpace(step.DoneAddress) ? string.Empty : "SET";
         var doneTarget = step.DoneAddress ?? string.Empty;
@@ -551,14 +500,13 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
     private static IList<StepOutputExpressionContext> BuildStepOutputExpressions(
         Step step,
-        IList<DeviceVariable> variables,
-        DeviceLibraryRoot library)
+        IList<DeviceVariable> variables)
     {
         var outputs = new List<StepOutputExpressionContext>();
         for (var actionIndex = 0; actionIndex < step.Actions.Count; actionIndex++)
         {
             var action = step.Actions[actionIndex];
-            var resolved = DeviceCommandResolver.Resolve(action, step.ExecAddress ?? string.Empty, variables, library);
+            var resolved = action.ResolvedCommand;
             if (resolved is null || resolved.OutputBindings.Count == 0)
             {
                 AddDirectActionOutput(outputs, action, actionIndex, step, variables);
@@ -990,6 +938,8 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
     private readonly record struct StepExecAddress(string Prefix, int Number, bool HasBit, int Bit, long SortValue);
 
+    private sealed record ResolvedFlowBuildResult(ResolvedFlow Flow, DiagramRuntimePlan RuntimePlan);
+
 
     private static Step EnrichStepActions(Step step, IList<DeviceVariable> variables, DeviceLibraryRoot library)
     {
@@ -1018,7 +968,14 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     {
         var resolved = DeviceCommandResolver.Resolve(action, stepExecAddress, variables, library);
         var feedback = resolved?.FeedbackSignals.FirstOrDefault(signal => !string.IsNullOrWhiteSpace(signal.PhysicalAddress));
-        if (feedback is null) return action;
+        var completion = feedback is null
+            ? action.Complete
+            : new StepActionCompletion
+            {
+                Sensor = feedback.SignalName,
+                SensorLabel = feedback.Label,
+                Address = feedback.PhysicalAddress
+            };
 
         return new StepAction
         {
@@ -1026,13 +983,10 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             Address = action.Address,
             Qualifier = action.Qualifier,
             TimeMs = action.TimeMs,
-            Complete = new StepActionCompletion
-            {
-                Sensor = feedback.SignalName,
-                SensorLabel = feedback.Label,
-                Address = feedback.PhysicalAddress
-            },
-            SensorRef = BuildSensorRef(action.Variable, feedback.SignalName)
+            Complete = completion,
+            SensorRef = feedback is null ? action.SensorRef : BuildSensorRef(action.Variable, feedback.SignalName),
+            DeviceCommandResolutionAttempted = true,
+            ResolvedCommand = resolved
         };
     }
 
@@ -1443,16 +1397,26 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     private static string ResolveFlowUnitId(FlowInfo flow)
         => flow.Diagram?.UnitId ?? string.Empty;
 
-    private static void ValidateMacroStepRules(IList<FlowInfo> flows)
+    private static IList<MacroBindingContext> AnalyzeMacroFlows(IList<FlowInfo> flows, IList<DeviceVariable> variables)
     {
         var flowById = flows
             .Where(flow => !string.IsNullOrWhiteSpace(flow.Id))
             .ToDictionary(flow => flow.Id!, StringComparer.OrdinalIgnoreCase);
+        var macroPortVariablesByName = variables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Label))
+            .GroupBy(variable => variable.Label, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
         var references = new Dictionary<string, List<(FlowInfo Caller, Step Step)>>(StringComparer.OrdinalIgnoreCase);
+        var bindings = new List<MacroBindingContext>();
 
         foreach (var flow in flows)
         {
             var flowType = NormalizeDiagramType(flow);
+            if (string.Equals(flowType, "MacroStep", StringComparison.OrdinalIgnoreCase))
+            {
+                ResolveAndValidateMacroPortVariable(flow, macroPortVariablesByName);
+            }
+
             foreach (var step in flow.Steps ?? new List<Step>())
             {
                 if (!string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase)) continue;
@@ -1482,12 +1446,24 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                     throw new InvalidOperationException($"Step {step.LabelOrId()} references MacroStep {target.Name ?? target.Id} from another unit.");
                 }
 
-                if (!references.TryGetValue(target.Id ?? step.MacroFlowId!, out var callers))
+                ResolveAndValidateMacroPortVariable(target, macroPortVariablesByName);
+                var targetId = target.Id ?? step.MacroFlowId!;
+                if (!references.TryGetValue(targetId, out var callers))
                 {
                     callers = new List<(FlowInfo Caller, Step Step)>();
-                    references[target.Id ?? step.MacroFlowId!] = callers;
+                    references[targetId] = callers;
                 }
+
                 callers.Add((flow, step));
+                bindings.Add(new MacroBindingContext
+                {
+                    unitId = ResolveFlowUnitId(flow),
+                    callerFlowId = flow.Id ?? string.Empty,
+                    callerStepId = step.Id,
+                    calleeFlowId = target.Id ?? string.Empty,
+                    portName = BuildMacroPortName(target),
+                    variable = ResolveMacroPortVariable(target)
+                });
             }
         }
 
@@ -1498,72 +1474,42 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 throw new InvalidOperationException($"MacroStep {target.Name ?? target.Id} is referenced by multiple macro steps.");
             }
         }
+
+        return bindings;
     }
-    private static IList<MacroBindingContext> BuildMacroBindings(IList<FlowInfo> flows)
+
+    private static void ResolveAndValidateMacroPortVariable(
+        FlowInfo flow,
+        IDictionary<string, List<DeviceVariable>> variablesByLabel)
     {
-        var flowById = flows
-            .Where(flow => !string.IsNullOrWhiteSpace(flow.Id))
-            .ToDictionary(flow => flow.Id!, StringComparer.OrdinalIgnoreCase);
+        var name = flow.Name ?? flow.Id ?? string.Empty;
+        var matches = !string.IsNullOrWhiteSpace(name) && variablesByLabel.TryGetValue(name, out var found)
+            ? found
+            : new List<DeviceVariable>();
 
-        return flows
-            .Where(flow => string.Equals(NormalizeDiagramType(flow), "Macro", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(flow => (flow.Steps ?? new List<Step>())
-                .Where(step => string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(step.MacroFlowId)
-                    && flowById.TryGetValue(step.MacroFlowId!, out var callee)
-                    && string.Equals(NormalizeDiagramType(callee), "MacroStep", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(ResolveFlowUnitId(flow), ResolveFlowUnitId(callee), StringComparison.OrdinalIgnoreCase))
-                .Select(step =>
-                {
-                    var callee = flowById[step.MacroFlowId!];
-                    return new MacroBindingContext
-                    {
-                        unitId = ResolveFlowUnitId(flow),
-                        callerFlowId = flow.Id ?? string.Empty,
-                        callerStepId = step.Id,
-                        calleeFlowId = callee.Id ?? string.Empty,
-                        portName = BuildMacroPortName(callee),
-                        variable = ResolveMacroPortVariable(callee)
-                    };
-                }))
-            .ToList();
+        if (matches.Count > 1)
+        {
+            throw new InvalidOperationException($"Duplicate MacroPort variable name for MacroStep {name}.");
+        }
+
+        if (matches.Count == 1 && !string.Equals(matches[0].Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"MacroStep {name} has variable with same name but format/dataType/structure is {matches[0].Format}, expected MacroPort.");
+        }
+
+        if (flow.MacroPortVariable is null && matches.Count == 1)
+        {
+            flow.MacroPortVariable = matches[0];
+        }
+
+        if (flow.MacroPortVariable is not null && !string.Equals(flow.MacroPortVariable.Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"MacroStep {name} macroPortVariable format is {flow.MacroPortVariable.Format}, expected MacroPort.");
+        }
     }
-
 
     private static DeviceVariable? ResolveMacroPortVariable(FlowInfo flow)
         => flow.MacroPortVariable;
-
-    private static void ValidateMacroPortVariables(IList<FlowInfo> flows, IList<DeviceVariable> variables)
-    {
-        foreach (var flow in flows.Where(flow => string.Equals(NormalizeDiagramType(flow), "MacroStep", StringComparison.OrdinalIgnoreCase)))
-        {
-            var name = flow.Name ?? flow.Id ?? string.Empty;
-            var matches = variables
-                .Where(variable => !string.IsNullOrWhiteSpace(variable.Label)
-                    && string.Equals(variable.Label, name, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (matches.Count > 1)
-            {
-                throw new InvalidOperationException($"Duplicate MacroPort variable name for MacroStep {name}.");
-            }
-
-            if (matches.Count == 1 && !string.Equals(matches[0].Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException($"MacroStep {name} has variable with same name but format/dataType/structure is {matches[0].Format}, expected MacroPort.");
-            }
-
-            if (flow.MacroPortVariable is null && matches.Count == 1)
-            {
-                flow.MacroPortVariable = matches[0];
-            }
-
-            if (flow.MacroPortVariable is not null && !string.Equals(flow.MacroPortVariable.Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException($"MacroStep {name} macroPortVariable format is {flow.MacroPortVariable.Format}, expected MacroPort.");
-            }
-        }
-    }
 
     private static string BuildMacroPortName(FlowInfo flow)
     {
