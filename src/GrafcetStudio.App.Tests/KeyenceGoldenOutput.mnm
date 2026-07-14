@@ -1,0 +1,40 @@
+; ORIGIN FLOWS
+; Flow: OriginFlow
+; Step  ()
+SET  MR2000
+LD   MR2000
+AND  MR101
+OUT  MR100
+LD   MR2000
+SET  MR2001
+
+; AUTO FLOWS
+; Flow: AutoFlow (Min: MR1000, Max: MR1002)
+; Step  ()
+SET  MR1000
+LD   MR1000
+AND  MR101
+OUT  MR100
+LD   MR1000
+AND  MR102
+SET  MR1001
+; Step  ()
+LD   MR1001
+AND  MR102
+SET  MR1002
+
+LD   MR1002
+SET  MR1003
+
+; DEVICE OUTPUTS
+; Device: Cylinder1 (Kind: cylinder, Address: MR10)
+; Command: Extend (Action: Extend, Target: MR100)
+LD   MR2
+AND  MR2000
+ANB  MR2001
+LD   MR0
+AND  MR1000
+ANB  MR1001
+ORL
+AND  MR101
+OUT  MR100
