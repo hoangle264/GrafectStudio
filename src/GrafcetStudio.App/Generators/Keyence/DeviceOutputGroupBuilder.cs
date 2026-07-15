@@ -71,9 +71,11 @@ internal static class DeviceOutputGroupBuilder
                         var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), unitAddresses);
                         var originCommandCount = flowCommands.Count(command => command.IsOrigin);
                         var autoCommandCount = flowCommands.Count(command => command.IsAuto);
-                        var sourceConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Select(command => command.conditionExpression), aggregationMode);
-                        var autoConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(command => command.conditionExpression), aggregationMode);
-                        var originConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(command => command.conditionExpression), aggregationMode);
+                        var getFlowCondition = new Func<DeviceCommandFlowOutput, string>(cmd =>
+                            ExpressionHelper.JoinAnd(new[] { cmd.modeFlagAddress, cmd.SourceExecuteBit, ExpressionHelper.NegateExpression(cmd.SourceDoneBit) }));
+                        var sourceConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Select(getFlowCondition), aggregationMode);
+                        var autoConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(getFlowCondition), aggregationMode);
+                        var originConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(getFlowCondition), aggregationMode);
                         var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
                         var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
                         var gatedSourceConditionExpression = !string.IsNullOrWhiteSpace(interlockExpression)
@@ -151,16 +153,8 @@ internal static class DeviceOutputGroupBuilder
                             FeedbackSignals = feedbackSignals,
                             output = outputIntent,
                             sources = flowCommands,
-                            conditionExpression = driveConditionExpression,
-                            sourceConditionExpression = sourceConditionExpression,
-                            autoConditionExpression = autoConditionExpression,
-                            originConditionExpression = originConditionExpression,
-                            manualConditionExpression = manualConditionExpression,
-                            interlockExpression = interlockExpression,
-                            driveConditionExpression = driveConditionExpression,
                             instruction = instruction,
                             target = physicalOutputRef,
-                            expression = expression,
                             mnemonic = mnemonic,
                             mnemonicLines = mnemonicLines
                         };
@@ -216,7 +210,7 @@ internal static class DeviceOutputGroupBuilder
                 var doneGuardExpression = ExpressionHelper.NegateExpression(source.SourceDoneBitRef);
                 var conditionExpression = ExpressionHelper.JoinAnd(new[] { modeFlagAddress, executeExpression, doneGuardExpression });
 
-                return new DeviceCommandFlowOutput
+                var flowOutput = new DeviceCommandFlowOutput
                 {
                     Id = source.FlowId,
                     Name = source.FlowName,
@@ -231,24 +225,23 @@ internal static class DeviceOutputGroupBuilder
                     actionSymbol = source.ActionSymbol ?? string.Empty,
                     qualifier = source.Qualifier ?? string.Empty,
                     modeFlagAddress = modeFlagAddress,
-                    executeExpression = executeExpression,
-                    doneGuardExpression = doneGuardExpression,
-                    conditionExpression = conditionExpression,
                     conditionMnemonic = string.Empty,
                     conditionMnemonicLines = new List<string>()
                 };
+                return new { FlowOutput = flowOutput, ConditionExpression = conditionExpression };
             })
-            .OrderBy(command => command.IsAuto)
-            .ThenBy(command => command.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(command => command.Id, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(command => command.CommandId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(command => command.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item.FlowOutput.IsAuto)
+            .ThenBy(item => item.FlowOutput.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.FlowOutput.Id, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.FlowOutput.CommandId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.FlowOutput.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return commands
-            .Select((command, index) =>
+            .Select((item, index) =>
             {
-                var conditionMnemonicLines = MnemonicEmitter.EmitConditionLines(command.conditionExpression, Array.Empty<DeviceVariable>());
+                var command = item.FlowOutput;
+                var conditionMnemonicLines = MnemonicEmitter.EmitConditionLines(item.ConditionExpression, Array.Empty<DeviceVariable>());
                 return new DeviceCommandFlowOutput
                 {
                     Id = command.Id,
@@ -264,9 +257,6 @@ internal static class DeviceOutputGroupBuilder
                     actionSymbol = command.actionSymbol,
                     qualifier = command.qualifier,
                     modeFlagAddress = command.modeFlagAddress,
-                    executeExpression = command.executeExpression,
-                    doneGuardExpression = command.doneGuardExpression,
-                    conditionExpression = command.conditionExpression,
                     conditionMnemonic = MnemonicEmitter.JoinMnemonicLines(conditionMnemonicLines),
                     conditionMnemonicLines = conditionMnemonicLines,
                     Index = index,

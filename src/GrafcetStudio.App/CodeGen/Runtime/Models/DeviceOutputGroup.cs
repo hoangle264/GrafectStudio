@@ -49,25 +49,9 @@ public class DeviceCommandOutput
 
     public IList<DeviceCommandFlowOutput> sources { get; init; } = new List<DeviceCommandFlowOutput>();
 
-    public string conditionExpression { get; init; } = string.Empty;
-
-    public string sourceConditionExpression { get; init; } = string.Empty;
-
-    public string autoConditionExpression { get; init; } = string.Empty;
-
-    public string originConditionExpression { get; init; } = string.Empty;
-
-    public string manualConditionExpression { get; init; } = string.Empty;
-
-    public string interlockExpression { get; init; } = string.Empty;
-
-    public string driveConditionExpression { get; init; } = string.Empty;
-
     public string instruction { get; init; } = string.Empty;
 
     public string target { get; init; } = string.Empty;
-
-    public string expression { get; init; } = string.Empty;
 
     public string mnemonic { get; init; } = string.Empty;
 
@@ -76,8 +60,6 @@ public class DeviceCommandOutput
     public string outputInstruction => instruction;
 
     public string outputTarget => target;
-
-    public string outputExpression => expression;
 }
 
 public class DeviceCommandFlowOutput
@@ -120,19 +102,11 @@ public class DeviceCommandFlowOutput
 
     public string modeFlagAddress { get; init; } = string.Empty;
 
-    public string executeExpression { get; init; } = string.Empty;
-
-    public string doneGuardExpression { get; init; } = string.Empty;
-
-    public string conditionExpression { get; init; } = string.Empty;
-
     public string conditionMnemonic { get; init; } = string.Empty;
 
     public IList<string> conditionMnemonicLines { get; init; } = new List<string>();
 
-    public string expression => conditionExpression;
-
-    public bool hasCondition => !string.IsNullOrWhiteSpace(conditionExpression);
+    public bool hasCondition => !string.IsNullOrWhiteSpace(conditionMnemonic);
 }
 
 public class DeviceOutputIntent

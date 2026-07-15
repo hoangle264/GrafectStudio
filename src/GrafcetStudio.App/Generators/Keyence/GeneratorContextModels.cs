@@ -9,8 +9,6 @@ internal sealed record GeneratorContext
     public ProjectInfo? project { get; init; }
     public UnitContext unit { get; init; } = new();
     public IList<DeviceContext> devices { get; init; } = new List<DeviceContext>();
-    public IList<ResolvedFlow> flows { get; init; } = new List<ResolvedFlow>();
-    public IList<FlowGroupContext> flowGroups { get; init; } = new List<FlowGroupContext>();
     public IList<ResolvedFlow> autoFlows { get; init; } = new List<ResolvedFlow>();
     public IList<ResolvedFlow> originFlows { get; init; } = new List<ResolvedFlow>();
     public IList<ResolvedFlow> macroFlows { get; init; } = new List<ResolvedFlow>();
@@ -54,15 +52,6 @@ internal sealed record DeviceSignalContext
     public string? address { get; init; }
 }
 
-internal sealed record FlowGroupContext
-{
-    public string key { get; init; } = string.Empty;
-    public string name { get; init; } = string.Empty;
-    public IList<ResolvedFlow> flows { get; init; } = new List<ResolvedFlow>();
-    public int count { get; init; }
-    public bool hasFlows { get; init; }
-    public bool isEmpty { get; init; }
-}
 
 internal sealed record MacroPortContext
 {

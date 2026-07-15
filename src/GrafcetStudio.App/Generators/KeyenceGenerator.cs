@@ -225,13 +225,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         var macroStepFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)).ToList();
         var autoFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
-        var flowGroups = new[]
-        {
-            BuildFlowGroup("auto", autoFlows),
-            BuildFlowGroup("origin", originFlows),
-            BuildFlowGroup("macro", macroFlows),
-            BuildFlowGroup("macroStep", macroStepFlows)
-        };
         var deviceTypesByName = payload.DeviceTypes.ToDictionaryIgnoreCase(d => d.Name);
         var devices = payload.Variables.Select(variable =>
         {
@@ -258,7 +251,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 }).ToList()
             };
         }).ToList();
-
         return new GeneratorContext
         {
             project = payload.Project,
@@ -271,17 +263,14 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
                 stepMaxAddress = unitStepRange.MaxAddress,
                 variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
-            devices,
-            flows = resolvedFlows,
-            flowGroups,
-            autoFlows,
-            originFlows,
-            macroFlows,
-            macroStepFlows,
-            macroBindings,
-            macroPorts,
-            //outputBindings,
-            deviceOutputGroups,
+            devices = devices,
+            autoFlows = autoFlows,
+            originFlows = originFlows,
+            macroFlows = macroFlows,
+            macroStepFlows = macroStepFlows,
+            macroBindings = macroBindings,
+            macroPorts = macroPorts,
+            deviceOutputGroups = deviceOutputGroups,
             warnings = Array.Empty<string>()
         };
     }
@@ -356,16 +345,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
         return new ResolvedFlowBuildResult(resolvedFlow, runtimePlan);
     }
-    private static FlowGroupContext BuildFlowGroup(string key, IList<ResolvedFlow> flows)
-        => new()
-        {
-            key = key,
-            name = key,
-            flows = flows,
-            count = flows.Count,
-            hasFlows = flows.Count > 0,
-            isEmpty = flows.Count == 0
-        };
 
     private sealed record ResolvedFlowBuildResult(ResolvedFlow Flow, DiagramRuntimePlan RuntimePlan);
 
