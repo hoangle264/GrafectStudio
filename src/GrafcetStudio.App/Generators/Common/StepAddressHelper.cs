@@ -3,12 +3,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GrafcetStudio.App.Generators.Keyence;
+namespace GrafcetStudio.App.Generators.Common;
 
 public record struct ParsedBoolBase(string Prefix, int Number, int Width);
 
 public record struct StepExecAddress(string Prefix, int Number, bool HasBit, int Bit, long SortValue);
 
+/// <summary>
+/// Helpers for computing step address ranges and formatting address strings.
+/// Platform-agnostic — does not depend on any Keyence-specific types.
+/// </summary>
 public static class StepAddressHelper
 {
     public static (string MinAddress, string MaxAddress, string SequenceEnd) BuildFlowStepAddressRange(FlowInfo flow)

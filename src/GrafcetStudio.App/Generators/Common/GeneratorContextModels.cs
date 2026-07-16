@@ -2,9 +2,9 @@ using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.Domain.Models;
 using System.Collections.Generic;
 
-namespace GrafcetStudio.App.Generators.Keyence;
+namespace GrafcetStudio.App.Generators.Common;
 
-internal sealed record GeneratorContext
+public sealed record GeneratorContext
 {
     public ProjectInfo? project { get; init; }
     public UnitContext unit { get; init; } = new();
@@ -19,7 +19,7 @@ internal sealed record GeneratorContext
     public IList<string> warnings { get; init; } = new List<string>();
 }
 
-internal sealed record UnitContext
+public sealed record UnitContext
 {
     public string id { get; init; } = string.Empty;
     public string label { get; init; } = string.Empty;
@@ -29,7 +29,7 @@ internal sealed record UnitContext
     public DeviceContext? variable { get; init; }
 }
 
-internal sealed record DeviceContext
+public sealed record DeviceContext
 {
     public string label { get; init; } = string.Empty;
     public string name { get; init; } = string.Empty;
@@ -42,7 +42,7 @@ internal sealed record DeviceContext
     public IList<DeviceSignalContext>? signals { get; init; }
 }
 
-internal sealed record DeviceSignalContext
+public sealed record DeviceSignalContext
 {
     public string id { get; init; } = string.Empty;
     public string name { get; init; } = string.Empty;
@@ -52,8 +52,7 @@ internal sealed record DeviceSignalContext
     public string? address { get; init; }
 }
 
-
-internal sealed record MacroPortContext
+public sealed record MacroPortContext
 {
     public string unitId { get; init; } = string.Empty;
     public string callerFlowId { get; init; } = string.Empty;
