@@ -111,6 +111,12 @@ public static class ExpressionHelper
     {
         var value = expression.Trim();
         if (string.IsNullOrWhiteSpace(value)) return false;
+
+        if (value.StartsWith("CMP(", StringComparison.OrdinalIgnoreCase) && value.EndsWith(")", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (value.Contains('&', StringComparison.Ordinal) || value.Contains('|', StringComparison.Ordinal) || value.Contains('(', StringComparison.Ordinal) || value.Contains(')', StringComparison.Ordinal) || value.Contains(' ', StringComparison.Ordinal))
         {
             return false;

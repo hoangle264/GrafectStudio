@@ -23,6 +23,23 @@ public class KeyenceMnemonicExpressionEmitterTests
         Assert.Equal(expected, lines);
     }
 
+    [Theory]
+    [InlineData("A^P", new[] { "LDP  A" })]
+    [InlineData("!A^F", new[] { "LDFB A" })]
+    [InlineData("A&B^P", new[] { "LD   A", "ANP  B" })]
+    [InlineData("A|B^F", new[] { "LD   A", "ORF  B" })]
+    [InlineData("!A^P & !B^F", new[] { "LDPB A", "ANFB B" })]
+    [InlineData("CMP(DM0, DM1, =)", new[] { "LD=  DM0 DM1" })]
+    [InlineData("!CMP(DM0, DM1, <>)", new[] { "LD<> DM0 DM1", "INV" })]
+    [InlineData("A & CMP(DM0, K100, >=)", new[] { "LD   A", "AND>= DM0 K100" })]
+    [InlineData("A^P | CMP(DM0, K100, <=)", new[] { "LDP  A", "OR<= DM0 K100" })]
+    public void EmitCondition_EdgeAndComparison_ReturnsExpectedMnemonic(string expression, string[] expected)
+    {
+        var lines = KeyenceMnemonicExpressionEmitter.EmitCondition(expression, Array.Empty<DeviceVariable>());
+
+        Assert.Equal(expected, lines);
+    }
+
     [Fact]
     public void EmitCondition_ResolvesOperandsThroughDeviceVariables()
     {

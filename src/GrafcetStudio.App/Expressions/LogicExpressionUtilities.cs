@@ -10,6 +10,24 @@ public static class LogicExpressionUtilities
             Negated = negated
         };
 
+    public static LogicExpression CreateEdgeTag(string tag, string qualifier, bool negated = false)
+        => new()
+        {
+            Type = "TAG",
+            Ref = tag,
+            Negated = negated,
+            Qualifier = qualifier
+        };
+
+    public static LogicExpression CreateCompare(string operand1, string operand2, string compareOp)
+        => new()
+        {
+            Type = "CMP",
+            Operand1 = operand1,
+            Operand2 = operand2,
+            CompareOp = compareOp
+        };
+
     public static LogicExpression CreateLogical(string nodeType, IEnumerable<LogicExpression> nodes)
         => new()
         {
@@ -29,7 +47,20 @@ public static class LogicExpressionUtilities
         var type = expression.Type?.Trim().ToUpperInvariant();
         return type switch
         {
-            "TAG" => CreateTag(expression.Ref ?? string.Empty, expression.Negated),
+            "TAG" => new LogicExpression
+            {
+                Type = "TAG",
+                Ref = expression.Ref,
+                Negated = expression.Negated,
+                Qualifier = expression.Qualifier
+            },
+            "CMP" => new LogicExpression
+            {
+                Type = "CMP",
+                Operand1 = expression.Operand1,
+                Operand2 = expression.Operand2,
+                CompareOp = expression.CompareOp
+            },
             "AND" => NormalizeLogical("AND", expression.Nodes),
             "OR" => NormalizeLogical("OR", expression.Nodes),
             "NOT" => NormalizeNot(expression.Node),
@@ -65,7 +96,13 @@ public static class LogicExpressionUtilities
 
         if (string.Equals(normalizedNode.Type, "TAG", StringComparison.OrdinalIgnoreCase))
         {
-            return CreateTag(normalizedNode.Ref ?? string.Empty, !normalizedNode.Negated);
+            return new LogicExpression
+            {
+                Type = "TAG",
+                Ref = normalizedNode.Ref ?? string.Empty,
+                Negated = !normalizedNode.Negated,
+                Qualifier = normalizedNode.Qualifier
+            };
         }
 
         return CreateNot(normalizedNode);

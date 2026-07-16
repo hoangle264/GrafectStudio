@@ -45,8 +45,45 @@ public static class LogicExpressionParser
              from operand in Sprache.Parse.Ref(() => unary)
              select LogicExpressionUtilities.CreateNot(operand))
             .Or(Sprache.Parse.Ref(() => primary));
+
+        var cmpOperand = Sprache.Parse
+            .Char(c => char.IsLetterOrDigit(c) || c is '_' or '.' or '@' or '#' or '-', "compare operand character")
+            .AtLeastOnce()
+            .Text()
+            .Token();
+
+        var compareOp = Sprache.Parse.String("<=").Text()
+            .Or(Sprache.Parse.String(">=").Text())
+            .Or(Sprache.Parse.String("<>").Text())
+            .Or(Sprache.Parse.String("<").Text())
+            .Or(Sprache.Parse.String(">").Text())
+            .Or(Sprache.Parse.String("=").Text())
+            .Token();
+
+        var cmpExpr =
+            from cmp in Sprache.Parse.String("CMP").Token()
+            from open in Sprache.Parse.Char('(').Token()
+            from op1 in cmpOperand
+            from comma1 in Sprache.Parse.Char(',').Token()
+            from op2 in cmpOperand
+            from comma2 in Sprache.Parse.Char(',').Token()
+            from op in compareOp
+            from close in Sprache.Parse.Char(')').Token()
+            select LogicExpressionUtilities.CreateCompare(op1, op2, op);
+
+        var edgeQualifier = Sprache.Parse.String("^P").Return("P")
+            .Or(Sprache.Parse.String("^F").Return("F"));
+
+        var edgeTag =
+            from tag in tagToken
+            from qual in edgeQualifier
+            select LogicExpressionUtilities.CreateEdgeTag(tag, qual);
+
         primary = Sprache.Parse.Ref(() => parenthesizedExpression)
+            .Or(cmpExpr)
+            .Or(edgeTag)
             .Or(tagToken.Select(tag => LogicExpressionUtilities.CreateTag(tag)));
+
         parenthesizedExpression =
             from open in Sprache.Parse.Char('(').Token()
             from expr in Sprache.Parse.Ref(() => orExpression)

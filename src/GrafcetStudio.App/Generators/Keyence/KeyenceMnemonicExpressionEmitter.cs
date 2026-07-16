@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.App.Expressions;
+using GrafcetStudio.App.Expressions;
 using GrafcetStudio.Domain.Models;
 using Sprache;
 using System;
@@ -156,6 +156,71 @@ public static class KeyenceMnemonicExpressionEmitter
         KeyenceMnemonicInstructionEmitter.AppendLine(sb, instruction, padInstructionTarget);
     }
 
+    private enum EmitPosition
+    {
+        Load,
+        And,
+        Or
+    }
+
+    private static string SelectContactMnemonic(EmitPosition position, bool negated, string? qualifier)
+    {
+        var isP = string.Equals(qualifier, "P", StringComparison.OrdinalIgnoreCase);
+        var isF = string.Equals(qualifier, "F", StringComparison.OrdinalIgnoreCase);
+
+        return position switch
+        {
+            EmitPosition.Load => (isP, isF, negated) switch
+            {
+                (true, false, false) => "LDP",
+                (true, false, true) => "LDPB",
+                (false, true, false) => "LDF",
+                (false, true, true) => "LDFB",
+                (false, false, true) => "LDB",
+                _ => "LD"
+            },
+            EmitPosition.And => (isP, isF, negated) switch
+            {
+                (true, false, false) => "ANP",
+                (true, false, true) => "ANPB",
+                (false, true, false) => "ANF",
+                (false, true, true) => "ANFB",
+                (false, false, true) => "ANB",
+                _ => "AND"
+            },
+            EmitPosition.Or => (isP, isF, negated) switch
+            {
+                (true, false, false) => "ORP",
+                (true, false, true) => "ORPB",
+                (false, true, false) => "ORF",
+                (false, true, true) => "ORFB",
+                (false, false, true) => "ORB",
+                _ => "OR"
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(position), position, null)
+        };
+    }
+
+    private static void EmitCompareAsLoadedResult(
+        LogicExpression expression,
+        ICollection<string> lines,
+        Func<string, string> resolveOperand,
+        KeyenceExpressionEmitOptions options)
+    {
+        var op = expression.CompareOp;
+        var op1 = ResolveCmpOperand(expression.Operand1 ?? string.Empty, resolveOperand);
+        var op2 = ResolveCmpOperand(expression.Operand2 ?? string.Empty, resolveOperand);
+        var mnemonic = $"LD{op}";
+        AddOperandLine(lines, mnemonic, $"{op1} {op2}", options);
+    }
+
+    private static string ResolveCmpOperand(string operand, Func<string, string> resolveOperand)
+    {
+        if (string.IsNullOrWhiteSpace(operand)) return string.Empty;
+        var resolved = resolveOperand(operand);
+        return string.IsNullOrWhiteSpace(resolved) ? operand : resolved;
+    }
+
     private static void EmitAsLoadedResult(
         LogicExpression expression,
         ICollection<string> lines,
@@ -164,14 +229,19 @@ public static class KeyenceMnemonicExpressionEmitter
     {
         expression = expression.Normalize();
 
-        if (TryGetTag(expression, out var tag, out var negated))
+        if (TryGetTag(expression, out var tag, out var negated, out var qualifier))
         {
-            AddOperandLine(lines, negated ? "LDB" : "LD", ResolveOperand(tag, resolveOperand), options);
+            var mnemonic = SelectContactMnemonic(EmitPosition.Load, negated, qualifier);
+            AddOperandLine(lines, mnemonic, ResolveOperand(tag, resolveOperand), options);
             return;
         }
 
         switch (GetNodeType(expression))
         {
+            case "CMP":
+                EmitCompareAsLoadedResult(expression, lines, resolveOperand, options);
+                return;
+
             case "AND":
                 EmitConjunctionAsLoadedResult(expression, lines, resolveOperand, options);
                 return;
@@ -203,9 +273,20 @@ public static class KeyenceMnemonicExpressionEmitter
     {
         expression = expression.Normalize();
 
-        if (TryGetTag(expression, out var tag, out var negated))
+        if (TryGetTag(expression, out var tag, out var negated, out var qualifier))
         {
-            AddOperandLine(lines, negated ? "ANB" : "AND", ResolveOperand(tag, resolveOperand), options);
+            var mnemonic = SelectContactMnemonic(EmitPosition.And, negated, qualifier);
+            AddOperandLine(lines, mnemonic, ResolveOperand(tag, resolveOperand), options);
+            return;
+        }
+
+        if (GetNodeType(expression) == "CMP")
+        {
+            var op = expression.CompareOp;
+            var op1 = ResolveCmpOperand(expression.Operand1 ?? string.Empty, resolveOperand);
+            var op2 = ResolveCmpOperand(expression.Operand2 ?? string.Empty, resolveOperand);
+            var mnemonic = $"AND{op}";
+            AddOperandLine(lines, mnemonic, $"{op1} {op2}", options);
             return;
         }
 
@@ -231,9 +312,20 @@ public static class KeyenceMnemonicExpressionEmitter
     {
         expression = expression.Normalize();
 
-        if (TryGetTag(expression, out var tag, out var negated))
+        if (TryGetTag(expression, out var tag, out var negated, out var qualifier))
         {
-            AddOperandLine(lines, negated ? "ORB" : "OR", ResolveOperand(tag, resolveOperand), options);
+            var mnemonic = SelectContactMnemonic(EmitPosition.Or, negated, qualifier);
+            AddOperandLine(lines, mnemonic, ResolveOperand(tag, resolveOperand), options);
+            return;
+        }
+
+        if (GetNodeType(expression) == "CMP")
+        {
+            var op = expression.CompareOp;
+            var op1 = ResolveCmpOperand(expression.Operand1 ?? string.Empty, resolveOperand);
+            var op2 = ResolveCmpOperand(expression.Operand2 ?? string.Empty, resolveOperand);
+            var mnemonic = $"OR{op}";
+            AddOperandLine(lines, mnemonic, $"{op1} {op2}", options);
             return;
         }
 
@@ -291,12 +383,13 @@ public static class KeyenceMnemonicExpressionEmitter
         return expression.Nodes;
     }
 
-    private static bool TryGetTag(LogicExpression expression, out string tag, out bool negated)
+    private static bool TryGetTag(LogicExpression expression, out string tag, out bool negated, out string? qualifier)
     {
         if (GetNodeType(expression) == "TAG")
         {
             tag = expression.Ref ?? string.Empty;
             negated = expression.Negated;
+            qualifier = expression.Qualifier;
             return true;
         }
 
@@ -304,11 +397,13 @@ public static class KeyenceMnemonicExpressionEmitter
         {
             tag = expression.Node.Ref ?? string.Empty;
             negated = !expression.Node.Negated;
+            qualifier = expression.Node.Qualifier;
             return true;
         }
 
         tag = string.Empty;
         negated = false;
+        qualifier = null;
         return false;
     }
 
@@ -334,5 +429,5 @@ public static class KeyenceMnemonicExpressionEmitter
         => expression.Type?.Trim().ToUpperInvariant() ?? string.Empty;
 
     private static NotSupportedException UnsupportedNode(LogicExpression expression)
-        => new($"Unsupported Keyence expression node '{expression.Type}'. Supported nodes: TAG, AND, OR, NOT.");
+        => new($"Unsupported Keyence expression node '{expression.Type}'. Supported nodes: TAG, AND, OR, NOT, CMP.");
 }
