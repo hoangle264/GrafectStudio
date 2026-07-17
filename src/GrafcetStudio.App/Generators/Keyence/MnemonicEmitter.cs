@@ -14,7 +14,7 @@ public static class MnemonicEmitter
     {
         if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return new List<string>();
 
-        var keyenceInstruction = ToInstruction(instruction, target);
+        var keyenceInstruction = ToInstruction(instruction, target, vars);
         if (keyenceInstruction is null) return new List<string>();
 
         if (string.IsNullOrWhiteSpace(condition))
@@ -46,18 +46,69 @@ public static class MnemonicEmitter
         }
     }
 
-    public static KeyenceInstruction? ToInstruction(string instruction, string target)
+    public static KeyenceInstruction? ToInstruction(string instruction, string target, IList<DeviceVariable> vars)
     {
         if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return null;
 
+        var resolvedTarget = AddressResolver.Resolve(target, vars.ToList());
         return instruction.Trim().ToUpperInvariant() switch
         {
-            "OUT" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Out, target),
-            "SET" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Set, target),
-            "RST" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Rst, target),
-            "RES" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Res, target),
+            "OUT" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Out, resolvedTarget),
+            "SET" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Set, resolvedTarget),
+            "RST" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Rst, resolvedTarget),
+            "RES" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Res, resolvedTarget),
             _ => null
         };
+    }
+
+    public static string ConvertPseudoExpressions(string rendered, IList<DeviceVariable> vars)
+    {
+        if (string.IsNullOrWhiteSpace(rendered)) return rendered;
+
+        var lines = rendered.Replace("\r", string.Empty).Split('\n');
+        var output = new List<string>(lines.Length);
+
+        foreach (var rawLine in lines)
+        {
+            if (TryConvertPseudoExpressionLine(rawLine, vars, out var mnemonicLines))
+            {
+                output.AddRange(mnemonicLines);
+                continue;
+            }
+
+            output.Add(rawLine);
+        }
+
+        return string.Join(Environment.NewLine, output);
+    }
+
+    public static bool TryConvertPseudoExpressionLine(string? rawLine, IList<DeviceVariable> vars, out IList<string> mnemonicLines)
+    {
+        mnemonicLines = new List<string>();
+        if (string.IsNullOrWhiteSpace(rawLine)) return false;
+
+        var trimmed = System.Net.WebUtility.HtmlDecode(rawLine).Trim();
+        if (trimmed.StartsWith(";", StringComparison.Ordinal) || !trimmed.Contains("->", StringComparison.Ordinal)) return false;
+
+        var arrowIndex = trimmed.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex < 0 || arrowIndex >= trimmed.Length - 2) return false;
+
+        var condition = trimmed[..arrowIndex].Trim();
+        var instructionPart = trimmed[(arrowIndex + 2)..].Trim();
+        var instructionSplit = instructionPart.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+        if (instructionSplit.Length < 2) return false;
+
+        var instruction = instructionSplit[0].Trim();
+        var target = instructionSplit[1].Trim();
+        if (string.IsNullOrWhiteSpace(instruction)
+            || string.IsNullOrWhiteSpace(target)
+            || target.Contains("->", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        mnemonicLines = EmitRungLines(condition, instruction, target, vars);
+        return mnemonicLines.Count > 0;
     }
 
     public static string JoinMnemonicLines(IEnumerable<string> lines)

@@ -28,6 +28,21 @@ public class ResolvedStep
 
     public string StepLabel => Step.Label;
 
+    /// <summary>Lowercase alias for <see cref="StepId"/>. Used by Handlebars templates via <c>{{id}}</c>.</summary>
+    public string id => Step.Id;
+
+    /// <summary>Lowercase alias for <see cref="StepNumber"/>. Used by Handlebars templates via <c>{{number}}</c>.</summary>
+    public int number => Step.Number;
+
+    /// <summary>Lowercase alias for <see cref="StepLabel"/>. Used by Handlebars templates via <c>{{label}}</c>.</summary>
+    public string label => Step.Label;
+
+    /// <summary>Lowercase alias for <see cref="ExecAddress"/>. Used by Handlebars templates via <c>{{execAddress}}</c>.</summary>
+    public string? execAddress => Step.ExecAddress;
+
+    /// <summary>Lowercase alias for <see cref="DoneAddress"/>. Used by Handlebars templates via <c>{{doneAddress}}</c>.</summary>
+    public string? doneAddress => Step.DoneAddress;
+
     public bool IsInitial => Step.IsInitial;
 
     public string? ExecAddress => Step.ExecAddress;
@@ -43,6 +58,9 @@ public class ResolvedStep
     public MacroBindingContext? MacroBinding { get; init; }
 
     public string MacroPortName => MacroBinding?.portName ?? string.Empty;
+
+    /// <summary>Lowercase alias for <see cref="Actions"/>. Used by Handlebars templates via <c>{{#each actions}}</c>.</summary>
+    public IList<StepAction> actions => Step.Actions;
 
     public IList<StepAction> Actions => Step.Actions;
 

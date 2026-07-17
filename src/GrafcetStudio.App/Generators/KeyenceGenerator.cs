@@ -70,7 +70,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
 
         var rendered = string.Join(Environment.NewLine, renderedSections);
         return RenderedOutputLooksExpressionBased(rendered)
-            ? ConvertRenderedPseudoExpressionToMnemonic(rendered, payload.Variables)
+            ? Keyence.MnemonicEmitter.ConvertPseudoExpressions(rendered, payload.Variables)
             : rendered;
     }
 
@@ -79,56 +79,6 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         => !string.IsNullOrWhiteSpace(rendered)
             && (rendered.Contains("->", StringComparison.Ordinal)
                 || rendered.Contains("-&gt;", StringComparison.OrdinalIgnoreCase));
-
-    private static string ConvertRenderedPseudoExpressionToMnemonic(string rendered, IList<DeviceVariable> vars)
-    {
-        if (string.IsNullOrWhiteSpace(rendered)) return rendered;
-
-        var lines = rendered.Replace("\r", string.Empty).Split('\n');
-        var output = new List<string>(lines.Length);
-
-        foreach (var rawLine in lines)
-        {
-            if (TryConvertPseudoExpressionLine(rawLine, vars, out var mnemonicLines))
-            {
-                output.AddRange(mnemonicLines);
-                continue;
-            }
-
-            output.Add(rawLine);
-        }
-
-        return string.Join(Environment.NewLine, output);
-    }
-
-    private static bool TryConvertPseudoExpressionLine(string? rawLine, IList<DeviceVariable> vars, out IList<string> mnemonicLines)
-    {
-        mnemonicLines = new List<string>();
-        if (string.IsNullOrWhiteSpace(rawLine)) return false;
-
-        var trimmed = System.Net.WebUtility.HtmlDecode(rawLine).Trim();
-        if (trimmed.StartsWith(";", StringComparison.Ordinal) || !trimmed.Contains("->", StringComparison.Ordinal)) return false;
-
-        var arrowIndex = trimmed.IndexOf("->", StringComparison.Ordinal);
-        if (arrowIndex < 0 || arrowIndex >= trimmed.Length - 2) return false;
-
-        var condition = trimmed[..arrowIndex].Trim();
-        var instructionPart = trimmed[(arrowIndex + 2)..].Trim();
-        var instructionSplit = instructionPart.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
-        if (instructionSplit.Length < 2) return false;
-
-        var instruction = instructionSplit[0].Trim();
-        var target = instructionSplit[1].Trim();
-        if (string.IsNullOrWhiteSpace(instruction)
-            || string.IsNullOrWhiteSpace(target)
-            || target.Contains("->", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        mnemonicLines = MnemonicEmitter.EmitRungLines(condition, instruction, target, vars);
-        return mnemonicLines.Count > 0;
-    }
     private IEnumerable<string> ResolveSectionTemplateNames()
     {
         if (_templates.IsTemplateLoaded("uc.main"))

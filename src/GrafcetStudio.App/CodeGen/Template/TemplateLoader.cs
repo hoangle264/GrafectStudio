@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace GrafcetStudio.CodeGen.Template;
@@ -54,7 +54,8 @@ public static class TemplateLoader
             (Filename: "origin.hbs", Id: "uc.origin", IsPartial: false),
             (Filename: "main-output.hbs", Id: "uc.mainOutput", IsPartial: false),
             (Filename: "output.hbs", Id: "uc.outputLegacy", IsPartial: false),
-            (Filename: "step-body.hbs", Id: "uc.stepBody", IsPartial: true)
+            (Filename: "step-body.hbs", Id: "uc.stepBody", IsPartial: true),
+            (Filename: "MapIO.hbs", Id: "uc.mapIo", IsPartial: false)
         };
 
         foreach (var item in mapping)

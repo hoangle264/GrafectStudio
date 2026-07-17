@@ -24,6 +24,129 @@ public class GeneratorSmokeTests
     }
 
     [Fact]
+    public void CodeGeneratorService_RendersMapIOTemplate_FromMnmFile()
+    {
+        var handlebars = Handlebars.Create();
+        var templateManager = new TemplateManager(handlebars);
+        
+        templateManager.RegisterTemplates(new List<TemplateEntry>
+        {
+            new()
+            {
+                Id = "simple.MapIO",
+                Name = "MapIO.hbs",
+                Content = "; IO {{#each ioMap}}{{this.name}} => {{this.address}}{{/each}}",
+                IsPartial = false
+            }
+        });
+
+        var mapIoGenerator = new MapIOGenerator();
+        var keyenceGenerator = new KeyenceGenerator(templateManager, new SequenceResolver());
+        var multiFileGenerator = new MultiFileGenerator(
+            keyenceGenerator,
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator(),
+            mapIoGenerator
+        );
+
+        var service = new CodeGeneratorService(new[] { multiFileGenerator }, templateManager);
+
+        var payload = BuildPayload();
+        payload.TemplateProfile = "simple";
+        payload.IOMapping = new GrafcetStudio.Domain.Models.IOMapping
+        {
+            PhysicalIOs = new List<GrafcetStudio.Domain.Models.PhysicalIO>
+            {
+                new() { Id = "io-1", PlcAddress = "X000" }
+            },
+            Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
+            {
+                new() { PhysicalIOId = "io-1", AppVariable = "Var1" }
+            }
+        };
+
+        var output = service.Generate("Keyence", payload);
+        var ioMappingFile = output.Files.FirstOrDefault(f => f.Path == "Devices/IOMapping.mnm");
+        Assert.NotNull(ioMappingFile);
+        Assert.Contains("; IO Var1 => X000", ioMappingFile.Content);
+    }
+
+    [Fact]
+    public void CodeGeneratorService_CompilesExpressionsAndNegatedInputs_EndToEnd()
+    {
+        var handlebars = Handlebars.Create();
+        var templateManager = new TemplateManager(handlebars);
+        
+        templateManager.RegisterTemplates(new List<TemplateEntry>
+        {
+            new()
+            {
+                Id = "simple.MapIO",
+                Name = "MapIO.hbs",
+                Content = "{{#each ioMap}}{{#if (eq this.direction \"Output\")}}{{this.name}} -> OUT {{this.address}}\n{{else}}{{this.address}} -> OUT {{this.name}}\n{{/if}}{{/each}}",
+                IsPartial = false
+            }
+        });
+
+        var mapIoGenerator = new MapIOGenerator();
+        var keyenceGenerator = new KeyenceGenerator(templateManager, new SequenceResolver());
+        var multiFileGenerator = new MultiFileGenerator(
+            keyenceGenerator,
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator(),
+            mapIoGenerator
+        );
+
+        var service = new CodeGeneratorService(new[] { multiFileGenerator }, templateManager);
+
+        var payload = BuildPayload();
+        payload.TemplateProfile = "simple";
+        payload.Variables = new List<GrafcetStudio.Domain.Models.DeviceVariable>
+        {
+            new() { Label = "MyVarOne", Address = "MR100" },
+            new() { Label = "MyVarTwo", Address = "MR101" }
+        };
+        payload.IOMapping = new GrafcetStudio.Domain.Models.IOMapping
+        {
+            PhysicalIOs = new List<GrafcetStudio.Domain.Models.PhysicalIO>
+            {
+                new() { Id = "io-out", PlcAddress = "Y000", Direction = "Output" },
+                new() { Id = "io-in-neg", PlcAddress = "!X000", Direction = "Input" },
+                new() { Id = "io-out-fallback", PlcAddress = "Y001" },
+                new() { Id = "io-in-fallback", PlcAddress = "X001" }
+            },
+            Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
+            {
+                new() { PhysicalIOId = "io-out", AppVariable = "MyVarOne & !MyVarTwo" },
+                new() { PhysicalIOId = "io-in-neg", AppVariable = "MyVarOne" },
+                new() { PhysicalIOId = "io-out-fallback", AppVariable = "MyVarOne" },
+                new() { PhysicalIOId = "io-in-fallback", AppVariable = "MyVarOne" }
+            }
+        };
+
+        var output = service.Generate("Keyence", payload);
+        var ioMappingFile = output.Files.FirstOrDefault(f => f.Path == "Devices/IOMapping.mnm");
+        Assert.NotNull(ioMappingFile);
+        
+        var content = ioMappingFile.Content;
+
+        Assert.Contains("LD   MR100", content);
+        Assert.Contains("ANB  MR101", content);
+        Assert.Contains("OUT  Y000", content);
+
+        Assert.Contains("LDB  X000", content);
+        Assert.Contains("OUT  MR100", content);
+
+        Assert.Contains("LD   MR100", content);
+        Assert.Contains("OUT  Y001", content);
+
+        Assert.Contains("LD   X001", content);
+        Assert.Contains("OUT  MR100", content);
+    }
+
+    [Fact]
     public void ErrorGenerator_ReturnsErrorsArray()
     {
         var generator = new ErrorGenerator();
@@ -105,7 +228,7 @@ public class GeneratorSmokeTests
             payload.TemplateRootPath = templateRoot;
             payload.Unit = new UnitInfo { Id = "unit-1", Name = "Main Unit", Label = "MainUnit" };
 
-            var file = Assert.Single(new SiemensLadDslGenerator().GenerateFiles(payload));
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
 
             Assert.Equal("MainUnit_CustomOverride_LAD.xml", file.Path);
             Assert.Contains("SW.Blocks.FC", file.Content);
@@ -235,7 +358,7 @@ public class GeneratorSmokeTests
                 }
             };
 
-            var file = Assert.Single(new SiemensLadDslGenerator().GenerateFiles(payload));
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
 
             Assert.Equal("MainUnit_Repeat_LAD.xml", file.Path);
             Assert.Equal(6, CountOccurrences(file.Content, "<SW.Blocks.CompileUnit"));
@@ -279,7 +402,7 @@ public class GeneratorSmokeTests
             var payload = BuildPayload();
             payload.TemplateRootPath = templateRoot;
 
-            var file = Assert.Single(new SiemensLadDslGenerator().GenerateFiles(payload));
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
 
             Assert.Equal("Main_SetReset_LAD.xml", file.Path);
             Assert.Contains("SetDone", file.Content);
@@ -332,7 +455,7 @@ public class GeneratorSmokeTests
             var payload = BuildPayload();
             payload.TemplateRootPath = templateRoot;
 
-            var ex = Assert.Throws<FileNotFoundException>(() => new SiemensLadDslGenerator().GenerateFiles(payload).ToList());
+            var ex = Assert.Throws<FileNotFoundException>(() => new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload).ToList());
             Assert.Contains("Cannot find Siemens LAD HBS text template", ex.Message);
             Assert.Contains("siemens-lad.hbs", ex.Message);
             Assert.Contains("default.lad.hbs", ex.Message);
@@ -369,7 +492,7 @@ public class GeneratorSmokeTests
             var payload = BuildPayload();
             payload.TemplateRootPath = templateRoot;
 
-            var ex = Assert.Throws<InvalidOperationException>(() => new SiemensLadDslGenerator().GenerateFiles(payload).ToList());
+            var ex = Assert.Throws<InvalidOperationException>(() => new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload).ToList());
             Assert.Contains("Network 'timer'", ex.Message);
             Assert.Contains("instruction 'TON'", ex.Message);
             Assert.Contains("XML generation is not implemented yet", ex.Message);

@@ -1,5 +1,7 @@
 using GrafcetStudio.Domain.Models;
 using GrafcetStudio.App.Expressions;
+using GrafcetStudio.App.Generators.Common;
+using GrafcetStudio.Domain.Resolution;
 using HandlebarsDotNet;
 using SimaticML.API;
 using SimaticML.Blocks;
@@ -30,6 +32,13 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
     //}
     private const string DefaultTemplatePath = "templates/siemens-lad/default.lad.hbs";
 
+    private readonly ISequenceResolver _sequenceResolver;
+
+    public SiemensLadDslGenerator(ISequenceResolver sequenceResolver)
+    {
+        _sequenceResolver = sequenceResolver;
+    }
+
     public string Platform => "siemens-lad";
 
     public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
@@ -43,7 +52,8 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         foreach (var unit in units)
         {
             var unitPayload = CloneForUnit(payload, unit);
-            var template = LoadTemplate(payload.TemplateRootPath, unitPayload);
+            var context = GeneratorContextBuilder.Build(unitPayload, _sequenceResolver);
+            var template = LoadTemplate(payload.TemplateRootPath, context);
             var document = BuildDocument(template);
             yield return new CodegenFile
             {
@@ -181,7 +191,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         };
     }
 
-    private static SiemensLadTemplate LoadTemplate(string? templateRootPath, CodegenPayload payload)
+    private static SiemensLadTemplate LoadTemplate(string? templateRootPath, GeneratorContext context)
     {
         var candidates = BuildTemplateCandidates(templateRootPath).ToList();
         var path = candidates.FirstOrDefault(File.Exists)
@@ -193,13 +203,9 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         }
 
         var source = File.ReadAllText(path);
-        //SiemensLadDebugLog("LoadTemplate path=" + path + ", flows=" + payload.Flows.Count + ", units=" + payload.Units.Count);
-        //SiemensLadDebugLog("Flow address summary: " + BuildFlowAddressSummary(payload));
-        var rendered = RenderTemplateSource(source, payload, path);
+        var rendered = RenderTemplateSource(source, context, path);
         var networkCount = rendered.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
             .Count(line => line.TrimStart().StartsWith("NETWORK ", StringComparison.OrdinalIgnoreCase));
-        //SiemensLadDebugLog("Rendered template networkCount=" + networkCount + ", renderedLength=" + rendered.Length + ", preview=" + rendered.Substring(0, Math.Min(600, rendered.Length)).Replace(Environment.NewLine, " "));
-        //SiemensLadDebugLog("Rendered network diagnostics:" + Environment.NewLine + BuildRenderedNetworkDiagnostics(rendered));
         return SiemensLadTextTemplateParser.Parse(rendered, path);
     }
 
@@ -266,11 +272,11 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
     private static string QuoteForLog(string? value)
         => value is null ? "<null>" : '"' + value.Replace("\r", "\\r").Replace("\n", "\\n") + '"';
 
-    private static string RenderTemplateSource(string source, CodegenPayload payload, string path)
+    private static string RenderTemplateSource(string source, GeneratorContext context, string path)
     {
         try
         {
-            return Handlebars.Compile(source)(payload);
+            return Handlebars.Compile(source)(context);
         }
         catch (Exception ex)
         {

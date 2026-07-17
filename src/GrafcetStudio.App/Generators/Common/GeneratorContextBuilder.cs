@@ -94,6 +94,7 @@ public static class GeneratorContextBuilder
                 variable = devices.FirstOrDefault(d => d.name.Contains(unitLabel, StringComparison.OrdinalIgnoreCase))
             },
             devices = devices,
+            flows = resolvedFlows,
             autoFlows = autoFlows,
             originFlows = originFlows,
             macroFlows = macroFlows,

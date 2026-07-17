@@ -1,6 +1,6 @@
 ; ORIGIN FLOWS
 ; Flow: OriginFlow
-; Step  ()
+; Step 10 (OriginStep)
 SET  MR2000
 LD   MR2000
 AND  MR101
@@ -10,7 +10,7 @@ SET  MR2001
 
 ; AUTO FLOWS
 ; Flow: AutoFlow (Min: MR1000, Max: MR1002)
-; Step  ()
+; Step 1 (Step1)
 SET  MR1000
 LD   MR1000
 AND  MR101
@@ -18,7 +18,7 @@ OUT  MR100
 LD   MR1000
 AND  MR102
 SET  MR1001
-; Step  ()
+; Step 2 (Step2)
 LD   MR1001
 AND  MR102
 SET  MR1002
