@@ -14,7 +14,34 @@ public interface ISystemControlGenerator
 
 public sealed class SystemControlGenerator : ISystemControlGenerator
 {
+    private const string SystemControlFormat = "SystemControl";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    /// <summary>
+    /// Finds the single SystemControl struct variable in the payload and maps it.
+    /// If none found, returns an empty SystemControlInfo (empty signalAddresses).
+    /// </summary>
+    private static SystemControlInfo MapSystemControl(IList<DeviceVariable>? variables)
+    {
+        if (variables == null || variables.Count == 0)
+            return new SystemControlInfo();
+
+        var found = variables.FirstOrDefault(v =>
+            string.Equals(v.Format, SystemControlFormat, StringComparison.OrdinalIgnoreCase));
+
+        return new SystemControlInfo
+        {
+            Label = found?.Label ?? string.Empty,
+            SignalAddresses = found?.SignalAddresses ?? new Dictionary<string, string>()
+        };
+    }
+
+    private static object MapUnitBasic(UnitInfo u) => new
+    {
+        id = u.Id,
+        name = u.Name,
+        label = u.Label
+    };
 
     public string GenerateOrchestrator(CodegenPayload payload)
     {
@@ -32,7 +59,8 @@ public sealed class SystemControlGenerator : ISystemControlGenerator
         var content = new
         {
             project = payload.Project,
-            unit = payload.Unit,
+            system = MapSystemControl(payload.Variables),
+            units = (payload.Units ?? new List<UnitInfo>()).Select(MapUnitBasic).ToList(),
             orchestratorFlows,
             phase = 1,
             skeleton = true
@@ -46,9 +74,8 @@ public sealed class SystemControlGenerator : ISystemControlGenerator
         var content = new
         {
             project = payload.Project,
-            unit = payload.Unit,
-            units = payload.Units ?? new List<UnitInfo>(),
-            flows = payload.Flows ?? new List<FlowInfo>()
+            system = MapSystemControl(payload.Variables),
+            units = (payload.Units ?? new List<UnitInfo>()).Select(MapUnitBasic).ToList()
         };
 
         return JsonSerializer.Serialize(content, JsonOptions);

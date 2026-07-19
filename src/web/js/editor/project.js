@@ -77,15 +77,24 @@ function renderStructPanel(devId) {
   const dev = (project.devices||[]).find(d=>d.id===devId);
   const title = document.getElementById('struct-panel-title');
   const edit = document.getElementById('struct-panel-edit');
+  const exportBtn = document.getElementById('struct-panel-export');
+  const importBtn = document.getElementById('struct-panel-import');
   const body = document.getElementById('struct-panel-body');
   if(!body) return;
   if(!dev) {
     if(title) title.textContent = 'STRUCTURE';
+    if(exportBtn) exportBtn.style.display = 'none';
+    if(importBtn) importBtn.style.display = 'none';
     body.innerHTML = '<div class="vt-empty">Struct data not found</div>';
     return;
   }
   if(title) title.textContent = 'STRUCTURE: ' + dev.name;
   if(edit) edit.setAttribute('onclick', "openDeviceTypeModal('"+dev.id+"')");
+  if(exportBtn) {
+    exportBtn.style.display = '';
+    exportBtn.setAttribute('onclick', "exportStructData('"+dev.id+"')");
+  }
+  if(importBtn) importBtn.style.display = '';
   const rows = (dev.signals||[]).map(sig=>`
     <tr>
       <td>${esc2(sig.name||'')}</td>

@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Models;
 using System.Linq;
 using System.Text.Json;
 
@@ -27,6 +27,18 @@ public sealed class ErrorGenerator : IErrorGenerator
             })
             .ToList();
 
-        return JsonSerializer.Serialize(new { errors }, JsonOptions);
+        var devices = (payload.Variables ?? Enumerable.Empty<DeviceVariable>())
+            .Select(v => new
+            {
+                name = v.Label,
+                label = v.Label,
+                type = v.Format,
+                format = v.Format,
+                address = v.Address,
+                signalAddresses = v.SignalAddresses
+            })
+            .ToList();
+
+        return JsonSerializer.Serialize(new { errors, devices }, JsonOptions);
     }
 }

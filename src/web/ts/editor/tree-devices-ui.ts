@@ -407,5 +407,63 @@ function removeDeviceSignal(devId: string, sigId: string, e?: Event): void {
   saveProject(); renderTree();
 }
 
+// -- Struct JSON Export / Import --------------------------------
 
+function exportStructData(devId: string): void {
+  const dev = (project.devices || []).find(d => d.id === devId);
+  if (!dev) { toast('Struct data not found'); return; }
+  const payload = {
+    exportedFrom: 'GrafectStudio',
+    version: 1,
+    struct: dev
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (dev.name || 'struct') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Exported: ' + dev.name);
+}
 
+function triggerStructImport(): void {
+  const input = document.getElementById('struct-import-input') as HTMLInputElement | null;
+  if (input) { input.value = ''; input.click(); }
+}
+
+function handleStructImport(event: Event): void {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target?.result as string);
+      // Support both wrapped format { struct: {...} } and raw device object
+      const incoming = data.struct || data;
+      if (!incoming || typeof incoming !== 'object' || !incoming.name) {
+        alert('Invalid struct JSON: missing "name" field.'); return;
+      }
+      if (!project.devices) project.devices = [];
+      const existingIdx = project.devices.findIndex(d => d.name === incoming.name);
+      if (existingIdx >= 0) {
+        // Same name → replace, keep existing id
+        const keepId = project.devices[existingIdx].id;
+        project.devices[existingIdx] = { ...incoming, id: keepId };
+      } else {
+        // New name → add
+        project.devices.push({ ...incoming, id: 'dev-' + Date.now() });
+      }
+      saveProject();
+      renderTree();
+      const devAfter = project.devices.find(d => d.name === incoming.name);
+      if (devAfter && typeof openStructTab === 'function') (openStructTab as Function)(devAfter.id);
+      toast('Imported struct: ' + incoming.name);
+    } catch (err) {
+      alert('Failed to parse JSON: ' + (err as Error).message);
+    }
+  };
+  reader.readAsText(file);
+}

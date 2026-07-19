@@ -153,6 +153,7 @@ public class GeneratorSmokeTests
         var payload = BuildPayload();
         var output = generator.Generate(payload);
         Assert.Contains("\"errors\"", output);
+        Assert.Contains("\"devices\"", output);
     }
 
     [Fact]
@@ -162,14 +163,93 @@ public class GeneratorSmokeTests
         var payload = BuildPayload();
         var output = generator.Generate(payload);
         Assert.Contains("deviceTypes", output);
+        Assert.Contains("devices", output);
         Assert.Contains("DeviceManager_", output);
     }
 
     [Fact]
-    public void SystemControlGenerator_ReturnsSkeleton()
+    public void SystemControlGenerator_GenerateSystem_ReturnsSystemAndUnits()
     {
         var generator = new SystemControlGenerator();
         var payload = BuildPayload();
+        payload.Units = new List<UnitInfo>
+        {
+            new() { Id = "unit-a", Name = "Unit A", Label = "Unit A" },
+            new() { Id = "unit-b", Name = "Unit B", Label = "Unit B" }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"units\"", output);
+        Assert.Contains("\"Unit A\"", output);
+        Assert.Contains("\"Unit B\"", output);
+        // No legacy single-unit field
+        Assert.DoesNotContain("\"flows\"", output);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_MapsSystemControlVariable()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "Machine",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["stateAuto"]   = "M100",
+                    ["stateManual"] = "M101",
+                    ["stateError"]  = "M102"
+                }
+            }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"signalAddresses\"", output);
+        Assert.Contains("\"stateAuto\": \"M100\"", output);
+        Assert.Contains("\"stateManual\": \"M101\"", output);
+        Assert.Contains("\"stateError\": \"M102\"", output);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_NoSystemVariable_ReturnsEmptySignals()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        // No "SystemControl" format variable
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Motor1", Format = "Motor", Address = "@M1" }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"signalAddresses\"", output);
+        // signalAddresses should be empty object, not null
+        Assert.DoesNotContain("null", output.Split("\"system\"")[1].Split("\"units\"")[0]);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateOrchestrator_ContainsSystemAndFlows()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "Machine",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string> { ["stateAuto"] = "M100" }
+            }
+        };
         payload.Flows.Add(new FlowInfo
         {
             Id = "orch-1",
@@ -178,20 +258,17 @@ public class GeneratorSmokeTests
             ControlState = "Auto",
             OrchestratorConfig = new OrchestratorConfig
             {
-                Elements = new List<OrchestratorElement>
-                {
-                    new() { Type = "noop" }
-                }
+                Elements = new List<OrchestratorElement> { new() { Type = "noop" } }
             }
         });
 
-        var orchestratorOutput = generator.GenerateOrchestrator(payload);
-        Assert.Contains("orchestratorFlows", orchestratorOutput);
-        Assert.Contains("skeleton", orchestratorOutput);
-        var systemOutput = generator.GenerateSystem(payload);
-        Assert.Contains("\"flows\"", systemOutput);
-    }
+        var output = generator.GenerateOrchestrator(payload);
 
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"stateAuto\": \"M100\"", output);
+        Assert.Contains("\"orchestratorFlows\"", output);
+        Assert.Contains("\"skeleton\"", output);
+    }
 
     [Fact]
     public void SiemensLadDslGenerator_CustomHbsTextTemplateOverridesDefaultTemplate()

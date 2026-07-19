@@ -46,6 +46,9 @@ public class CodegenPayload
     [JsonPropertyName("unitConfig")]
     public Dictionary<string, UnitConfig> UnitConfig { get; set; } = new();
 
+    [JsonPropertyName("system")]
+    public SystemControlInfo? System { get; set; }
+
     public void EnrichVariables()
     {
         // Signal IDs are stable keys from the web model; keep them unchanged for resolution.
@@ -135,6 +138,15 @@ public class UnitConfig
 {
     [JsonPropertyName("label")] public string Label { get; set; } = string.Empty;
     [JsonPropertyName("signalAddresses")] public Dictionary<string, string> SignalAddresses { get; set; } = new();
+}
+
+public class SystemControlInfo
+{
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    [JsonPropertyName("signalAddresses")]
+    public IDictionary<string, string> SignalAddresses { get; set; } = new Dictionary<string, string>();
 }
 
 public class IOMapping

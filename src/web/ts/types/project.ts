@@ -260,6 +260,7 @@ namespace GrafcetStudioProject {
     templateProfile: string;
     ioMapping?: IOMapping;
     unitConfig?: Record<string, UnitConfig>;
+    system?: SystemControlInfo;
         // UI-only, not serialized to C#
     outputPath?: string;
   }
@@ -341,6 +342,11 @@ namespace GrafcetStudioProject {
   export interface UnitCSVParseResult {
     configs: UnitConfig[];
     errors: string[];
+  }
+
+  export interface SystemControlInfo {
+    label: string;
+    signalAddresses: Record<string, string>;
   }
 
   export interface StructCSVParseResult {

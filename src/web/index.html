@@ -46,6 +46,7 @@
             <button class="btn btn-cyan" onclick="toggleAiChatPanel(true)">AI Preview</button> 
             <button class="btn" onclick="triggerImport()">Import</button> 
             <input type="file" id="file-input" accept=".json,.grafcet,.grafcet2" class="is-hidden" onchange="handleImport(event)">
+            <input type="file" id="struct-import-input" accept=".json" class="is-hidden" onchange="handleStructImport(event)">
         </nav>
     </header>
     <main class="app"> <!-- Left Sidebar -->
@@ -305,6 +306,8 @@
                 <div class="sub-panel-head sub-panel-head-fixed"> 
                     <span class="sub-panel-title" id="struct-panel-title">STRUCTURE</span> 
                     <button class="panel-head-btn" id="struct-panel-edit" onclick="" title="Edit Struct Data">Edit</button> 
+                    <button class="panel-head-btn" id="struct-panel-export" onclick="" title="Export Struct as JSON" style="display:none">&#8595; Export JSON</button>
+                    <button class="panel-head-btn" id="struct-panel-import" onclick="triggerStructImport()" title="Import Struct from JSON" style="display:none">&#8593; Import JSON</button>
                 </div>
                 <div id="struct-panel-body" class="structure-panel-body"></div>
             </section>

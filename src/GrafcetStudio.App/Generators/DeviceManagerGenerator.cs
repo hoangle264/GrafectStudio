@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +35,19 @@ public sealed class DeviceManagerGenerator : IDeviceManagerGenerator
             .OrderBy(item => item.type, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return JsonSerializer.Serialize(new { deviceTypes }, JsonOptions);
+        var devices = (payload.Variables ?? Enumerable.Empty<DeviceVariable>())
+            .Select(v => new
+            {
+                name = v.Label,
+                label = v.Label,
+                type = v.Format,
+                format = v.Format,
+                address = v.Address,
+                signalAddresses = v.SignalAddresses
+            })
+            .ToList();
+
+        return JsonSerializer.Serialize(new { deviceTypes, devices }, JsonOptions);
     }
 
     private static string NormalizeDeviceKind(string? format)
