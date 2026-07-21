@@ -256,25 +256,6 @@ namespace GrafcetStudioCodegenPayload {
     });
   }
 
-  function getCylinderSignalAddress(rawAddresses: Record<string, string>, signal: DeviceSignal): string {
-    const key = String((signal && signal.name) || (signal && signal.id) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const byStructName = rawAddresses[(signal && signal.name) || ''];
-    if (byStructName) return byStructName;
-    if (key === 'lsh') return rawAddresses.LSH || rawAddresses.cyl_lsh || '';
-    if (key === 'lsl') return rawAddresses.LSL || rawAddresses.cyl_lsl || '';
-    if (key === 'locka') return rawAddresses.LockA || rawAddresses.cyl_lockA || '';
-    if (key === 'lockb') return rawAddresses.LockB || rawAddresses.cyl_lockB || '';
-    if (key === 'dissnslsh' || key === 'dissnsh') return rawAddresses.DisSnsLSH || rawAddresses.DisSnsH || rawAddresses.cyl_disSnsH || '';
-    if (key === 'dissnslsl' || key === 'dissnsl') return rawAddresses.DisSnsLSL || rawAddresses.DisSnsL || rawAddresses.cyl_disSnsL || '';
-    if (key === 'state') return rawAddresses.State || rawAddresses.cyl_state || '';
-    if (key === 'errora' || key === 'erra') return rawAddresses.ErrorA || rawAddresses.ErrA || rawAddresses.cyl_errA || '';
-    if (key === 'errorb' || key === 'errb') return rawAddresses.ErrorB || rawAddresses.ErrB || rawAddresses.cyl_errB || '';
-    if (key === 'coila') return rawAddresses.CoilA || rawAddresses.cyl_coilA || '';
-    if (key === 'coilb') return rawAddresses.CoilB || rawAddresses.cyl_coilB || '';
-    if (key === 'hmimanbtn' || key === 'hmiman') return rawAddresses.HmiManBtn || rawAddresses.HmiMan || rawAddresses.cyl_hmiMan || '';
-    return rawAddresses[(signal && signal.id) || ''] || '';
-  }
-
   function getCSharpSignalAddresses(context: PayloadContext, variable: ProjectVariable): Record<string, string> {
     const format = variable && (variable.format || variable.dataType || '');
     const deviceType = ((context.project && context.project.devices) || []).find(device => device && device.name === format);
@@ -284,11 +265,10 @@ namespace GrafcetStudioCodegenPayload {
     const signalAddresses: Record<string, string> = {};
     deviceType.signals.forEach(signal => {
       const normalized = normalizeCSharpSignal(context, deviceType.name, signal);
-      if (!normalized.id) return;
-      const address = format === 'Cylinder'
-        ? getCylinderSignalAddress(rawAddresses, normalized)
-        : (rawAddresses[normalized.name] || rawAddresses[signal && signal.name] || rawAddresses[signal && signal.id]);
-      signalAddresses[normalized.id] = address || '';
+      const outputKey = normalized.name || normalized.id;
+      if (!outputKey) return;
+      const address = rawAddresses[normalized.name] || rawAddresses[signal && signal.name] || '';
+      signalAddresses[outputKey] = address;
     });
     return signalAddresses;
   }
@@ -342,7 +322,7 @@ namespace GrafcetStudioCodegenPayload {
             ? (current as Record<string, unknown>)[part]
             : '';
         }, cfg) || '';
-        if (address) signalAddresses[signal.id] = String(address);
+        if (address) signalAddresses[signal.name || signal.id] = String(address);
       });
       add({ label: cfg.label || key, format: 'Unit Station', address: null, signalAddresses });
     });

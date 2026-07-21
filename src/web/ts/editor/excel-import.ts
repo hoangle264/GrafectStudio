@@ -191,7 +191,7 @@ namespace GrafcetStudioExcelImport {
         const signalId = signal.id || ('sig-' + signalIndex);
         const columnIndex = hasHeader ? headerMap[normalizeStructHeader(signal.name || signalId)] : (signalIndex + 1);
         const address = (columnIndex != null ? columns[columnIndex] : '') || '';
-        signalMap[signalId] = address;
+        signalMap[signal.name || signalId] = address;
         if (address && !validateAddress(address)) {
           errors.push('Dong ' + (rowIndex + 1) + ' [' + id + '.' + (signal.name || signalId) + ']: dia chi khong hop le "' + address + '"');
           hasError = true;

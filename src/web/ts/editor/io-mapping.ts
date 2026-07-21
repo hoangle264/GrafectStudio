@@ -106,19 +106,19 @@ namespace GrafcetStudioIOMapping {
       if (isKnownPath && sig.path) context.varsApi.gvtSetUnitAddr(cfg, sig.path, value);
       else {
         if (!cfg.signalAddresses) cfg.signalAddresses = {};
-        cfg.signalAddresses[sig.id] = value;
+        cfg.signalAddresses[sig.name || sig.id] = value;
       }
     } else if ((entry.source === 'imported' || entry.source === 'user') && project.variables && entry.bucket) {
       const list = project.variables[entry.bucket] as ProjectVariable[] | undefined;
       const rec = list && list[entry.key as number];
       if (!rec) return;
       if (!rec.signalAddresses) rec.signalAddresses = {};
-      rec.signalAddresses[sig.id] = value;
+      rec.signalAddresses[sig.name || sig.id] = value;
     } else if (entry.source === 'excel' && project.excelVars) {
       const rec = project.excelVars[entry.key as number];
       if (!rec) return;
       if (!rec.signalAddresses) rec.signalAddresses = {};
-      rec.signalAddresses[sig.id] = value;
+      rec.signalAddresses[sig.name || sig.id] = value;
     }
   }
 

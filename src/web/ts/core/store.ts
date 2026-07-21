@@ -296,10 +296,21 @@ namespace GrafcetStudioStoreHelpers {
         }
         const signalAddresses = v.signalAddresses;
         (device.signals || []).forEach(function(sig) {
-          const id = sig && (sig.id || sig.name);
-          if (!id || Object.prototype.hasOwnProperty.call(signalAddresses, id)) return;
-          signalAddresses[id] = '';
-          changed = true;
+          const newKey = sig && (sig.name || sig.id);
+          const oldKey = sig && (sig.id || sig.name);
+          if (!newKey) return;
+          // Migrate value from old key (sig.id) to new key (sig.name) if they differ
+          if (oldKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(signalAddresses, oldKey)) {
+            if (!Object.prototype.hasOwnProperty.call(signalAddresses, newKey) || !signalAddresses[newKey]) {
+              signalAddresses[newKey] = signalAddresses[oldKey];
+            }
+            delete signalAddresses[oldKey];
+            changed = true;
+          }
+          if (!Object.prototype.hasOwnProperty.call(signalAddresses, newKey)) {
+            signalAddresses[newKey] = '';
+            changed = true;
+          }
         });
       });
     });

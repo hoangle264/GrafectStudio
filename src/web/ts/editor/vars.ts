@@ -171,21 +171,7 @@ namespace GrafcetStudioVars {
   export function gvtGetExcelSignalAddress(variable: ProjectVariable | null | undefined, sig: DeviceSignal | null | undefined): string {
     const sAddr = (variable && variable.signalAddresses) || {};
     if (!sig) return '';
-    if ((variable && variable.format) === 'Cylinder') {
-      const key = String(sig.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (key === 'lsh') return sAddr.cyl_lsh || sAddr.LSH || '';
-      if (key === 'lsl') return sAddr.cyl_lsl || sAddr.LSL || '';
-      if (key === 'locka') return sAddr.cyl_lockA || sAddr.LockA || '';
-      if (key === 'lockb') return sAddr.cyl_lockB || sAddr.LockB || '';
-      if (key === 'dissnslsh' || key === 'dissnsh') return sAddr.cyl_disSnsH || sAddr.DisSnsLSH || sAddr.DisSnsH || '';
-      if (key === 'dissnslsl' || key === 'dissnsl') return sAddr.cyl_disSnsL || sAddr.DisSnsLSL || sAddr.DisSnsL || '';
-      if (key === 'state') return sAddr.cyl_state || sAddr.State || '';
-      if (key === 'errora' || key === 'erra') return sAddr.cyl_errA || sAddr.ErrorA || sAddr.ErrA || '';
-      if (key === 'errorb' || key === 'errb') return sAddr.cyl_errB || sAddr.ErrorB || sAddr.ErrB || '';
-      if (key === 'coila') return sAddr.cyl_coilA || sAddr.CoilA || '';
-      if (key === 'coilb') return sAddr.cyl_coilB || sAddr.CoilB || '';
-      if (key === 'hmimanbtn' || key === 'hmiman') return sAddr.cyl_hmiMan || sAddr.HmiManBtn || sAddr.HmiMan || '';
-    }
+    if (sig.name && sAddr[sig.name]) return sAddr[sig.name];
     if (sig.id && sAddr[sig.id]) return sAddr[sig.id];
     return '';
   }
