@@ -56,6 +56,7 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     protected override string GenerateLegacy(CodegenPayload payload)
     {
          var context = BuildContext(payload);
+         Console.WriteLine($"Unit Context: {JsonSerializer.Serialize(context.unit, JsonOptions)}");
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()

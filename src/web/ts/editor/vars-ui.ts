@@ -101,22 +101,19 @@ function gvtGetExcelSignalAddress(v: VuiProjectVariable | null | undefined, sig:
 
 function gvtSetSignalAddress(entry: VuiVarEntry, sig: VuiDeviceSignal, value: string): boolean {
   if (!entry || !sig) return false;
+  const sigKey = sig.name || sig.id;
+  if (!sigKey) return false;
   if((entry.source === 'imported' || entry.source === 'user') && project.variables && entry.bucket && project.variables[entry.bucket] && (project.variables[entry.bucket] as VuiProjectVariable[])[entry.key as number]){
     const rec = (project.variables[entry.bucket] as VuiProjectVariable[])[entry.key as number];
     if(!rec.signalAddresses) rec.signalAddresses={};
-    rec.signalAddresses[sig.id]=value;
+    rec.signalAddresses[sigKey]=value;
   } else if(entry.source === 'excel' && project.excelVars[entry.key as number]){
     if(!project.excelVars[entry.key as number].signalAddresses) project.excelVars[entry.key as number].signalAddresses={};
-    project.excelVars[entry.key as number].signalAddresses![sig.id]=value;
+    project.excelVars[entry.key as number].signalAddresses![sigKey]=value;
   } else if(entry.source === 'unit' && project.unitConfig && project.unitConfig[entry.key as string]) {
     const cfg = project.unitConfig[entry.key as string];
-    const isKnownPath = GVT_UNIT_SIGNALS.some(function(unitSig) { return unitSig.path === sig.path; });
-    if (isKnownPath) {
-      gvtSetUnitAddr(cfg, sig.path!, value);
-    } else {
-      if (!cfg.signalAddresses) cfg.signalAddresses = {};
-      cfg.signalAddresses[sig.id] = value;
-    }
+    if (!cfg.signalAddresses) cfg.signalAddresses = {};
+    cfg.signalAddresses[sigKey] = value;
   } else {
     return false;
   }

@@ -171,9 +171,8 @@ namespace GrafcetStudioVars {
   export function gvtGetExcelSignalAddress(variable: ProjectVariable | null | undefined, sig: DeviceSignal | null | undefined): string {
     const sAddr = (variable && variable.signalAddresses) || {};
     if (!sig) return '';
-    if (sig.name && sAddr[sig.name]) return sAddr[sig.name];
-    if (sig.id && sAddr[sig.id]) return sAddr[sig.id];
-    return '';
+    const key = sig.name || sig.id || '';
+    return (key && sAddr[key]) || '';
   }
 
   export function getVars(context: VarsContext): ProjectVariable[] {

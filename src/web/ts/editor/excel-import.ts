@@ -188,12 +188,12 @@ namespace GrafcetStudioExcelImport {
       let hasError = false;
 
       signals.forEach(function(signal: DeviceSignal, signalIndex) {
-        const signalId = signal.id || ('sig-' + signalIndex);
-        const columnIndex = hasHeader ? headerMap[normalizeStructHeader(signal.name || signalId)] : (signalIndex + 1);
+        const key = (signal.name || signal.id || ('sig-' + signalIndex)).trim();
+        const columnIndex = hasHeader ? headerMap[normalizeStructHeader(key)] : (signalIndex + 1);
         const address = (columnIndex != null ? columns[columnIndex] : '') || '';
-        signalMap[signal.name || signalId] = address;
+        signalMap[key] = address;
         if (address && !validateAddress(address)) {
-          errors.push('Dong ' + (rowIndex + 1) + ' [' + id + '.' + (signal.name || signalId) + ']: dia chi khong hop le "' + address + '"');
+          errors.push('Dong ' + (rowIndex + 1) + ' [' + id + '.' + key + ']: dia chi khong hop le "' + address + '"');
           hasError = true;
         }
       });

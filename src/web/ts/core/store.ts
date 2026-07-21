@@ -277,13 +277,35 @@ namespace GrafcetStudioStoreHelpers {
 
   export function syncVariableSignalAddressesFromDeviceTypes(context: StoreContext): boolean {
     const currentProject = context.getProject();
+    let changed = false;
+
+    // Deduplicate signals in all device types to ensure valid unique signal names
+    (currentProject.devices || []).forEach(function(device) {
+      if (!device || !Array.isArray(device.signals)) return;
+      const seenNames = new Set<string>();
+      const cleanSignals: DeviceSignal[] = [];
+      device.signals.forEach(function(sig) {
+        const sigName = (sig.name || sig.id || '').trim();
+        if (!sigName) return;
+        if (seenNames.has(sigName)) {
+          changed = true;
+          return;
+        }
+        seenNames.add(sigName);
+        cleanSignals.push(Object.assign({}, sig, { id: sigName, name: sigName }));
+      });
+      if (cleanSignals.length !== device.signals.length) {
+        device.signals = cleanSignals;
+        changed = true;
+      }
+    });
+
     const devicesByName = new Map<string, DeviceType>((currentProject.devices || [])
       .filter(function(device): device is DeviceType { return !!device && !!device.name && Array.isArray(device.signals); })
       .map(function(device) { return [device.name, device]; }));
     const groups: ProjectVariable[][] = [];
     const vars = ensureProjectVariables(context);
     groups.push(vars.imported, vars.user, currentProject.excelVars || []);
-    let changed = false;
 
     groups.forEach(function(list) {
       (list || []).forEach(function(v) {
@@ -296,19 +318,10 @@ namespace GrafcetStudioStoreHelpers {
         }
         const signalAddresses = v.signalAddresses;
         (device.signals || []).forEach(function(sig) {
-          const newKey = sig && (sig.name || sig.id);
-          const oldKey = sig && (sig.id || sig.name);
-          if (!newKey) return;
-          // Migrate value from old key (sig.id) to new key (sig.name) if they differ
-          if (oldKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(signalAddresses, oldKey)) {
-            if (!Object.prototype.hasOwnProperty.call(signalAddresses, newKey) || !signalAddresses[newKey]) {
-              signalAddresses[newKey] = signalAddresses[oldKey];
-            }
-            delete signalAddresses[oldKey];
-            changed = true;
-          }
-          if (!Object.prototype.hasOwnProperty.call(signalAddresses, newKey)) {
-            signalAddresses[newKey] = '';
+          const key = sig && (sig.name || sig.id);
+          if (!key) return;
+          if (!Object.prototype.hasOwnProperty.call(signalAddresses, key)) {
+            signalAddresses[key] = '';
             changed = true;
           }
         });

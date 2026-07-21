@@ -189,7 +189,7 @@ namespace GrafcetStudioTree {
       if (oldId && oldId !== nextId) idMap[oldId] = nextId;
       signals.push({
         id: nextId,
-        name: signalName,
+        name: nextId,
         dataType: signal.dataType || 'Bool',
         varType: signal.varType || 'Input',
         address: signal.address || '',
