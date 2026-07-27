@@ -75,7 +75,11 @@ public sealed class SystemControlGenerator : ISystemControlGenerator
         {
             project = payload.Project,
             system = MapSystemControl(payload.Variables),
-            units = (payload.Units ?? new List<UnitInfo>()).Select(MapUnitBasic).ToList()
+            units = (payload.Units ?? new List<UnitInfo>()).Select(MapUnitBasic).ToList(),
+            variables = (payload.Variables ?? new List<DeviceVariable>())
+                .Where(v => !string.IsNullOrWhiteSpace(v.Label))
+                .GroupBy(v => v.Label, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase)
         };
 
         return JsonSerializer.Serialize(content, JsonOptions);

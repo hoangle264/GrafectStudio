@@ -21,6 +21,8 @@ public class ResolvedFlow
 
     public DeviceVariable? macroPortVariable { get; init; }
 
+    public DeviceVariable? flowVariable { get; init; }
+
     public string stepMinAddress { get; init; } = string.Empty;
 
     public string stepMaxAddress { get; init; } = string.Empty;

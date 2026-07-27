@@ -13,7 +13,6 @@ public sealed record GeneratorContext
     public IList<ResolvedFlow> originFlows { get; init; } = new List<ResolvedFlow>();
     public IList<ResolvedFlow> macroFlows { get; init; } = new List<ResolvedFlow>();
     public IList<ResolvedFlow> macroStepFlows { get; init; } = new List<ResolvedFlow>();
-    /// <summary>All resolved flows (macroFlows + macroStepFlows). Suitable for template iteration.</summary>
     public IList<ResolvedFlow> flows { get; init; } = new List<ResolvedFlow>();
     public IList<MacroBindingContext> macroBindings { get; init; } = new List<MacroBindingContext>();
     public IList<MacroPortContext> macroPorts { get; init; } = new List<MacroPortContext>();

@@ -20,9 +20,37 @@ public sealed class SiemensDbUdtGenerator : ICodeGenerator
 
     public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
     {
-        if (payload.Blocks.Count == 0)
+        var hasBlocks = payload.Blocks.Count > 0;
+        var hasSharedStruct = payload.SharedFlowStruct != null && payload.SharedFlowStruct.Enabled;
+
+        if (!hasBlocks && !hasSharedStruct)
         {
             yield break;
+        }
+
+        if (hasSharedStruct && payload.SharedFlowStruct != null)
+        {
+            var structTypeName = SanitizeBlockName(payload.SharedFlowStruct.StructTypeName);
+            var udtDoc = BuildSharedFlowUdtDocument(structTypeName, payload.SharedFlowStruct.Members);
+            yield return new CodegenFile
+            {
+                Path = structTypeName + ".xml",
+                Content = ToString(udtDoc)
+            };
+
+            var flows = payload.Flows ?? new List<FlowInfo>();
+            foreach (var flow in flows)
+            {
+                var flowName = flow.Name;
+                if (string.IsNullOrWhiteSpace(flowName)) continue;
+                var instanceName = "ST_" + SanitizeBlockName(flowName);
+                var dbDoc = BuildFlowInstanceDbDocument(instanceName, structTypeName, payload.SharedFlowStruct.Members);
+                yield return new CodegenFile
+                {
+                    Path = instanceName + ".xml",
+                    Content = ToString(dbDoc)
+                };
+            }
         }
 
         var variablesByBlock = payload.Variables
@@ -52,6 +80,37 @@ public sealed class SiemensDbUdtGenerator : ICodeGenerator
                 Content = ToString(document)
             };
         }
+    }
+
+    private static XmlDocument BuildSharedFlowUdtDocument(string structTypeName, IEnumerable<SharedFlowStructMember> members)
+    {
+        var udt = new BlockUDT();
+        udt.Init();
+        udt.AttributeList.BlockName = structTypeName;
+
+        foreach (var m in members)
+        {
+            var name = SanitizeMemberName(m.Name);
+            var member = udt.AttributeList.NONE.AddMember(name, MapDataType(m.Type));
+            if (!string.IsNullOrWhiteSpace(m.Comment))
+            {
+                member.AddComment(CultureInfo.CurrentCulture, m.Comment);
+            }
+        }
+
+        return SimaticMLAPI.CreateDocument(udt);
+    }
+
+    private static XmlDocument BuildFlowInstanceDbDocument(string instanceName, string structTypeName, IEnumerable<SharedFlowStructMember> members)
+    {
+        var db = new BlockGlobalDB();
+        db.Init();
+        db.AttributeList.BlockName = instanceName;
+
+        var structType = new SimaticDataType(structTypeName, 0);
+        db.AttributeList.STATIC.AddMember("Data", structType);
+
+        return SimaticMLAPI.CreateDocument(db);
     }
 
     private static XmlDocument BuildGlobalDbDocument(string blockName, IEnumerable<DeviceVariable> variables, IList<DeviceType> deviceTypes)

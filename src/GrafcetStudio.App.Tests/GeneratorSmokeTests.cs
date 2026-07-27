@@ -7,12 +7,22 @@ using HandlebarsDotNet;
 using GrafcetStudio.Domain.Models;
 using GrafcetStudio.Domain.Enums;
 using Xunit;
+using Xunit.Abstractions;
+using GrafcetStudio.App.Generators.Common;
 using System.IO;
+using System.Text.Json;
 
 namespace GrafcetStudio.App.Tests;
 
 public class GeneratorSmokeTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public GeneratorSmokeTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     [Fact]
     public void MapIOGenerator_ReturnsExpectedSections()
     {
@@ -234,6 +244,50 @@ public class GeneratorSmokeTests
         Assert.Contains("\"signalAddresses\"", output);
         // signalAddresses should be empty object, not null
         Assert.DoesNotContain("null", output.Split("\"system\"")[1].Split("\"units\"")[0]);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_SupportsDotNotationInHandlebars()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "SysCtrl",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["StartSystem"] = "%M0.0",
+                    ["StopSystem"]  = "%M0.1"
+                }
+            },
+            new()
+            {
+                Label = "OUT_bStartLamp",
+                Format = "Lamp",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["Q"] = "%Q0.0"
+                }
+            }
+        };
+
+        var jsonOutput = generator.GenerateSystem(payload);
+
+        var handlebars = HandlebarsDotNet.Handlebars.Create();
+        var templates = new GrafcetStudio.CodeGen.Template.TemplateManager(handlebars);
+        templates.LoadTemplate("simple.System", ";Start {{system.signalAddresses.StartSystem}} Lamp {{variables.OUT_bStartLamp.signalAddresses.Q}}");
+
+        var stubGenerator = new TestSystemGenerator(generator);
+        var service = new CodeGeneratorService(new ICodeGenerator[] { stubGenerator }, templates);
+
+        var result = service.Generate("Keyence", payload);
+        var systemFile = result.Files.FirstOrDefault(f => f.Path == "System.mnm");
+
+        Assert.NotNull(systemFile);
+        Assert.Equal(";Start %M0.0 Lamp %Q0.0", systemFile.Content);
     }
 
     [Fact]
@@ -842,7 +896,7 @@ public class GeneratorSmokeTests
     public void KeyenceGenerator_TemplateExpressionStylePostProcessesSingleOutputRungsToMnemonic()
     {
         var templates = new TemplateManager(Handlebars.Create());
-        templates.LoadTemplate("uc.auto", """
+        templates.LoadTemplate("uc.unitAuto", """
         ; Expression-style template keeps HBS readable
         {{#each autoFlows}}
         {{#each steps}}
@@ -1313,26 +1367,211 @@ public class GeneratorSmokeTests
         DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.unitSignals => UnitSignals;
         DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
     }
+
+    [Fact]
+    public void SiemensDbUdtGenerator_GeneratesSharedFlowStructAndInstances()
+    {
+        var generator = new SiemensDbUdtGenerator();
+        var payload = BuildPayload();
+        payload.SharedFlowStruct = new SharedFlowStructSchema
+        {
+            Enabled = true,
+            StructTypeName = "UDT_FlowData",
+            Members = new List<SharedFlowStructMember>
+            {
+                new() { Name = "StartCmd", Type = "BOOL", Comment = "Start command" },
+                new() { Name = "CycleCount", Type = "INT", Comment = "Counter" }
+            }
+        };
+        payload.Flows = new List<FlowInfo>
+        {
+            new() { Name = "MainSequence" },
+            new() { Name = "SubSequence" }
+        };
+
+        var files = generator.GenerateFiles(payload).ToList();
+
+        Assert.Contains(files, f => f.Path == "UDT_FlowData.xml");
+        Assert.Contains(files, f => f.Path == "ST_MainSequence.xml");
+        Assert.Contains(files, f => f.Path == "ST_SubSequence.xml");
+
+        var udtFile = files.First(f => f.Path == "UDT_FlowData.xml");
+        Assert.Contains("UDT_FlowData", udtFile.Content);
+        Assert.Contains("StartCmd", udtFile.Content);
+        Assert.Contains("CycleCount", udtFile.Content);
+
+        var dbFile = files.First(f => f.Path == "ST_MainSequence.xml");
+        Assert.Contains("ST_MainSequence", dbFile.Content);
+        Assert.Contains("UDT_FlowData", dbFile.Content);
+    }
+
+    [Fact]
+    public void LogAndVerify_CodegenPayload_ReceivedByCSharp()
+    {
+        // 1. Giả lập JSON Payload từ WebView2 / JS gửi qua C#
+        var jsonPayload = """
+        {
+          "platform": "siemens-db",
+          "templateRootPath": "C:/Templates",
+          "sharedFlowStruct": {
+            "enabled": true,
+            "structTypeName": "UDT_FlowData",
+            "members": [
+              { "id": "m1", "name": "StartCmd", "type": "BOOL", "comment": "Lenh chay" },
+              { "id": "m2", "name": "TargetSpeed", "type": "REAL", "comment": "Toc do dat" },
+              { "id": "m3", "name": "StepCounter", "type": "INT", "comment": "Dem buoc" }
+            ]
+          },
+          "flows": [
+            {
+              "id": "flow-1",
+              "name": "MainSequence",
+              "type": "Macro",
+              "structInstanceName": "ST_MainSequence",
+              "structTypeName": "UDT_FlowData",
+              "flowVariable": {
+                "label": "ST_MainSequence",
+                "format": "UDT_FlowData",
+                "declarationMode": "SymbolicBlock"
+              },
+              "steps": [ { "id": "step-1", "name": "S1" } ],
+              "transitions": []
+            },
+            {
+              "id": "flow-2",
+              "name": "SubSequence",
+              "type": "Macro",
+              "structInstanceName": "ST_SubSequence",
+              "structTypeName": "UDT_FlowData",
+              "flowVariable": {
+                "label": "ST_SubSequence",
+                "format": "UDT_FlowData",
+                "declarationMode": "SymbolicBlock"
+              },
+              "steps": [],
+              "transitions": []
+            }
+          ],
+          "variables": [
+            { "label": "ST_MainSequence", "format": "UDT_FlowData", "declarationMode": "SymbolicBlock" },
+            { "label": "ST_SubSequence", "format": "UDT_FlowData", "declarationMode": "SymbolicBlock" }
+          ]
+        }
+        """;
+
+        // 2. C# Deserialization sang CodegenPayload
+        var payload = JsonSerializer.Deserialize<CodegenPayload>(jsonPayload);
+        Assert.NotNull(payload);
+
+        // 3. Log thông tin nhận được tại C#
+        _output.WriteLine("=== [LOG PAYLOAD C# NHẬN ĐƯỢC] ===");
+        _output.WriteLine($"Platform: {payload.Platform}");
+        _output.WriteLine($"Shared Struct Enabled: {payload.SharedFlowStruct?.Enabled}");
+        _output.WriteLine($"Shared Struct Type Name: {payload.SharedFlowStruct?.StructTypeName}");
+        _output.WriteLine($"Shared Struct Members Count: {payload.SharedFlowStruct?.Members.Count}");
+
+        foreach (var m in payload.SharedFlowStruct?.Members ?? [])
+        {
+            _output.WriteLine($"   - Member: {m.Name} ({m.Type}) | Comment: '{m.Comment}'");
+        }
+
+        _output.WriteLine($"Flows Count: {payload.Flows.Count}");
+        foreach (var f in payload.Flows)
+        {
+            _output.WriteLine($"   - Flow: '{f.Name}' | StructInstanceName: '{f.StructInstanceName}' | FlowVariable: '{f.FlowVariable?.Label}' (Format: {f.FlowVariable?.Format})");
+        }
+
+        // 4. Verification Assertions
+        Assert.NotNull(payload.SharedFlowStruct);
+        Assert.Equal("UDT_FlowData", payload.SharedFlowStruct.StructTypeName);
+        Assert.Equal(3, payload.SharedFlowStruct.Members.Count);
+        Assert.Equal("ST_MainSequence", payload.Flows[0].StructInstanceName);
+        Assert.Equal("ST_SubSequence", payload.Flows[1].StructInstanceName);
+    }
+
+    [Fact]
+    public void LogAndVerify_CodegenPayload_AutoFallbackFromDeviceType()
+    {
+        // 1. Giả lập JSON payload có sharedFlowStruct.members = [] nhưng deviceTypes chứa UDT_FlowData với 10 signals (giống log thực tế của người dùng)
+        var jsonPayload = """
+        {
+          "platform": "Keyence",
+          "sharedFlowStruct": {
+            "enabled": true,
+            "structTypeName": "UDT_FlowData",
+            "members": []
+          },
+          "deviceTypes": [
+            {
+              "Id": "dev-1784820513771",
+              "Name": "UDT_FlowData",
+              "Signals": [
+                { "Id": "bEnable", "Name": "bEnable", "DataType": "Bool" },
+                { "Id": "bReset", "Name": "bReset", "DataType": "Bool" },
+                { "Id": "bInterlock", "Name": "bInterlock", "DataType": "Bool" },
+                { "Id": "bStepbyStep", "Name": "bStepbyStep", "DataType": "Bool" },
+                { "Id": "bStart", "Name": "bStart", "DataType": "Bool" },
+                { "Id": "nTransStep", "Name": "nTransStep", "DataType": "Bool" },
+                { "Id": "bRunning", "Name": "bRunning", "DataType": "Bool" },
+                { "Id": "nStep", "Name": "nStep", "DataType": "Bool" },
+                { "Id": "nCurrentStep", "Name": "nCurrentStep", "DataType": "Bool" },
+                { "Id": "nJumpStep", "Name": "nJumpStep", "DataType": "Bool" }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var payload = JsonSerializer.Deserialize<CodegenPayload>(jsonPayload);
+        Assert.NotNull(payload);
+        payload.EnrichVariables();
+
+        _output.WriteLine("=== [LOG FALLBACK AUTO-POPULATE MEMBERS FROM DEVICETYPE] ===");
+        _output.WriteLine($"Shared Struct Type: {payload.SharedFlowStruct?.StructTypeName}");
+        _output.WriteLine($"Shared Struct Members Count Sau Khi Enrich: {payload.SharedFlowStruct?.Members.Count}");
+
+        foreach (var m in payload.SharedFlowStruct?.Members ?? [])
+        {
+            _output.WriteLine($"   - Member: {m.Name} ({m.Type})");
+        }
+
+        Assert.Equal(10, payload.SharedFlowStruct?.Members.Count);
+        Assert.Equal("bEnable", payload.SharedFlowStruct?.Members[0].Name);
+        Assert.Equal("nJumpStep", payload.SharedFlowStruct?.Members[9].Name);
+    }
+
+    [Fact]
+    public void GeneratorContextBuilder_BuildsFlowVariableInFlowContext()
+    {
+        var payload = BuildPayload();
+        payload.Flows[0].Name = "AutoFlow";
+        payload.Flows[0].Type = "auto";
+        payload.Flows[0].DiagramType = "Macro";
+        payload.Variables.Add(new DeviceVariable
+        {
+            Label = "ST_AutoFlow",
+            Format = "UDT_FlowData",
+            DeclarationMode = "SymbolicBlock",
+            SignalAddresses = new Dictionary<string, string> { ["bEnable"] = "MR2100" }
+        });
+
+        var context = GeneratorContextBuilder.Build(payload, new SequenceResolver());
+
+        Assert.NotEmpty(context.autoFlows);
+        var autoFlow = context.autoFlows[0];
+        Assert.NotNull(autoFlow.flowVariable);
+        Assert.Equal("ST_AutoFlow", autoFlow.flowVariable.Label);
+        Assert.Equal("MR2100", autoFlow.flowVariable.SignalAddresses["bEnable"]);
+    }
+
+    private class TestSystemGenerator : ICodeGenerator
+    {
+        private readonly SystemControlGenerator _sysGen;
+        public TestSystemGenerator(SystemControlGenerator sysGen) => _sysGen = sysGen;
+        public string Platform => "Keyence";
+        public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
+        {
+            yield return new CodegenFile { Path = "System.mnm", Content = _sysGen.GenerateSystem(payload) };
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

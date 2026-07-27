@@ -144,6 +144,10 @@ public static class GeneratorContextBuilder
         }).ToList();
 
         var flowStepRange = StepAddressHelper.BuildFlowStepAddressRange(flow);
+        var instanceName = "ST_" + (flow.Name ?? string.Empty).Replace(" ", "_");
+        var flowVar = flow.FlowVariable
+            ?? variables.FirstOrDefault(v => string.Equals(v.Label, instanceName, StringComparison.OrdinalIgnoreCase));
+
         var resolvedFlow = new ResolvedFlow
         {
             id = flow.Id,
@@ -154,6 +158,7 @@ public static class GeneratorContextBuilder
             diagramType = NormalizeDiagramType(flow),
             diagram = flow.Diagram,
             macroPortVariable = flow.MacroPortVariable,
+            flowVariable = flowVar,
             stepMinAddress = flowStepRange.MinAddress,
             stepMaxAddress = flowStepRange.MaxAddress,
             sequenceEnd = flowStepRange.SequenceEnd,

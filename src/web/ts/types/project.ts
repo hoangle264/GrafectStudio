@@ -19,6 +19,20 @@ namespace GrafcetStudioProject {
   export type BlockKind = 'DB' | 'UDT' | 'GVL' | string;
   export type ActionQualifier = 'N' | 'S' | 'R' | 'P' | 'P0' | 'L' | 'D' | 'SD' | 'DS' | 'SL';
 
+  export interface SharedFlowStructMember {
+    id: string;
+    name: string;
+    type: string;
+    comment?: string;
+    defaultValue?: string;
+  }
+
+  export interface SharedFlowStructSchema {
+    enabled: boolean;
+    structTypeName: string;
+    members: SharedFlowStructMember[];
+  }
+
   export interface PlcBlock {
     id: string;
     name: string;              // vd "DB_Motor", "UDT_Cylinder", "GVL_IO"
@@ -41,6 +55,7 @@ namespace GrafcetStudioProject {
     plcConfig?: PlcConfig;
     plcName?: string;
     blocks?: PlcBlock[];
+    sharedFlowStruct?: SharedFlowStructSchema;
     [key: string]: unknown;
   }
 
@@ -210,6 +225,9 @@ namespace GrafcetStudioProject {
     steps: Step[];
     transitions: Transition[];
     macroPortVariable?: DeviceVariable | null;
+    structInstanceName?: string;
+    structTypeName?: string;
+    flowVariable?: DeviceVariable | null;
     [key: string]: unknown;
   }
 
@@ -258,6 +276,7 @@ namespace GrafcetStudioProject {
     deviceTypes: DeviceType[];
     deviceLibraryPath: string;
     templateProfile: string;
+    sharedFlowStruct?: SharedFlowStructSchema;
     ioMapping?: IOMapping;
     unitConfig?: Record<string, UnitConfig>;
     system?: SystemControlInfo;

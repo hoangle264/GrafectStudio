@@ -48,19 +48,27 @@ public static class TemplateLoader
     {
         var mapping = new[]
         {
-            (Filename: "error.hbs", Id: "uc.error", IsPartial: false),
-            (Filename: "manual.hbs", Id: "uc.manual", IsPartial: false),
-            (Filename: "auto.hbs", Id: "uc.auto", IsPartial: false),
-            (Filename: "origin.hbs", Id: "uc.origin", IsPartial: false),
-            (Filename: "main-output.hbs", Id: "uc.mainOutput", IsPartial: false),
-            (Filename: "output.hbs", Id: "uc.outputLegacy", IsPartial: false),
-            (Filename: "step-body.hbs", Id: "uc.stepBody", IsPartial: true),
-            (Filename: "MapIO.hbs", Id: "uc.mapIo", IsPartial: false)
+            (Filenames: new[] { "unitError.hbs", "unit-error.hbs", "error.hbs" }, Id: "uc.unitError", IsPartial: false),
+            (Filenames: new[] { "unitManual.hbs", "unit-manual.hbs", "manual.hbs" }, Id: "uc.unitManual", IsPartial: false),
+            (Filenames: new[] { "unitAuto.hbs", "unit-auto.hbs", "auto.hbs" }, Id: "uc.unitAuto", IsPartial: false),
+            (Filenames: new[] { "unitOrigin.hbs", "unit-origin.hbs", "origin.hbs" }, Id: "uc.unitOrigin", IsPartial: false),
+            (Filenames: new[] { "unitMainOutput.hbs", "unit-main-output.hbs", "main-output.hbs" }, Id: "uc.unitMainOutput", IsPartial: false),
+            (Filenames: new[] { "output.hbs" }, Id: "uc.outputLegacy", IsPartial: false),
+            (Filenames: new[] { "step-body.hbs" }, Id: "uc.stepBody", IsPartial: true),
+            (Filenames: new[] { "MapIO.hbs" }, Id: "uc.mapIo", IsPartial: false)
         };
 
         foreach (var item in mapping)
         {
-            LoadMappedTemplate(Path.Combine(rootPath, item.Filename), item.Id, item.Filename, item.IsPartial, result);
+            foreach (var filename in item.Filenames)
+            {
+                var fullPath = Path.Combine(rootPath, filename);
+                if (File.Exists(fullPath))
+                {
+                    LoadMappedTemplate(fullPath, item.Id, filename, item.IsPartial, result);
+                    break;
+                }
+            }
         }
     }
 

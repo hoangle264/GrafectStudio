@@ -6,6 +6,7 @@ using GrafcetStudio.Domain.Models;
 using GrafcetStudio.Domain.Resolution;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 
@@ -16,10 +17,10 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly string[] SectionTemplateOrder =
     [
-        "uc.error",
-        "uc.manual",
-        "uc.origin",
-        "uc.auto"
+        "uc.unitError",
+        "uc.unitManual",
+        "uc.unitOrigin",
+        "uc.unitAuto"
     ];
 
     private static readonly string[] ExpressionSectionTemplateOrder =
@@ -56,11 +57,11 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
     protected override string GenerateLegacy(CodegenPayload payload)
     {
          var context = BuildContext(payload);
-         Console.WriteLine($"Unit Context: {JsonSerializer.Serialize(context.unit, JsonOptions)}");
+  //      Debug.WriteLine($"Unit Context: {JsonSerializer.Serialize(payload, JsonOptions)}");
         RegisterPartials();
 
         var renderedSections = ResolveSectionTemplateNames()
-            .Select(templateName => _templates.TryRender(templateName, context, out var result) ? result : string.Empty)
+            .Select(templateName => _templates.TryRender(templateName, context, out var result) ? result.TrimEnd('\r', '\n') : string.Empty)
             .Where(section => !string.IsNullOrWhiteSpace(section))
             .ToList();
 
@@ -103,6 +104,10 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
         if (_templates.IsTemplateLoaded("uc.outputs"))
         {
             yield return "uc.outputs";
+        }
+        else if (_templates.IsTemplateLoaded("uc.unitMainOutput"))
+        {
+            yield return "uc.unitMainOutput";
         }
         else if (_templates.IsTemplateLoaded("uc.mainOutput"))
         {

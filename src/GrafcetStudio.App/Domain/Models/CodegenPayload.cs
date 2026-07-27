@@ -49,9 +49,31 @@ public class CodegenPayload
     [JsonPropertyName("system")]
     public SystemControlInfo? System { get; set; }
 
+    [JsonPropertyName("sharedFlowStruct")]
+    public SharedFlowStructSchema? SharedFlowStruct { get; set; }
+
     public void EnrichVariables()
     {
-        // Signal IDs are stable keys from the web model; keep them unchanged for resolution.
+        if (SharedFlowStruct != null && SharedFlowStruct.Enabled && SharedFlowStruct.Members.Count == 0)
+        {
+            var targetName = SharedFlowStruct.StructTypeName;
+            if (string.IsNullOrWhiteSpace(targetName)) targetName = "UDT_FlowData";
+
+            var matchingDevice = DeviceTypes.FirstOrDefault(d => string.Equals(d.Name, targetName, StringComparison.OrdinalIgnoreCase));
+            if (matchingDevice != null && matchingDevice.Signals != null && matchingDevice.Signals.Count > 0)
+            {
+                foreach (var s in matchingDevice.Signals)
+                {
+                    SharedFlowStruct.Members.Add(new SharedFlowStructMember
+                    {
+                        Id = s.Id,
+                        Name = s.Name,
+                        Type = s.DataType ?? "BOOL",
+                        Comment = s.Comment
+                    });
+                }
+            }
+        }
     }
 }
 
@@ -132,6 +154,9 @@ public class FlowInfo
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();
     [JsonPropertyName("macroPortVariable")] public DeviceVariable? MacroPortVariable { get; set; }
+    [JsonPropertyName("structInstanceName")] public string? StructInstanceName { get; set; }
+    [JsonPropertyName("structTypeName")] public string? StructTypeName { get; set; }
+    [JsonPropertyName("flowVariable")] public DeviceVariable? FlowVariable { get; set; }
 }
 
 public class UnitConfig
@@ -170,6 +195,22 @@ public class IOMappingEntry
     [JsonPropertyName("appVariable")] public string AppVariable { get; set; } = string.Empty;
     [JsonPropertyName("status")] public string Status { get; set; } = string.Empty;
     [JsonPropertyName("matchScore")] public double MatchScore { get; set; }
+}
+
+public class SharedFlowStructMember
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+    [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+    [JsonPropertyName("type")] public string Type { get; set; } = "BOOL";
+    [JsonPropertyName("comment")] public string? Comment { get; set; }
+    [JsonPropertyName("defaultValue")] public string? DefaultValue { get; set; }
+}
+
+public class SharedFlowStructSchema
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; } = true;
+    [JsonPropertyName("structTypeName")] public string StructTypeName { get; set; } = "UDT_FlowData";
+    [JsonPropertyName("members")] public List<SharedFlowStructMember> Members { get; set; } = new();
 }
 
 

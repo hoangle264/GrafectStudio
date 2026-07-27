@@ -26,8 +26,8 @@ public class KeyenceGeneratorBaselineTests
         var templates = new TemplateManager(Handlebars.Create());
         
         // Load default/standard templates so we render actual sections
-        templates.LoadTemplate("uc.auto", "; AUTO FLOWS\n{{#each autoFlows}}\n; Flow: {{name}} (Min: {{stepMinAddress}}, Max: {{stepMaxAddress}})\n{{#each steps}}\n; Step {{number}} ({{label}})\n{{expression.activationMnemonic}}\n{{expression.outputMnemonic}}\n{{expression.doneMnemonic}}\n{{/each}}\n{{/each}}");
-        templates.LoadTemplate("uc.origin", "; ORIGIN FLOWS\n{{#each originFlows}}\n; Flow: {{name}}\n{{#each steps}}\n; Step {{number}} ({{label}})\n{{expression.activationMnemonic}}\n{{expression.outputMnemonic}}\n{{expression.doneMnemonic}}\n{{/each}}\n{{/each}}");
+        templates.LoadTemplate("uc.unitAuto", "; AUTO FLOWS\n{{#each autoFlows}}\n; Flow: {{name}} (Min: {{stepMinAddress}}, Max: {{stepMaxAddress}})\n{{#each steps}}\n; Step {{number}} ({{label}})\n{{expression.activationMnemonic}}\n{{expression.outputMnemonic}}\n{{expression.doneMnemonic}}\n{{/each}}\n{{/each}}");
+        templates.LoadTemplate("uc.unitOrigin", "; ORIGIN FLOWS\n{{#each originFlows}}\n; Flow: {{name}}\n{{#each steps}}\n; Step {{number}} ({{label}})\n{{expression.activationMnemonic}}\n{{expression.outputMnemonic}}\n{{expression.doneMnemonic}}\n{{/each}}\n{{/each}}");
         templates.LoadTemplate("uc.outputs", "; DEVICE OUTPUTS\n{{#each deviceOutputGroups}}\n; Device: {{deviceLabel}} (Kind: {{deviceKind}}, Address: {{address}})\n{{#each commands}}\n; Command: {{commandId}} (Action: {{actionLabel}}, Target: {{target}})\n{{mnemonic}}\n{{/each}}\n{{/each}}");
 
         var generator = new KeyenceGenerator(templates, new SequenceResolver());

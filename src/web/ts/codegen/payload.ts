@@ -440,6 +440,30 @@ namespace GrafcetStudioCodegenPayload {
     return units;
   }
 
+  function buildSharedFlowStructInfo(context: PayloadContext): GrafcetStudioProject.SharedFlowStructSchema {
+    const project = context.project;
+    const shared: GrafcetStudioProject.SharedFlowStructSchema = (project && project.sharedFlowStruct)
+      ? JSON.parse(JSON.stringify(project.sharedFlowStruct))
+      : { enabled: true, structTypeName: 'UDT_FlowData', members: [] };
+
+    const typeName = shared.structTypeName || 'UDT_FlowData';
+
+    if (!shared.members || shared.members.length === 0) {
+      const devices = (project && project.devices) || [];
+      const matchingDevice = devices.find(d => d && d.name === typeName);
+      if (matchingDevice && Array.isArray(matchingDevice.signals)) {
+        shared.members = matchingDevice.signals.map(s => ({
+          id: s.id || s.name,
+          name: s.name,
+          type: s.dataType || 'BOOL',
+          comment: s.comment || ''
+        }));
+      }
+    }
+
+    return shared;
+  }
+
   function buildCSharpPayloadCore(
     context: PayloadContext,
     platform: string,
@@ -454,8 +478,33 @@ namespace GrafcetStudioCodegenPayload {
       allVars.push(variable);
     };
 
+    const sharedStruct = buildSharedFlowStructInfo(context);
+    const structTypeName = sharedStruct.structTypeName || 'UDT_FlowData';
+
+    const projectVars = getCSharpVariables(context, { steps: [], transitions: [], connections: [], vars: [] });
+    const projectVarMap = new Map<string, DeviceVariable>();
+    projectVars.forEach(v => {
+      if (v && v.label) {
+        projectVarMap.set(v.label, v);
+        addVar(v);
+      }
+    });
+
     const flows = flowsWithVariables.map(flow => {
       (flow.variables || []).forEach(addVar);
+      const flowName = (flow.diagram && flow.diagram.name) || 'Flow';
+      const instanceName = 'ST_' + flowName.replace(/[^a-zA-Z0-9_]/g, '_');
+      const existingProjectVar = projectVarMap.get(instanceName);
+
+      const flowVar: DeviceVariable = existingProjectVar ? existingProjectVar : {
+        label: instanceName,
+        format: structTypeName,
+        declarationMode: 'SymbolicBlock'
+      };
+
+      if (sharedStruct.enabled !== false && !existingProjectVar) {
+        addVar(flowVar);
+      }
       return {
         id: flow.diagram && flow.diagram.id,
         name: flow.diagram && flow.diagram.name,
@@ -469,7 +518,10 @@ namespace GrafcetStudioCodegenPayload {
         diagram: flow.diagram,
         steps: flow.steps,
         transitions: flow.transitions,
-        macroPortVariable: (flow as any).macroPortVariable || null
+        macroPortVariable: (flow as any).macroPortVariable || null,
+        structInstanceName: instanceName,
+        structTypeName: structTypeName,
+        flowVariable: flowVar
       };
     });
     getCSharpVariables(context, { steps: [], transitions: [], connections: [], vars: [] }).forEach(addVar);
@@ -502,6 +554,7 @@ namespace GrafcetStudioCodegenPayload {
       variables: allVars,
       blocks: buildBlocksInfo(context),
       deviceTypes: getCSharpDeviceTypes(context),
+      sharedFlowStruct: sharedStruct,
       ioMapping: JSON.parse(JSON.stringify((context.project && context.project.ioMapping) || { physicalIOs: [], entries: [] })),
       unitConfig: JSON.parse(JSON.stringify((context.project && context.project.unitConfig) || {}))
     };

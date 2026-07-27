@@ -13,13 +13,18 @@ namespace GrafcetStudioTemplateEditor {
 
 
   const PRESETS: Preset[] = [
-    { id: 'main-output', label: 'main-output.hbs', path: 'main-output.hbs' },
+    { id: 'unitMainOutput', label: 'unitMainOutput.hbs', path: 'unitMainOutput.hbs' },
+    { id: 'unit-main-output', label: 'unit-main-output.hbs', path: 'unit-main-output.hbs' },
     { id: 'step-body', label: 'step-body.hbs', path: 'step-body.hbs' },
     { id: 'step-body-1', label: 'step-body-1.hbs', path: 'step-body-1.hbs' },
-    { id: 'error', label: 'error.hbs', path: 'error.hbs' },
-    { id: 'manual', label: 'manual.hbs', path: 'manual.hbs' },
-    { id: 'auto', label: 'auto.hbs', path: 'auto.hbs' },
-    { id: 'origin', label: 'origin.hbs', path: 'origin.hbs' },
+    { id: 'unitError', label: 'unitError.hbs', path: 'unitError.hbs' },
+    { id: 'unit-error', label: 'unit-error.hbs', path: 'unit-error.hbs' },
+    { id: 'unitManual', label: 'unitManual.hbs', path: 'unitManual.hbs' },
+    { id: 'unit-manual', label: 'unit-manual.hbs', path: 'unit-manual.hbs' },
+    { id: 'unitAuto', label: 'unitAuto.hbs', path: 'unitAuto.hbs' },
+    { id: 'unit-auto', label: 'unit-auto.hbs', path: 'unit-auto.hbs' },
+    { id: 'unitOrigin', label: 'unitOrigin.hbs', path: 'unitOrigin.hbs' },
+    { id: 'unit-origin', label: 'unit-origin.hbs', path: 'unit-origin.hbs' },
     { id: 'output', label: 'output.hbs', path: 'output.hbs' },
     { id: 'simple-UnitCode', label: 'simple/UnitCode.hbs', path: 'simple/UnitCode.hbs' },
     { id: 'simple-DeviceManager', label: 'simple/DeviceManager.hbs', path: 'simple/DeviceManager.hbs' },
