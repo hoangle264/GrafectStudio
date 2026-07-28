@@ -138,8 +138,7 @@ public static class GeneratorContextBuilder
                 NextStep = nextStep,
                 InTransition = entry.InTransition,
                 OutTransition = entry.OutTransition,
-                BranchType = entry.BranchType,
-                Expression = StepContextBuilder.BuildStepExpressionContext(step, previousStep, nextStep, entry.InTransition, entry.OutTransition, index == 0, variables)
+                BranchType = entry.BranchType
             };
         }).ToList();
 

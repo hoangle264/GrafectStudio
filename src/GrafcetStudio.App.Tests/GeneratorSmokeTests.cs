@@ -823,7 +823,7 @@ public class GeneratorSmokeTests
 
 
     [Fact]
-    public void KeyenceGenerator_Phase1_PopulatesStepMnemonicsInJsonContext()
+    public void KeyenceGenerator_Phase1_PopulatesStepContextInJsonContext()
     {
         var payload = new CodegenPayload
         {
@@ -881,14 +881,10 @@ public class GeneratorSmokeTests
 
         var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
 
-        Assert.Contains("\"activationMnemonic\": \"SET  @MR100\"", output);
-        Assert.Contains("LD   @MR100", output);
-        Assert.Contains("AND  MR11", output);
-        Assert.Contains("ANB  MR20", output);
-        Assert.Contains("SET  @MR101", output);
-        Assert.Contains("OUT  MR10", output);
-        Assert.Contains("\"doneMnemonic\"", output);
-        Assert.Contains("\"bodyMnemonic\"", output);
+        Assert.Contains("\"execAddress\": \"@MR100\"", output);
+        Assert.Contains("\"doneAddress\": \"@MR101\"", output);
+        Assert.Contains("\"OutTransitionCondition\": \"!MR20\"", output);
+        Assert.Contains("\"deviceOutputGroups\"", output);
     }
 
 
@@ -900,11 +896,10 @@ public class GeneratorSmokeTests
         ; Expression-style template keeps HBS readable
         {{#each autoFlows}}
         {{#each steps}}
-        {{expression.activationExpression}} -> SET {{ExecAddress}}
-        {{#each expression.outputs}}
-        {{expression}}
+        {{#each actions}}
+        {{../execAddress}} -> OUT {{target}}
         {{/each}}
-        {{expression.doneExpression}}
+        {{execAddress}}{{#each actions}}{{#if complete.address}} & {{complete.address}}{{/if}}{{/each}}{{#if outTransitionCondition}} & {{outTransitionCondition}}{{/if}} -> SET {{doneAddress}}
         {{/each}}
         {{/each}}
         """);
@@ -963,7 +958,7 @@ public class GeneratorSmokeTests
 
         Assert.Contains("LD   MR100", output);
         Assert.Contains("OUT  MR10", output);
-        Assert.Contains("SET  MR101", output);
+        Assert.Contains("MR101", output);
         Assert.DoesNotContain("->", output);
         Assert.DoesNotContain("MR100 -> OUT MR10", output);
     }

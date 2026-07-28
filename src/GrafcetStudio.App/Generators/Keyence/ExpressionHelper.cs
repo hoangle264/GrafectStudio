@@ -33,17 +33,6 @@ public static class ExpressionHelper
         return JoinAnd(terms);
     }
 
-    public static string BuildDoneConditionExpression(Step step, string outTransitionExpression, IList<StepActionExpressionContext> actions)
-    {
-        var terms = new List<string>();
-        AddConditionTerm(terms, step.ExecAddress);
-        foreach (var action in actions)
-        {
-            AddConditionTerm(terms, action.completionExpression);
-        }
-        AddConditionTerm(terms, outTransitionExpression);
-        return JoinAnd(terms);
-    }
 
     public static string NegateExpression(string? expression)
     {

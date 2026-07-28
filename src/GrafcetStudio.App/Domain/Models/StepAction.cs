@@ -36,6 +36,21 @@ public class StepAction
     [JsonIgnore]
     public ActionResolveResult? ResolvedCommand { get; init; }
 
+    [JsonIgnore]
+    public string TargetAddress => ResolvedCommand?.OutputBindings.FirstOrDefault()?.PhysicalOutputRef 
+        ?? (!string.IsNullOrWhiteSpace(Address) ? Address! : Variable);
+
+    /// <summary>Lowercase alias for <see cref="TargetAddress"/>. Used by Handlebars templates via <c>{{target}}</c>.</summary>
+    [JsonIgnore]
+    public string target => TargetAddress;
+
+    [JsonIgnore]
+    public string? InterlockAddress => ResolvedCommand?.OutputBindings.FirstOrDefault()?.InterlockAddress;
+
+    /// <summary>Lowercase alias for <see cref="InterlockAddress"/>. Used by Handlebars templates via <c>{{interlockAddress}}</c>.</summary>
+    [JsonIgnore]
+    public string? interlockAddress => InterlockAddress;
+
     public string ToPhysicalAddress(IList<DeviceVariable> vars)
         => !string.IsNullOrWhiteSpace(Address)
             ? Address!

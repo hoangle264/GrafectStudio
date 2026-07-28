@@ -1,92 +1,16 @@
 ;{{DeviceLabel}}
 {{#each Commands}}
-;Action
-    {{#each FlowCommands}}
-        {{#if IsSingle}}
-            {{#if IsOrigin}}
-LD   {{../../UnitAddresses.flagOrigin}}    ;origin
-AND  {{SourceExecuteBit}} 
-ANB  {{SourceDoneBit}}
-            {{else}}
-LD   {{../../UnitAddresses.flagAuto}}    ;auto
-AND  {{SourceExecuteBit}}
-ANB  {{SourceDoneBit}}
-            {{/if}}
-        {{else}}
-            {{#if IsFirst}}
-                {{#if IsOrigin}}
-LD   {{../../UnitAddresses.flagOrigin}}    ;origin
-AND  {{SourceExecuteBit}}
-ANB  {{SourceDoneBit}}
-                {{else}}
-LD   {{../../UnitAddresses.flagAuto}}    ;auto
-AND  {{SourceExecuteBit}}
-ANB  {{SourceDoneBit}}
-                {{/if}}
-            {{else}}
-                {{#if IsOrigin}}
-LD   {{../../UnitAddresses.flagOrigin}}    ;origin
-AND  {{SourceExecuteBit}}
-ANB  {{SourceDoneBit}}
-                {{else}}
-LD   {{../../UnitAddresses.flagAuto}}    ;auto
-AND  {{SourceExecuteBit}}
-ANB  {{SourceDoneBit}}
-                {{/if}}
-ORL
-            {{/if}}
-        {{/if}} 
-    {{/each}}
-LD   {{../UnitAddresses.flagManual}}    ;manual
-    {{#if (eq CommandId "CoilA")}}
-ANP  {{../SignalAddresses.SysManCy}}    ;sys man cyl
-    {{else}}
-ANF  {{../SignalAddresses.SysManCy}}    ;sys man cyl
-    {{/if}}
-ORL
-{{#if (eq CommandId "CoilA")}}
-AND  {{../SignalAddresses.LockA}}    ;Lock A
-SET  {{../SignalAddresses.CoilA}}    ;coil A
-CON
-RES  {{../SignalAddresses.CoilB}}    ;coil B
+;{{CommandId}}
+{{#each FlowCommands}}
+{{#if IsFirst}}
+LD   {{SourceExecuteBit}}
 {{else}}
-AND  {{../SignalAddresses.LockB}}    ;Lock B
-SET  {{../SignalAddresses.CoilB}}    ;coil B
-CON
-RES  {{../SignalAddresses.CoilA}}    ;coil A
+AND   {{SourceExecuteBit}}
 {{/if}}
-;Error
+{{/each}}
 {{#if (eq CommandId "CoilA")}}
-LDB  {{../SignalAddresses.DisSnsH}}    ;dis sns high
-AND  {{../SignalAddresses.LSH}}    ;Feedback
-INV
-AND  {{PhysicalOutputRef}}    ;{{CommandId}}
-ONDL #500 {{../SignalAddresses.ErrorA}}    ;error A
+SET  {{../SignalAddresses.bControl}}    ;coil A
 {{else}}
-LDB  {{../SignalAddresses.DisSnsL}}    ;dis sns low
-AND  {{../SignalAddresses.LSL}}    ;Feedback
-INV
-AND  {{PhysicalOutputRef}}    ;{{CommandId}}
-ONDL #500 {{../SignalAddresses.ErrorB}}    ;error B
-{{/if}}
-;State
-{{#if (eq CommandId "CoilA")}}
-LD   {{PhysicalOutputRef}}      ;{{CommandId}}
-LD   {{../SignalAddresses.DisSnsH}}     ;dis sns high
-AND  {{../SignalAddresses.ErrorA}}      ;error A
-LDB  {{../SignalAddresses.DisSnsH}}     ;dis sns high
-AND  {{../SignalAddresses.LSH}}     ;LSH
-ORL
-ANL
-SET  {{../SignalAddresses.State}}       ;state
-{{else}}
-LD   {{PhysicalOutputRef}}  ;{{CommandId}}
-LD   {{../SignalAddresses.DisSnsL}}     ;dis sns low
-AND  {{../SignalAddresses.ErrorB}}      ;error B
-LDB  {{../SignalAddresses.DisSnsL}}     ;dis sns low
-AND  {{../SignalAddresses.LSL}}     ;LSL
-ORL
-ANL
-RES  {{../SignalAddresses.State}}       ;state
+RES  {{../SignalAddresses.bControl}}    ;coil B
 {{/if}}
 {{/each}}
