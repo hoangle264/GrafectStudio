@@ -157,13 +157,99 @@ public class GeneratorSmokeTests
     }
 
     [Fact]
-    public void ErrorGenerator_ReturnsErrorsArray()
+    public void ErrorGenerator_ReturnsErrorsAndDeviceGroups()
     {
         var generator = new ErrorGenerator();
         var payload = BuildPayload();
         var output = generator.Generate(payload);
         Assert.Contains("\"errors\"", output);
-        Assert.Contains("\"devices\"", output);
+        Assert.Contains("\"deviceGroups\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_IncludesUnit_WhenUnitIsSet()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload(); // Unit = { Name = "Main" }
+        var output = generator.Generate(payload);
+        Assert.Contains("\"unit\"", output);
+        Assert.Contains("\"Main\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_OmitsUnit_WhenUnitIsNull()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Unit = null;
+        var output = generator.Generate(payload);
+        Assert.DoesNotContain("\"unit\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_FiltersPrimitiveTypes_FromDeviceGroups()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Clamp",  Format = "Cylinder" },
+            new() { Label = "Flag",   Format = "BOOL" },
+            new() { Label = "Count",  Format = "INT" },
+            new() { Label = "Weight", Format = "REAL" },
+            new() { Label = "Motor1", Format = "Motor" }
+        };
+        var output = generator.Generate(payload);
+
+        // Device types → có trong output
+        Assert.Contains("\"Cylinder\"", output);
+        Assert.Contains("\"Motor\"", output);
+
+        // Primitive types → bị lọc bỏ
+        Assert.DoesNotContain("\"BOOL\"", output);
+        Assert.DoesNotContain("\"INT\"", output);
+        Assert.DoesNotContain("\"REAL\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_IncludesSystemControl_WhenVariableExists()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Machine", Format = "SystemControl",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["stateAuto"]   = "M100",
+                        ["stateManual"] = "M101",
+                        ["stateError"]  = "M102"
+                    }},
+            new() { Label = "Clamp", Format = "Cylinder" }
+        };
+        var output = generator.Generate(payload);
+
+        // systemControl field có trong output
+        Assert.Contains("\"systemControl\"", output);
+        Assert.Contains("\"Machine\"", output);
+        Assert.Contains("\"stateAuto\"", output);
+
+        // SystemControl không xuất hiện trong deviceGroups
+        Assert.DoesNotContain("\"SystemControl\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_OmitsSystemControl_WhenNoVariableExists()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Clamp", Format = "Cylinder" }
+        };
+        var output = generator.Generate(payload);
+
+        Assert.DoesNotContain("\"systemControl\"", output);
     }
 
     [Fact]

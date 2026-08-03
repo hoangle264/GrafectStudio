@@ -28,7 +28,7 @@ public static class MnemonicEmitter
         }
         catch
         {
-            return SplitMnemonicLines(BuildInstructionExpression(condition, instruction, target));
+            return SplitMnemonicLines(StepContextBuilder.BuildInstructionExpression(condition, instruction, target));
         }
     }
 
@@ -121,13 +121,4 @@ public static class MnemonicEmitter
         => string.IsNullOrWhiteSpace(text)
             ? new List<string>()
             : text.Replace("\r", string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
-
-    private static string BuildInstructionExpression(string conditionExpression, string instruction, string target)
-    {
-        if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return string.Empty;
-
-        return string.IsNullOrWhiteSpace(conditionExpression)
-            ? $"{instruction} {target}"
-            : $"{conditionExpression} -> {instruction} {target}";
-    }
 }

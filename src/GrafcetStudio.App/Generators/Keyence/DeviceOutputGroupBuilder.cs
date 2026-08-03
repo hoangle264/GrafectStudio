@@ -9,6 +9,8 @@ namespace GrafcetStudio.App.Generators.Keyence;
 
 internal static class DeviceOutputGroupBuilder
 {
+    private readonly record struct FlattenedSourceItem(AggregatedOutputBinding Binding, OutputBindingSource Source);
+
     public static IList<DeviceOutputGroup> BuildDeviceOutputGroups(
         IList<AggregatedOutputBinding> mergedBindings,
         IList<DeviceVariable> variables,
@@ -18,171 +20,180 @@ internal static class DeviceOutputGroupBuilder
         var variablesByLabel = variables.ToDictionaryIgnoreCase(variable => variable.Label);
         var deviceTypesByName = deviceTypes.ToDictionaryIgnoreCase(deviceType => deviceType.Name);
         var flattenedSources = mergedBindings
-            .SelectMany(binding => binding.Sources.Select(source => new { Binding = binding, Source = source }))
+            .SelectMany(binding => binding.Sources.Select(source => new FlattenedSourceItem(binding, source)))
             .Where(item => !string.IsNullOrWhiteSpace(item.Source.DeviceLabel))
             .ToList();
 
         return flattenedSources
             .GroupBy(item => item.Source.DeviceLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(deviceGroup =>
-            {
-                var firstSource = deviceGroup.Select(item => item.Source).First();
-                variablesByLabel.TryGetValue(deviceGroup.Key, out var variable);
-                deviceTypesByName.TryGetValue(firstSource.DeviceFormat, out var deviceType);
-                var deviceKind = NormalizeDeviceKind(firstSource.DeviceFormat);
-
-                var signals = variable is null || deviceType is null
-                    ? new List<object>()
-                    : deviceType.Signals.Select(signal => new
-                    {
-                        name = signal.Name,
-                        dataType = signal.DataType,
-                        varType = signal.VarType.ToString(),
-                        comment = signal.Comment,
-                        address = variable.GetSignalAddress(signal.Id) ?? variable.GetSignalAddress(signal.Name)
-                    }).Cast<object>().ToList();
-
-                var commands = deviceGroup
-                    .Where(item => !string.IsNullOrWhiteSpace(item.Source.CommandId))
-                    .GroupBy(item => item.Source.CommandId, StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(commandGroup => commandGroup.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select((commandGroup, commandIndex) =>
-                    {
-                        var commandSource = commandGroup.Select(item => item.Source).First();
-                        var commandBindings = commandGroup.Select(item => item.Binding).ToList();
-                        var aggregationMode = commandGroup
-                            .Select(item => item.Binding.AggregationMode)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "OR";
-                        var physicalOutputRef = commandGroup
-                            .Select(item => item.Binding.PhysicalOutputRef)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                        var interlockSignal = commandGroup
-                            .Select(item => item.Source.InterlockSignal)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                        var interlockAddress = commandGroup
-                            .Select(item => item.Source.InterlockAddress)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                        var interlockLabel = commandGroup
-                            .Select(item => item.Source.InterlockLabel)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                        var interlockRequiredState = commandGroup
-                            .Select(item => item.Source.InterlockRequiredState)
-                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                        var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), unitAddresses);
-                        var originCommandCount = flowCommands.Count(command => command.IsOrigin);
-                        var autoCommandCount = flowCommands.Count(command => command.IsAuto);
-                        var getFlowCondition = new Func<DeviceCommandFlowOutput, string>(cmd =>
-                            ExpressionHelper.JoinAnd(new[] { cmd.modeFlagAddress, cmd.SourceExecuteBit, ExpressionHelper.NegateExpression(cmd.SourceDoneBit) }));
-                        var sourceConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Select(getFlowCondition), aggregationMode);
-                        var autoConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(getFlowCondition), aggregationMode);
-                        var originConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(getFlowCondition), aggregationMode);
-                        var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
-                        var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
-                        var gatedSourceConditionExpression = !string.IsNullOrWhiteSpace(interlockExpression)
-                            ? ExpressionHelper.WrapConditionTerm(sourceConditionExpression)
-                            : sourceConditionExpression;
-                        var driveConditionExpression = ExpressionHelper.JoinAnd(new[] { gatedSourceConditionExpression, interlockExpression });
-                        var instruction = ResolveOutputInstruction(commandGroup.Select(item => item.Source.Qualifier));
-                        var expression = StepContextBuilder.BuildInstructionExpression(driveConditionExpression, instruction, physicalOutputRef);
-                        var feedbackSignals = commandGroup
-                            .SelectMany(item => item.Source.FeedbackSignals)
-                            .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
-                            .Select(signalGroup => signalGroup.First())
-                            .ToList();
-                        var mnemonicLines = MnemonicEmitter.EmitRungLines(driveConditionExpression, instruction, physicalOutputRef, variables);
-                        var mnemonic = MnemonicEmitter.JoinMnemonicLines(mnemonicLines);
-                        var outputIntent = new DeviceOutputIntent
-                        {
-                            index = commandIndex,
-                            number = commandIndex + 1,
-                            deviceLabel = deviceGroup.Key,
-                            deviceFormat = firstSource.DeviceFormat,
-                            deviceKind = deviceKind,
-                            commandId = commandSource.CommandId,
-                            actionLabel = commandSource.ActionLabel,
-                            driveSignal = commandSource.DriveSignal,
-                            conditionExpression = driveConditionExpression,
-                            sourceConditionExpression = sourceConditionExpression,
-                            autoConditionExpression = autoConditionExpression,
-                            originConditionExpression = originConditionExpression,
-                            manualConditionExpression = manualConditionExpression,
-                            interlockExpression = interlockExpression,
-                            driveConditionExpression = driveConditionExpression,
-                            instruction = instruction,
-                            target = physicalOutputRef,
-                            expression = expression,
-                            mnemonic = mnemonic,
-                            mnemonicLines = mnemonicLines,
-                            sources = flowCommands,
-                            feedbackSignals = feedbackSignals
-                        };
-
-                        return new DeviceCommandOutput
-                        {
-                            CommandId = commandSource.CommandId,
-                            ActionLabel = commandSource.ActionLabel,
-                            DriveSignal = commandSource.DriveSignal,
-                            InterlockSignal = interlockSignal,
-                            InterlockAddress = interlockAddress,
-                            InterlockLabel = interlockLabel,
-                            InterlockRequiredState = interlockRequiredState,
-                            HasInterlock = !string.IsNullOrWhiteSpace(interlockExpression),
-                            PhysicalOutputRef = physicalOutputRef,
-                            AggregationMode = aggregationMode,
-                            SourceSteps = commandBindings
-                                .SelectMany(binding => binding.SourceSteps)
-                                .NotEmpty()
-                                .DistinctIgnoreCase()
-                                .ToList(),
-                            SourceExecuteBitRefs = commandBindings
-                                .SelectMany(binding => binding.SourceExecuteBitRefs)
-                                .NotEmpty()
-                                .DistinctIgnoreCase()
-                                .ToList(),
-                            SourceDoneBitRefs = commandBindings
-                                .SelectMany(binding => binding.SourceDoneBitRefs)
-                                .NotEmpty()
-                                .DistinctIgnoreCase()
-                                .ToList(),
-                            FlowCommands = flowCommands,
-                            FlowCommandCount = flowCommands.Count,
-                            OriginCommandCount = originCommandCount,
-                            AutoCommandCount = autoCommandCount,
-                            HasOriginCommands = originCommandCount > 0,
-                            HasAutoCommands = autoCommandCount > 0,
-                            FeedbackSignals = feedbackSignals,
-                            output = outputIntent,
-                            sources = flowCommands,
-                            instruction = instruction,
-                            target = physicalOutputRef,
-                            mnemonic = mnemonic,
-                            mnemonicLines = mnemonicLines
-                        };
-                    })
-                    .ToList();
-                var outputs = commands.Select(command => command.output).ToList();
-
-                return new DeviceOutputGroup
-                {
-                    DeviceLabel = deviceGroup.Key,
-                    DeviceFormat = firstSource.DeviceFormat,
-                    DeviceKind = deviceKind,
-                    Address = variable?.Address,
-                    SignalAddresses = variable?.SignalAddresses ?? new Dictionary<string, string>(),
-                    UnitAddresses = new Dictionary<string, string>(unitAddresses, StringComparer.OrdinalIgnoreCase),
-                    Signals = signals,
-                    Commands = commands,
-                    outputs = outputs
-                };
-            })
+            .Select(deviceGroup => BuildDeviceOutputGroup(deviceGroup, variablesByLabel, deviceTypesByName, unitAddresses, variables))
             .OrderBy(group => group.DeviceLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
-    private static string NormalizeDeviceKind(string? format)
+    private static DeviceOutputGroup BuildDeviceOutputGroup(
+        IGrouping<string, FlattenedSourceItem> deviceGroup,
+        IDictionary<string, DeviceVariable> variablesByLabel,
+        IDictionary<string, DeviceType> deviceTypesByName,
+        IDictionary<string, string> unitAddresses,
+        IList<DeviceVariable> variables)
     {
-        if (string.IsNullOrWhiteSpace(format)) return "generic";
-        return new string(format.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');
+        var firstSource = deviceGroup.First().Source;
+        variablesByLabel.TryGetValue(deviceGroup.Key, out var variable);
+        deviceTypesByName.TryGetValue(firstSource.DeviceFormat, out var deviceType);
+        var deviceKind = Common.GeneratorContextBuilder.NormalizeDeviceKind(firstSource.DeviceFormat);
+
+        var signals = variable is null || deviceType is null
+            ? new List<object>()
+            : deviceType.Signals.Select(signal => new
+            {
+                name = signal.Name,
+                dataType = signal.DataType,
+                varType = signal.VarType.ToString(),
+                comment = signal.Comment,
+                address = variable.GetSignalAddress(signal.Id) ?? variable.GetSignalAddress(signal.Name)
+            }).Cast<object>().ToList();
+
+        var commands = deviceGroup
+            .Where(item => !string.IsNullOrWhiteSpace(item.Source.CommandId))
+            .GroupBy(item => item.Source.CommandId, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(commandGroup => commandGroup.Key, StringComparer.OrdinalIgnoreCase)
+            .Select((commandGroup, commandIndex) => BuildDeviceCommandOutput(commandGroup, commandIndex, deviceGroup.Key, firstSource.DeviceFormat, deviceKind, unitAddresses, variables))
+            .ToList();
+
+        var outputs = commands.Select(command => command.output).ToList();
+
+        return new DeviceOutputGroup
+        {
+            DeviceLabel = deviceGroup.Key,
+            DeviceFormat = firstSource.DeviceFormat,
+            DeviceKind = deviceKind,
+            Address = variable?.Address,
+            SignalAddresses = variable?.SignalAddresses ?? new Dictionary<string, string>(),
+            UnitAddresses = new Dictionary<string, string>(unitAddresses, StringComparer.OrdinalIgnoreCase),
+            Signals = signals,
+            Commands = commands,
+            outputs = outputs
+        };
+    }
+
+    private static DeviceCommandOutput BuildDeviceCommandOutput(
+        IGrouping<string, FlattenedSourceItem> commandGroup,
+        int commandIndex,
+        string deviceLabel,
+        string deviceFormat,
+        string deviceKind,
+        IDictionary<string, string> unitAddresses,
+        IList<DeviceVariable> variables)
+    {
+        var commandSource = commandGroup.First().Source;
+        var commandBindings = commandGroup.Select(item => item.Binding).ToList();
+        var aggregationMode = commandGroup
+            .Select(item => item.Binding.AggregationMode)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "OR";
+        var physicalOutputRef = commandGroup
+            .Select(item => item.Binding.PhysicalOutputRef)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+        var interlockSignal = commandGroup
+            .Select(item => item.Source.InterlockSignal)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+        var interlockAddress = commandGroup
+            .Select(item => item.Source.InterlockAddress)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+        var interlockLabel = commandGroup
+            .Select(item => item.Source.InterlockLabel)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+        var interlockRequiredState = commandGroup
+            .Select(item => item.Source.InterlockRequiredState)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+        var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), unitAddresses);
+        var originCommandCount = flowCommands.Count(command => command.IsOrigin);
+        var autoCommandCount = flowCommands.Count(command => command.IsAuto);
+
+        var getFlowCondition = new Func<DeviceCommandFlowOutput, string>(cmd =>
+            ExpressionHelper.JoinAnd(new[] { cmd.modeFlagAddress, cmd.SourceExecuteBit, ExpressionHelper.NegateExpression(cmd.SourceDoneBit) }));
+        var sourceConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Select(getFlowCondition), aggregationMode);
+        var autoConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(getFlowCondition), aggregationMode);
+        var originConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(getFlowCondition), aggregationMode);
+        var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
+        var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
+
+        var gatedSourceConditionExpression = !string.IsNullOrWhiteSpace(interlockExpression)
+            ? ExpressionHelper.WrapConditionTerm(sourceConditionExpression)
+            : sourceConditionExpression;
+        var driveConditionExpression = ExpressionHelper.JoinAnd(new[] { gatedSourceConditionExpression, interlockExpression });
+
+        var instruction = ResolveOutputInstruction(commandGroup.Select(item => item.Source.Qualifier));
+        var feedbackSignals = commandGroup
+            .SelectMany(item => item.Source.FeedbackSignals)
+            .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
+            .Select(signalGroup => signalGroup.First())
+            .ToList();
+
+        var mnemonicLines = MnemonicEmitter.EmitRungLines(driveConditionExpression, instruction, physicalOutputRef, variables);
+        var mnemonic = MnemonicEmitter.JoinMnemonicLines(mnemonicLines);
+
+        var outputIntent = new DeviceOutputIntent
+        {
+            index = commandIndex,
+            number = commandIndex + 1,
+            deviceLabel = deviceLabel,
+            deviceFormat = deviceFormat,
+            deviceKind = deviceKind,
+            commandId = commandSource.CommandId,
+            actionLabel = commandSource.ActionLabel,
+            driveSignal = commandSource.DriveSignal,
+            sourceConditionExpression = sourceConditionExpression,
+            autoConditionExpression = autoConditionExpression,
+            originConditionExpression = originConditionExpression,
+            manualConditionExpression = manualConditionExpression,
+            interlockExpression = interlockExpression,
+            driveConditionExpression = driveConditionExpression,
+            instruction = instruction,
+            target = physicalOutputRef,
+            mnemonic = mnemonic,
+            mnemonicLines = mnemonicLines,
+            sources = flowCommands,
+            feedbackSignals = feedbackSignals
+        };
+
+        return new DeviceCommandOutput
+        {
+            CommandId = commandSource.CommandId,
+            ActionLabel = commandSource.ActionLabel,
+            DriveSignal = commandSource.DriveSignal,
+            InterlockSignal = interlockSignal,
+            InterlockAddress = interlockAddress,
+            InterlockLabel = interlockLabel,
+            InterlockRequiredState = interlockRequiredState,
+            HasInterlock = !string.IsNullOrWhiteSpace(interlockExpression),
+            PhysicalOutputRef = physicalOutputRef,
+            AggregationMode = aggregationMode,
+            SourceSteps = commandBindings
+                .SelectMany(binding => binding.SourceSteps)
+                .NotEmpty()
+                .DistinctIgnoreCase()
+                .ToList(),
+            SourceExecuteBitRefs = commandBindings
+                .SelectMany(binding => binding.SourceExecuteBitRefs)
+                .NotEmpty()
+                .DistinctIgnoreCase()
+                .ToList(),
+            SourceDoneBitRefs = commandBindings
+                .SelectMany(binding => binding.SourceDoneBitRefs)
+                .NotEmpty()
+                .DistinctIgnoreCase()
+                .ToList(),
+            FlowCommands = flowCommands,
+            FlowCommandCount = flowCommands.Count,
+            OriginCommandCount = originCommandCount,
+            AutoCommandCount = autoCommandCount,
+            HasOriginCommands = originCommandCount > 0,
+            HasAutoCommands = autoCommandCount > 0,
+            FeedbackSignals = feedbackSignals,
+            output = outputIntent
+        };
     }
 
     public static DeviceVariable? FindUnitVariable(IList<DeviceVariable> variables, string unitLabel)

@@ -1,16 +1,16 @@
 ;{{DeviceLabel}}
-{{#each Commands}}
+{{#each Commands~}}
 ;{{CommandId}}
-{{#each FlowCommands}}
-{{#if IsFirst}}
+{{#each FlowCommands~}}
+{{#if IsFirst~}}
 LD   {{SourceExecuteBit}}
-{{else}}
+{{else~}}
 AND   {{SourceExecuteBit}}
-{{/if}}
-{{/each}}
-{{#if (eq CommandId "CoilA")}}
+{{/if~}}
+{{/each~}}
+{{#if (eq CommandId "CoilA")~}}
 SET  {{../SignalAddresses.bControl}}    ;coil A
-{{else}}
+{{else~}}
 RES  {{../SignalAddresses.bControl}}    ;coil B
-{{/if}}
-{{/each}}
+{{/if~}}
+{{/each~}}

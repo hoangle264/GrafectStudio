@@ -396,7 +396,7 @@ public static class GeneratorContextBuilder
             ? "MacroStep"
             : "Macro";
 
-    private static string NormalizeDeviceKind(string? format)
+    public static string NormalizeDeviceKind(string? format)
     {
         if (string.IsNullOrWhiteSpace(format)) return "generic";
         return new string(format.Trim().ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray()).Trim('_');

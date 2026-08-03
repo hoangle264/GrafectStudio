@@ -47,19 +47,15 @@ public class DeviceCommandOutput
     /// <summary>Expression-first shape for new Keyence templates: condition -> instruction target.</summary>
     public DeviceOutputIntent output { get; init; } = new();
 
-    public IList<DeviceCommandFlowOutput> sources { get; init; } = new List<DeviceCommandFlowOutput>();
+    public IList<DeviceCommandFlowOutput> sources => output.sources;
 
-    public string instruction { get; init; } = string.Empty;
+    public string instruction => output.instruction;
 
-    public string target { get; init; } = string.Empty;
+    public string target => output.target;
 
-    public string mnemonic { get; init; } = string.Empty;
+    public string mnemonic => output.mnemonic;
 
-    public IList<string> mnemonicLines { get; init; } = new List<string>();
-
-    public string outputInstruction => instruction;
-
-    public string outputTarget => target;
+    public IList<string> mnemonicLines => output.mnemonicLines;
 }
 
 public class DeviceCommandFlowOutput
@@ -127,7 +123,7 @@ public class DeviceOutputIntent
 
     public string driveSignal { get; init; } = string.Empty;
 
-    public string conditionExpression { get; init; } = string.Empty;
+    public string conditionExpression => driveConditionExpression;
 
     public string sourceConditionExpression { get; init; } = string.Empty;
 
@@ -150,12 +146,6 @@ public class DeviceOutputIntent
     public string mnemonic { get; init; } = string.Empty;
 
     public IList<string> mnemonicLines { get; init; } = new List<string>();
-
-    public string outputInstruction => instruction;
-
-    public string outputTarget => target;
-
-    public string outputExpression => expression;
 
     public IList<DeviceCommandFlowOutput> sources { get; init; } = new List<DeviceCommandFlowOutput>();
 
