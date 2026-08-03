@@ -43,19 +43,6 @@ public class DeviceCommandOutput
     public bool HasAutoCommands { get; init; }
 
     public IList<FeedbackSignalResult> FeedbackSignals { get; init; } = new List<FeedbackSignalResult>();
-
-    /// <summary>Expression-first shape for new Keyence templates: condition -> instruction target.</summary>
-    public DeviceOutputIntent output { get; init; } = new();
-
-    public IList<DeviceCommandFlowOutput> sources => output.sources;
-
-    public string instruction => output.instruction;
-
-    public string target => output.target;
-
-    public string mnemonic => output.mnemonic;
-
-    public IList<string> mnemonicLines => output.mnemonicLines;
 }
 
 public class DeviceCommandFlowOutput
@@ -97,71 +84,6 @@ public class DeviceCommandFlowOutput
     public string qualifier { get; init; } = string.Empty;
 
     public string modeFlagAddress { get; init; } = string.Empty;
-
-    public string conditionMnemonic { get; init; } = string.Empty;
-
-    public IList<string> conditionMnemonicLines { get; init; } = new List<string>();
-
-    public bool hasCondition => !string.IsNullOrWhiteSpace(conditionMnemonic);
-}
-
-public class DeviceOutputIntent
-{
-    public int index { get; init; }
-
-    public int number { get; init; }
-
-    public string deviceLabel { get; init; } = string.Empty;
-
-    public string deviceFormat { get; init; } = string.Empty;
-
-    public string deviceKind { get; init; } = "generic";
-
-    public string commandId { get; init; } = string.Empty;
-
-    public string actionLabel { get; init; } = string.Empty;
-
-    public string driveSignal { get; init; } = string.Empty;
-
-    public string conditionExpression => driveConditionExpression;
-
-    public string sourceConditionExpression { get; init; } = string.Empty;
-
-    public string autoConditionExpression { get; init; } = string.Empty;
-
-    public string originConditionExpression { get; init; } = string.Empty;
-
-    public string manualConditionExpression { get; init; } = string.Empty;
-
-    public string interlockExpression { get; init; } = string.Empty;
-
-    public string driveConditionExpression { get; init; } = string.Empty;
-
-    public string instruction { get; init; } = string.Empty;
-
-    public string target { get; init; } = string.Empty;
-
-    public string expression { get; init; } = string.Empty;
-
-    public string mnemonic { get; init; } = string.Empty;
-
-    public IList<string> mnemonicLines { get; init; } = new List<string>();
-
-    public IList<DeviceCommandFlowOutput> sources { get; init; } = new List<DeviceCommandFlowOutput>();
-
-    public IList<FeedbackSignalResult> feedbackSignals { get; init; } = new List<FeedbackSignalResult>();
-
-    public bool hasCondition => !string.IsNullOrWhiteSpace(conditionExpression);
-
-    public bool hasAutoCondition => !string.IsNullOrWhiteSpace(autoConditionExpression);
-
-    public bool hasOriginCondition => !string.IsNullOrWhiteSpace(originConditionExpression);
-
-    public bool hasManualCondition => !string.IsNullOrWhiteSpace(manualConditionExpression);
-
-    public bool hasInterlock => !string.IsNullOrWhiteSpace(interlockExpression);
-
-    public bool hasFeedback => feedbackSignals.Count > 0;
 }
 
 public class DeviceOutputGroup
@@ -181,7 +103,4 @@ public class DeviceOutputGroup
     public IList<object> Signals { get; init; } = new List<object>();
 
     public IList<DeviceCommandOutput> Commands { get; init; } = new List<DeviceCommandOutput>();
-
-    /// <summary>Flat expression-first outputs for templates that do not need legacy command binding details.</summary>
-    public IList<DeviceOutputIntent> outputs { get; init; } = new List<DeviceOutputIntent>();
 }

@@ -58,10 +58,8 @@ internal static class DeviceOutputGroupBuilder
             .Where(item => !string.IsNullOrWhiteSpace(item.Source.CommandId))
             .GroupBy(item => item.Source.CommandId, StringComparer.OrdinalIgnoreCase)
             .OrderBy(commandGroup => commandGroup.Key, StringComparer.OrdinalIgnoreCase)
-            .Select((commandGroup, commandIndex) => BuildDeviceCommandOutput(commandGroup, commandIndex, deviceGroup.Key, firstSource.DeviceFormat, deviceKind, unitAddresses, variables))
+            .Select((commandGroup, commandIndex) => BuildDeviceCommandOutput(commandGroup, unitAddresses))
             .ToList();
-
-        var outputs = commands.Select(command => command.output).ToList();
 
         return new DeviceOutputGroup
         {
@@ -72,19 +70,13 @@ internal static class DeviceOutputGroupBuilder
             SignalAddresses = variable?.SignalAddresses ?? new Dictionary<string, string>(),
             UnitAddresses = new Dictionary<string, string>(unitAddresses, StringComparer.OrdinalIgnoreCase),
             Signals = signals,
-            Commands = commands,
-            outputs = outputs
+            Commands = commands
         };
     }
 
     private static DeviceCommandOutput BuildDeviceCommandOutput(
         IGrouping<string, FlattenedSourceItem> commandGroup,
-        int commandIndex,
-        string deviceLabel,
-        string deviceFormat,
-        string deviceKind,
-        IDictionary<string, string> unitAddresses,
-        IList<DeviceVariable> variables)
+        IDictionary<string, string> unitAddresses)
     {
         var commandSource = commandGroup.First().Source;
         var commandBindings = commandGroup.Select(item => item.Binding).ToList();
@@ -110,53 +102,13 @@ internal static class DeviceOutputGroupBuilder
         var flowCommands = BuildCommandFlowOutputs(commandGroup.Select(item => item.Source), unitAddresses);
         var originCommandCount = flowCommands.Count(command => command.IsOrigin);
         var autoCommandCount = flowCommands.Count(command => command.IsAuto);
-
-        var getFlowCondition = new Func<DeviceCommandFlowOutput, string>(cmd =>
-            ExpressionHelper.JoinAnd(new[] { cmd.modeFlagAddress, cmd.SourceExecuteBit, ExpressionHelper.NegateExpression(cmd.SourceDoneBit) }));
-        var sourceConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Select(getFlowCondition), aggregationMode);
-        var autoConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsAuto).Select(getFlowCondition), aggregationMode);
-        var originConditionExpression = ExpressionHelper.JoinByAggregationMode(flowCommands.Where(command => command.IsOrigin).Select(getFlowCondition), aggregationMode);
-        var manualConditionExpression = ResolveModeFlagAddress("manual", unitAddresses);
         var interlockExpression = BuildInterlockExpression(interlockAddress, interlockRequiredState);
 
-        var gatedSourceConditionExpression = !string.IsNullOrWhiteSpace(interlockExpression)
-            ? ExpressionHelper.WrapConditionTerm(sourceConditionExpression)
-            : sourceConditionExpression;
-        var driveConditionExpression = ExpressionHelper.JoinAnd(new[] { gatedSourceConditionExpression, interlockExpression });
-
-        var instruction = ResolveOutputInstruction(commandGroup.Select(item => item.Source.Qualifier));
         var feedbackSignals = commandGroup
             .SelectMany(item => item.Source.FeedbackSignals)
             .GroupBy(signal => $"{signal.SignalName}\u001F{signal.PhysicalAddress}", StringComparer.OrdinalIgnoreCase)
             .Select(signalGroup => signalGroup.First())
             .ToList();
-
-        var mnemonicLines = MnemonicEmitter.EmitRungLines(driveConditionExpression, instruction, physicalOutputRef, variables);
-        var mnemonic = MnemonicEmitter.JoinMnemonicLines(mnemonicLines);
-
-        var outputIntent = new DeviceOutputIntent
-        {
-            index = commandIndex,
-            number = commandIndex + 1,
-            deviceLabel = deviceLabel,
-            deviceFormat = deviceFormat,
-            deviceKind = deviceKind,
-            commandId = commandSource.CommandId,
-            actionLabel = commandSource.ActionLabel,
-            driveSignal = commandSource.DriveSignal,
-            sourceConditionExpression = sourceConditionExpression,
-            autoConditionExpression = autoConditionExpression,
-            originConditionExpression = originConditionExpression,
-            manualConditionExpression = manualConditionExpression,
-            interlockExpression = interlockExpression,
-            driveConditionExpression = driveConditionExpression,
-            instruction = instruction,
-            target = physicalOutputRef,
-            mnemonic = mnemonic,
-            mnemonicLines = mnemonicLines,
-            sources = flowCommands,
-            feedbackSignals = feedbackSignals
-        };
 
         return new DeviceCommandOutput
         {
@@ -191,8 +143,7 @@ internal static class DeviceOutputGroupBuilder
             AutoCommandCount = autoCommandCount,
             HasOriginCommands = originCommandCount > 0,
             HasAutoCommands = autoCommandCount > 0,
-            FeedbackSignals = feedbackSignals,
-            output = outputIntent
+            FeedbackSignals = feedbackSignals
         };
     }
 
@@ -217,11 +168,8 @@ internal static class DeviceOutputGroupBuilder
                 var source = commandGroup.First();
                 var flowType = string.Equals(source.FlowType, "origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "auto";
                 var modeFlagAddress = ResolveModeFlagAddress(flowType, unitAddresses);
-                var executeExpression = source.SourceExecuteBitRef ?? string.Empty;
-                var doneGuardExpression = ExpressionHelper.NegateExpression(source.SourceDoneBitRef);
-                var conditionExpression = ExpressionHelper.JoinAnd(new[] { modeFlagAddress, executeExpression, doneGuardExpression });
 
-                var flowOutput = new DeviceCommandFlowOutput
+                return new DeviceCommandFlowOutput
                 {
                     Id = source.FlowId,
                     Name = source.FlowName,
@@ -235,51 +183,42 @@ internal static class DeviceOutputGroupBuilder
                     SourceDoneBit = source.SourceDoneBitRef ?? string.Empty,
                     actionSymbol = source.ActionSymbol ?? string.Empty,
                     qualifier = source.Qualifier ?? string.Empty,
-                    modeFlagAddress = modeFlagAddress,
-                    conditionMnemonic = string.Empty,
-                    conditionMnemonicLines = new List<string>()
+                    modeFlagAddress = modeFlagAddress
                 };
-                return new { FlowOutput = flowOutput, ConditionExpression = conditionExpression };
             })
-            .OrderBy(item => item.FlowOutput.IsAuto)
-            .ThenBy(item => item.FlowOutput.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.FlowOutput.Id, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.FlowOutput.CommandId, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.FlowOutput.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item.IsAuto)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.CommandId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.SourceExecuteBit, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return commands
-            .Select((item, index) =>
+            .Select((command, index) => new DeviceCommandFlowOutput
             {
-                var command = item.FlowOutput;
-                var conditionMnemonicLines = MnemonicEmitter.EmitConditionLines(item.ConditionExpression, Array.Empty<DeviceVariable>());
-                return new DeviceCommandFlowOutput
-                {
-                    Id = command.Id,
-                    Name = command.Name,
-                    FlowType = command.FlowType,
-                    IsOrigin = command.IsOrigin,
-                    IsAuto = command.IsAuto,
-                    CommandId = command.CommandId,
-                    ActionLabel = command.ActionLabel,
-                    SourceStep = command.SourceStep,
-                    SourceExecuteBit = command.SourceExecuteBit,
-                    SourceDoneBit = command.SourceDoneBit,
-                    actionSymbol = command.actionSymbol,
-                    qualifier = command.qualifier,
-                    modeFlagAddress = command.modeFlagAddress,
-                    conditionMnemonic = MnemonicEmitter.JoinMnemonicLines(conditionMnemonicLines),
-                    conditionMnemonicLines = conditionMnemonicLines,
-                    Index = index,
-                    Number = index + 1,
-                    TotalCount = commands.Count,
-                    IsFirst = index == 0,
-                    IsLast = index == commands.Count - 1,
-                    IsSingle = commands.Count == 1
-                };
+                Id = command.Id,
+                Name = command.Name,
+                FlowType = command.FlowType,
+                IsOrigin = command.IsOrigin,
+                IsAuto = command.IsAuto,
+                CommandId = command.CommandId,
+                ActionLabel = command.ActionLabel,
+                SourceStep = command.SourceStep,
+                SourceExecuteBit = command.SourceExecuteBit,
+                SourceDoneBit = command.SourceDoneBit,
+                actionSymbol = command.actionSymbol,
+                qualifier = command.qualifier,
+                modeFlagAddress = command.modeFlagAddress,
+                Index = index,
+                Number = index + 1,
+                TotalCount = commands.Count,
+                IsFirst = index == 0,
+                IsLast = index == commands.Count - 1,
+                IsSingle = commands.Count == 1
             })
             .ToList();
     }
+
     private static string BuildInterlockExpression(string? interlockAddress, string? requiredState)
     {
         if (string.IsNullOrWhiteSpace(interlockAddress)) return string.Empty;
@@ -287,12 +226,6 @@ internal static class DeviceOutputGroupBuilder
         return ExpressionHelper.IsFalseState((requiredState ?? string.Empty).Trim())
             ? ExpressionHelper.NegateExpression(interlockAddress)
             : interlockAddress.Trim();
-    }
-
-    private static string ResolveOutputInstruction(IEnumerable<string?> qualifiers)
-    {
-        var first = qualifiers.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-        return string.IsNullOrWhiteSpace(first) ? "OUT" : StepContextBuilder.ResolveActionInstruction(first!);
     }
 
     private static string ResolveModeFlagAddress(string flowType, IDictionary<string, string> unitAddresses)

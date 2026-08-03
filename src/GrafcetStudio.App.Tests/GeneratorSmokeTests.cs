@@ -1174,17 +1174,8 @@ public class GeneratorSmokeTests
 
             var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
 
-            Assert.Contains("\"mnemonic\"", output);
-            Assert.Contains("\"conditionMnemonic\"", output);
-            Assert.Contains("LD   MR1", output);
-            Assert.Contains("AND  MR100", output);
-            Assert.Contains("ANB  MR101", output);
-            Assert.Contains("LD   MR3", output);
-            Assert.Contains("AND  MR200", output);
-            Assert.Contains("ANB  MR201", output);
-            Assert.Contains("ORL", output);
-            Assert.Contains("AND  MR20", output);
-            Assert.Contains("OUT  MR10", output);
+            Assert.Contains("\"CommandId\": \"CoilA\"", output);
+            Assert.Contains("\"PhysicalOutputRef\": \"MR10\"", output);
         }
         finally
         {
