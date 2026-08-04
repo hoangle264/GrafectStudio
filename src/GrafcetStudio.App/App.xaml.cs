@@ -1,4 +1,5 @@
 using GrafcetStudio.App.Generators;
+using GrafcetStudio.App.Generators.Robot;
 using GrafcetStudio.App.Generators.Siemens;
 using GrafcetStudio.App.Services.Ai;
 using GrafcetStudio.App.Services.Siemens;
@@ -51,6 +52,7 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<ISequenceResolver, SequenceResolver>();
         containerRegistry.RegisterSingleton<ICodeGenerator, SiemensLadDslGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, SiemensDbUdtGenerator>();
+        containerRegistry.RegisterSingleton<ICodeGenerator, AbbRapidGenerator>();
         containerRegistry.RegisterSingleton<KeyenceGenerator>();
         containerRegistry.RegisterSingleton<ISystemControlGenerator, SystemControlGenerator>();
         containerRegistry.RegisterSingleton<ICodeGenerator, MultiFileGenerator>();
