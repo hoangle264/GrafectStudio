@@ -39,7 +39,8 @@ function showGenerateCodeModal(): void {
             <option value="Keyence">Keyence Mnemonic List</option>
             <option value="siemens-lad">Siemens LAD XML</option>
             <option value="siemens-db">Siemens DB/UDT XML</option>
-                                  </select>
+            <option value="abb-rapid">ABB Robot (RAPID)</option>
+          </select>
         </div>
 
         <div id="cg-base-mr-wrap">
@@ -76,6 +77,16 @@ function showGenerateCodeModal(): void {
           <label style="font-size:9px;color:var(--text3);">Block Folder</label>
           <input id="cg-tia-target-folder" oninput="cgOnSiemensLadConfigChanged()" value="Program blocks" placeholder="Program blocks/Generated" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
           <div style="font-size:9px;color:var(--text3);grid-column:3 / span 2;">Send selected/all generates XML first, then imports it through the host bridge.</div>
+        </div>
+      </div>
+
+      <div id="cg-robot-safety-panel" style="display:none;background:rgba(239, 68, 68, 0.12);border-top:1px solid #ef4444;border-bottom:1px solid #ef4444;color:#fca5a5;padding:10px 20px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:16px;">⚠️</span>
+          <div>
+            <strong style="color:#ef4444;letter-spacing:0.5px;">SAFETY WARNING:</strong>
+            <span style="font-size:11px;margin-left:4px;">Review all motion instructions & positions carefully before exporting. Incorrect positions or speed settings can cause physical equipment damage or personal harm. Always teach/verify positions in low speed manual mode (T1).</span>
+          </div>
         </div>
       </div>
 
@@ -189,6 +200,10 @@ function cgCopyText(text: string): void {
 }
 
 function cgOnTargetChanged(): void {
+  const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence';
+  const isRobot = target === 'abb-rapid' || target === 'ABB Robot';
+  const safetyPanel = document.getElementById('cg-robot-safety-panel');
+  if (safetyPanel) safetyPanel.style.display = isRobot ? 'block' : 'none';
   cgUpdatePreview();
   cgUpdateSiemensLadPanel();
 }

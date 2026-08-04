@@ -70,8 +70,8 @@ const GVT_UNIT_SIGNALS: VuiDeviceSignal[] = [
   {id:'outHomed',       name:'outHomed',       dataType:'Bool', varType:'Output', path:'io.outHomed'},
 ];
 
-// Danh sch kiu primitive ph thng
-const GVT_PRIMITIVE_TYPES = ['BOOL','BOOL','INT','DINT','UINT','UDINT','WORD','DWORD','BYTE','REAL','LREAL','STRING','TIME'].filter(function(value, index, list) { return list.indexOf(value) === index; });
+// Danh sách kiểu primitive phổ thông (bao gồm kiểu Robot POS & TOOL)
+const GVT_PRIMITIVE_TYPES = ['BOOL','BOOL','INT','DINT','UINT','UDINT','WORD','DWORD','BYTE','REAL','LREAL','STRING','TIME','POS','TOOL'].filter(function(value, index, list) { return list.indexOf(value) === index; });
 
 function gvtGetEntries(): VuiVarEntry[] {
   return varsGetApi().gvtGetEntries(varsGetContext());
