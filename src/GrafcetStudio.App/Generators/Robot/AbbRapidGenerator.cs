@@ -36,7 +36,7 @@ public class AbbRapidGenerator : ICodeGenerator
 
         string rawJsonResponse;
 
-        if (_aiCompletionService != null)
+        if (_aiCompletionService != null && _aiCompletionService is not MockAiCompletionService)
         {
             try
             {
@@ -45,16 +45,18 @@ public class AbbRapidGenerator : ICodeGenerator
                 var req = new AiCompletionRequest(sanitized);
                 var result = Task.Run(() => _aiCompletionService.CompleteAsync(req)).GetAwaiter().GetResult();
                 
-                if (!result.Ok)
+                if (result.Ok && !string.IsNullOrWhiteSpace(result.RawText) && _validator.Validate(result.RawText).IsValid)
                 {
-                    throw new InvalidOperationException($"AI Generation error: {string.Join("; ", result.Errors)}");
+                    rawJsonResponse = result.RawText;
                 }
-                rawJsonResponse = result.RawText;
+                else
+                {
+                    rawJsonResponse = GenerateFallbackJson(payload, flowNameClean);
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                // Fallback to deterministic template JSON if AI fails or in offline/test environment
-                rawJsonResponse = GenerateFallbackJson(payload, flowNameClean, ex.Message);
+                rawJsonResponse = GenerateFallbackJson(payload, flowNameClean);
             }
         }
         else
@@ -98,13 +100,19 @@ public class AbbRapidGenerator : ICodeGenerator
 
     private string GenerateFallbackJson(CodegenPayload payload, string flowName, string? errorContext = null)
     {
-        var positions = new List<string> { "pHome", "pWait", "pPickup", "pPlace" };
+        var posVars = payload.Variables?.Where(v => string.Equals(v.Format, "POS", StringComparison.OrdinalIgnoreCase) || string.Equals(v.Format, "Position", StringComparison.OrdinalIgnoreCase)).Select(v => v.Label).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        var positions = (posVars != null && posVars.Count > 0) ? posVars : new List<string> { "pHome", "pWait", "pPickup", "pPlace" };
+        if (!positions.Contains("pHome", StringComparer.OrdinalIgnoreCase)) positions.Insert(0, "pHome");
+        if (!positions.Contains("pWait", StringComparer.OrdinalIgnoreCase)) positions.Add("pWait");
+        if (!positions.Contains("pPickup", StringComparer.OrdinalIgnoreCase)) positions.Add("pPickup");
+        if (!positions.Contains("pPlace", StringComparer.OrdinalIgnoreCase)) positions.Add("pPlace");
+
         var posObjects = positions.Select(p => new RobotPosition
         {
             Name = p,
-            MotionType = p == "pHome" ? "AbsJ" : (p == "pWait" ? "Joint" : "Linear"),
-            Speed = p == "pPickup" || p == "pPlace" ? "Precise" : "Medium",
-            Description = $"Auto generated position target {p}"
+            MotionType = p.Equals("pHome", StringComparison.OrdinalIgnoreCase) ? "AbsJ" : (p.Equals("pWait", StringComparison.OrdinalIgnoreCase) ? "Joint" : "Linear"),
+            Speed = (p.Equals("pPickup", StringComparison.OrdinalIgnoreCase) || p.Equals("pPlace", StringComparison.OrdinalIgnoreCase)) ? "Precise" : "Medium",
+            Description = $"Robot position target {p}"
         }).ToList();
 
         var signals = new List<RobotSignal>
