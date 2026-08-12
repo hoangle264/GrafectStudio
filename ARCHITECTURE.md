@@ -1,46 +1,51 @@
 # GRAFCET Studio v2 — Architecture
 
-## Tổng quan
+## Tổng quan Kiến trúc
 
-```
-┌─────────────────────────────────────────────────┐
-│                  WPF Window                     │
-│           (container, không có UI logic)        │
-│                                                 │
-│  ┌──────────────────────┐  ┌─────────────────┐  │
-│  │      WebView2        │  │    C# Core      │  │
-│  │                      │  │                 │  │
-│  │  Toàn bộ HTML UI     │  │  Code Generator │  │
-│  │  - Canvas GRAFCET    │◄─┤  AI Client      │  │
-│  │  - Drag & Drop       │─►│  File I/O       │  │
-│  │  - Panels / Sidebar  │  │  Project Mgmt   │  │
-│  │  - localStorage      │  │                 │  │
-│  └──────────────────────┘  └────────┬────────┘  │
-│                                     │           │
-└─────────────────────────────────────┼───────────┘
-                                      │
-                              Anthropic API
-                              (claude-sonnet)
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                           WPF Window                            │
+│                  (container host WebView2)                      │
+│                                                                 │
+│  ┌─────────────────────────────┐  ┌──────────────────────────┐  │
+│  │          WebView2           │  │         C# Core          │  │
+│  │                             │  │                          │  │
+│  │  Toàn bộ HTML/TS UI         │  │  Code Generators         │  │
+│  │  - Canvas GRAFCET (SVG)     │  │  - Keyence Mnemonic      │  │
+│  │  - Drag & Drop / Editor     │◄─┤  - TwinCAT ST            │  │
+│  │  - Variable Tables          │─►│  - Siemens LAD ML XML    │  │
+│  │  - localStorage Persistence │  │  - ABB RAPID Robot       │  │
+│  │                             │  │  AI Client Services      │  │
+│  │                             │  │  File I/O Native         │  │
+│  └─────────────────────────────┘  └────────────┬─────────────┘  │
+└────────────────────────────────────────────────┼────────────────┘
+                                                 │
+                                           AI Services API
+                                       (Gemini & Claude Sonnet)
 ```
 
 ---
 
 ## Phân chia trách nhiệm
 
-### HTML / WebView2
-- Toàn bộ UI: canvas, panels, toolbar, sidebar
-- Drag & Drop, connect, zoom/pan diagram
-- State management (localStorage)
-- Hiển thị generated code, streaming AI response
+### 1. HTML / TypeScript / WebView2 (`src/web/`)
+- Toàn bộ UI: canvas, panels, toolbar, sidebar, dialogs.
+- Drag & Drop, kết nối node, zoom/pan sơ đồ GRAFCET/SFC.
+- State management & persistence (localStorage).
+- Hiển thị generated code, streaming AI response realtime.
 
-### C#
-- **Code Generation:** Keyence Mnemonic, TwinCAT ST (Strategy Pattern `ICodeGenerator`)
-- **AI Client:** gọi Anthropic API, giữ API key secure, buffer + stream response
-- **File I/O:** Save/Open project qua native Windows dialog
-- **WPF Shell:** host WebView2, không có business logic
+### 2. C# Core (`src/GrafcetStudio.App/` & `src/SimaticML/`)
+- **Code Generation (`ICodeGenerator` Strategy Pattern):**
+  - Keyence Mnemonic (`KeyenceMnemonicGenerator`)
+  - TwinCAT ST (`TwinCatStGenerator`)
+  - Siemens TIA Portal LAD (`SiemensLadDslGenerator` + thư viện `SimaticML` dựng XML)
+  - ABB RAPID Robot (`AbbRapidGenerator`)
+- **AI Client Services:** Gọi Anthropic Claude / Google Gemini API, mã hóa & lưu trữ API key an toàn, buffer + stream response về UI.
+- **File I/O:** Save/Open project native Windows dialog (`.grafcet` JSON), export code files (`.txt`, `.xml`, `.mod`).
+- **WPF Shell:** Host WebView2 control, quản lý DI container (Prism + DryIoc).
 
-### C# Internal — Prism & DryIoc
-```
+### 3. C# Internal — Prism & DryIoc
+```text
 ViewModel ──► IEventAggregator.Publish(event)
                     │
             IWebViewBridgeService (subscriber)
@@ -50,28 +55,28 @@ ViewModel ──► IEventAggregator.Publish(event)
 
 ---
 
-## Bridge API
+## Bridge API Protocol
 
-### JS → C#
+### JS → C# (`chrome.webview.postMessage`)
 
 | Event | Payload | Mô tả |
 |---|---|---|
-| `GENERATE_CODE` | `{ platform, steps, transitions, actions, variables }` | User bấm Generate |
-| `AI_REQUEST` | `{ type, prompt, diagramContext }` | User dùng AI feature |
-| `SAVE_FILE` | `{ projectJson }` | Native Save dialog |
-| `OPEN_FILE` | _(không có data)_ | Native Open dialog |
+| `GENERATE_CODE` | `{ platform, steps, transitions, actions, variables }` | User bấm nút Generate code |
+| `AI_REQUEST` | `{ type, prompt, diagramContext }` | User kích hoạt tính năng AI |
+| `SAVE_FILE` | `{ projectJson }` | Mở Native SaveFileDialog và ghi file |
+| `OPEN_FILE` | _(không có payload)_ | Mở Native OpenFileDialog và đọc file |
 
-> **Debounce** áp dụng **chỉ cho `AI_REQUEST`** — đặc biệt quan trọng khi `diagramContext` lớn (hệ thống nhiều servo + cylinder).
+> **Debounce** áp dụng cho `AI_REQUEST` khi `diagramContext` lớn (hệ thống nhiều servo + cylinder).
 
-### C# → JS
+### C# → JS (`ExecuteScriptAsync`)
 
-| Function | Tham số | Mô tả |
+| Function Callback | Tham số | Mô tả |
 |---|---|---|
-| `receiveGeneratedCode(code)` | string | Kết quả code generation |
-| `receiveAiChunk(chunk)` | string | Streaming AI response (đã buffer) |
-| `loadProjectData(json)` | string | Sau khi Open file |
+| `receiveGeneratedCode(code)` | string | Kết quả code generation từ C# |
+| `receiveAiChunk(chunk)` | string | Streaming AI response (đã buffer 100ms) |
+| `loadProjectData(json)` | string | Dữ liệu project đẩy vào UI sau khi Open file |
 | `updateDiagramState(actions)` | array | AI auto-fix: patch từng node cục bộ |
-| `receiveError(error)` | object | Thông báo lỗi từ C# về JS |
+| `receiveError(error)` | object | Thông báo lỗi từ C# về JS UI |
 
 #### Schema `updateDiagramState`
 ```json
@@ -90,52 +95,43 @@ ViewModel ──► IEventAggregator.Publish(event)
 
 ---
 
-## AI Integration
+## AI Integration Architecture
 
-### API Key
-- Lưu trong `appsettings.json` hoặc Windows Credential Store
-- Không bao giờ expose sang HTML/JS
-
-### Use Cases
-
-| Feature | Mô tả |
-|---|---|
-| **Generate GRAFCET** | User mô tả text → AI trả JSON steps/transitions → JS load canvas |
-| **Review diagram** | C# serialize table data → AI phát hiện deadlock, missing transition → trả `updateDiagramState` actions patch cục bộ |
-| **Explain code** | Sau generate Keyence Mnemonic → AI comment từng dòng |
-| **Suggest actions** | User chọn Step → AI suggest action blocks phù hợp |
+### API Key Management
+- Lưu trữ trong mã hóa Windows DPAPI hoặc biến môi trường OS (`GRAFCETSTUDIO_GEMINI_KEY` / `ANTHROPIC_API_KEY`).
+- Không bao giờ expose API Key sang môi trường HTML/JS.
 
 ### Streaming Pipeline
-```
-Anthropic API stream
-      │
-      ▼
-C# buffer (gom chunk, flush mỗi 100ms)
-      │
-      ▼
+```text
+Gemini / Anthropic API Stream
+              │
+              ▼
+C# Buffer (gom chunk, flush mỗi 100ms)
+              │
+              ▼
 ExecuteScriptAsync("receiveAiChunk(...)")
-      │
-      ▼
-HTML render realtime
+              │
+              ▼
+HTML UI render realtime
 ```
-
-### Prompt Strategy
-- System prompt = few-shot Keyence Mnemonic examples (RAG-lite)
-- C# build prompt = `systemPrompt + diagramContext + userRequest`
 
 ---
 
-## Tech Stack
+## Tech Stack Summary
 
 | Layer | Technology |
 |---|---|
-| Shell | WPF (.NET 10) |
+| Shell Host | WPF (.NET 10) |
 | UI Engine | WebView2 (Microsoft Edge Chromium) |
-| Frontend | HTML + CSS + JS (từ web version) |
+| Frontend | HTML5 + Vanilla CSS + TypeScript (`src/web/ts`) |
 | State | localStorage (trong WebView2 profile) |
-| Code Gen | C# — Strategy Pattern (`ICodeGenerator`) |
-| AI | Anthropic API (`claude-sonnet-4-20250514`) |
-| DI | Prism + DryIoc |
+| Code Generators | C# — Strategy Pattern (`ICodeGenerator`) |
+| SimaticML Engine | C# (.NET 10) — `SimaticML` library |
+| AI Integration | Google Gemini API & Anthropic Claude API |
+| Dependency Injection | Prism + DryIoc |
 | Messaging | Prism `IEventAggregator` |
-| Bridge Service | `IWebViewBridgeService` (custom interface) |
-| Docking | AvalonDock (nếu cần panels ngoài WebView2) |
+| Bridge Service | `IWebViewBridgeService` |
+
+---
+
+👉 *Xem danh mục tài liệu liên quan tại [docs/README.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/README.md).*

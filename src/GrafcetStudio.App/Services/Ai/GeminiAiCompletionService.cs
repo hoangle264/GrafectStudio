@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -177,25 +177,67 @@ public class GeminiAiCompletionService : IAiCompletionService
 
     private static object BuildGeminiPayload(AiCompletionRequest request, string apiVersion)
     {
-        var systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
-        var userPrompt = AiPromptBuilder.BuildUserPrompt(request.Request);
+        // Cố gắng lấy systemPrompt / userPrompt đã được build sẵn bởi RobotPromptBuilder
+        // (được serialize vào field Json của SanitizedAiRequest tại AbbRapidGenerator).
+        // Nếu không parse được thì fallback về AiPromptBuilder chung cho các AI request thông thường.
+        string systemPrompt;
+        string userPrompt;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(request.Request.Json);
+            var root = doc.RootElement;
+            var hasSys  = root.TryGetProperty("systemPrompt", out var sysProp)  && sysProp.ValueKind == JsonValueKind.String;
+            var hasUser = root.TryGetProperty("userPrompt",   out var userProp) && userProp.ValueKind == JsonValueKind.String;
+
+            if (hasSys && hasUser)
+            {
+                systemPrompt = sysProp.GetString()!;
+                userPrompt   = userProp.GetString()!;
+            }
+            else
+            {
+                // Request thông thường (AI chat, proposal, v.v.) — dùng prompt builder chung
+                systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
+                userPrompt   = AiPromptBuilder.BuildUserPrompt(request.Request);
+            }
+        }
+        catch
+        {
+            systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
+            userPrompt   = AiPromptBuilder.BuildUserPrompt(request.Request);
+        }
+
+        // Gemini API hỗ trợ systemInstruction riêng biệt (không merge vào user turn).
+        // Chỉ dùng systemInstruction khi có system prompt thực sự.
+        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        {
+            return new
+            {
+                systemInstruction = new
+                {
+                    parts = new[] { new { text = systemPrompt } }
+                },
+                contents = new[]
+                {
+                    new { role = "user", parts = new[] { new { text = userPrompt } } }
+                },
+                generationConfig = new { temperature = 0.2 }
+            };
+        }
+
+        // Fallback: gộp system + user prompt vào một turn (hành vi cũ)
         var combinedPrompt = systemPrompt + Environment.NewLine + Environment.NewLine + userPrompt;
         return new
         {
             contents = new[]
             {
-                new
-                {
-                    role = "user",
-                    parts = new[] { new { text = combinedPrompt } }
-                }
+                new { role = "user", parts = new[] { new { text = combinedPrompt } } }
             },
-            generationConfig = new
-            {
-                temperature = 0.2
-            }
+            generationConfig = new { temperature = 0.2 }
         };
     }
+
 
 
     private static (string Text, bool Malformed) TryExtractStreamText(string data)

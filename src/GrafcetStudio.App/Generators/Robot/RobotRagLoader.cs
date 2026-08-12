@@ -18,8 +18,25 @@ public class RobotRagLoader
         var sb = new StringBuilder();
         var platformDir = Path.Combine(_basePath, platform.ToLowerInvariant());
 
+        if (!Directory.Exists(platformDir))
+        {
+            var fallbackDir = Path.Combine(Directory.GetCurrentDirectory(), "assets", "rag", platform.ToLowerInvariant());
+            if (Directory.Exists(fallbackDir))
+            {
+                platformDir = fallbackDir;
+            }
+        }
+
         if (Directory.Exists(platformDir))
         {
+            var rulesFile = Path.Combine(platformDir, "rules.md");
+            if (File.Exists(rulesFile))
+            {
+                sb.AppendLine("## Supplemental Rules");
+                sb.AppendLine(File.ReadAllText(rulesFile));
+                sb.AppendLine();
+            }
+
             var irPatternsFile = Path.Combine(platformDir, "ir_patterns.md");
             if (File.Exists(irPatternsFile))
             {
@@ -28,33 +45,14 @@ public class RobotRagLoader
                 sb.AppendLine();
             }
 
-            var rulesFile = Path.Combine(platformDir, "rules.md");
-            if (File.Exists(rulesFile))
+            var patternsSubDir = Path.Combine(platformDir, "patterns");
+            if (Directory.Exists(patternsSubDir))
             {
-                sb.AppendLine("## Supplemental Rules");
-                sb.AppendLine(File.ReadAllText(rulesFile));
-                sb.AppendLine();
-            }
-        }
-        else
-        {
-            // Fallback if running relative to project root
-            var fallbackDir = Path.Combine(Directory.GetCurrentDirectory(), "assets", "rag", platform.ToLowerInvariant());
-            if (Directory.Exists(fallbackDir))
-            {
-                var irPatternsFile = Path.Combine(fallbackDir, "ir_patterns.md");
-                if (File.Exists(irPatternsFile))
+                var mdFiles = Directory.GetFiles(patternsSubDir, "*.md");
+                foreach (var mdFile in mdFiles)
                 {
-                    sb.AppendLine("## RAG IR Patterns");
-                    sb.AppendLine(File.ReadAllText(irPatternsFile));
-                    sb.AppendLine();
-                }
-
-                var rulesFile = Path.Combine(fallbackDir, "rules.md");
-                if (File.Exists(rulesFile))
-                {
-                    sb.AppendLine("## Supplemental Rules");
-                    sb.AppendLine(File.ReadAllText(rulesFile));
+                    sb.AppendLine($"## Pattern ({Path.GetFileNameWithoutExtension(mdFile)})");
+                    sb.AppendLine(File.ReadAllText(mdFile));
                     sb.AppendLine();
                 }
             }

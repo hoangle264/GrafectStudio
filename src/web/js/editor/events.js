@@ -346,7 +346,17 @@ const startElementDrag = (e, id) => {
 
 const connectFromElement = (e, id, type) => {
   if (type !== 'parallel') {
-    handlePortClick(id, type, 'bottom');
+    // Pick the nearest port (top or bottom) based on where the user clicked
+    const { x, y } = getCanvasPoint(e);
+    const portTop = getPortXY(id, 'top');
+    const portBot = getPortXY(id, 'bottom');
+    let port = 'bottom';
+    if (portTop && portBot) {
+      const distTop = Math.abs(y - portTop.y);
+      const distBot = Math.abs(y - portBot.y);
+      port = distTop < distBot ? 'top' : 'bottom';
+    }
+    handlePortClick(id, type, port);
     return;
   }
 
@@ -424,9 +434,18 @@ function startPortDragConnect(id, type, port, wx, wy, e) {
     const p = w2s(ev.clientX, ev.clientY);
     const target = findElementAt(p.x, p.y);
     if(target && target.id !== id) {
-      const tp = target.type==='parallel'
-        ? getNearestParPort(state.parallels.find(x=>x.id===target.id), p.x, p.y)
-        : guessTargetPort(connFrom, target.id, target.type, null);
+      let tp;
+      if (target.type === 'parallel') {
+        tp = getNearestParPort(state.parallels.find(x=>x.id===target.id), p.x, p.y);
+      } else {
+        const portTop = getPortXY(target.id, 'top');
+        const portBot = getPortXY(target.id, 'bottom');
+        if (portTop && portBot) {
+           tp = Math.abs(p.y - portTop.y) < Math.abs(p.y - portBot.y) ? 'top' : 'bottom';
+        } else {
+           tp = 'top';
+        }
+      }
       addConn(connFrom.id, connFrom.port, target.id, tp);
     }
     cancelConnect();
@@ -479,7 +498,7 @@ const handlePortClick = (id, type, port) => {
 };
 
 const guessTargetPort = (from, toId, toType, clickedPort) => {
-  if (clickedPort && clickedPort !== 'bottom' && clickedPort !== 'top') return clickedPort;
+  if (clickedPort) return clickedPort;
 
   if (toType === 'parallel') {
     const pb = state.parallels.find((item) => item.id === toId);
@@ -490,7 +509,13 @@ const guessTargetPort = (from, toId, toType, clickedPort) => {
   const fp = getPortXY(from.id, from.port);
   const targetTop = getPortXY(toId, 'top');
   if (!fp || !targetTop) return clickedPort || 'top';
-  return fp.y < targetTop.y ? 'top' : 'bottom';
+  
+  const isUpward = fp.y > targetTop.y;
+  if (isUpward) {
+    return toType === 'step' ? 'bottom' : 'top';
+  }
+  
+  return 'top';
 };
 
 const cancelConnect = () => {

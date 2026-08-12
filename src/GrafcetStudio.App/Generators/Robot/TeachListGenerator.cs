@@ -5,7 +5,7 @@ namespace GrafcetStudio.App.Generators.Robot;
 
 public class TeachListGenerator
 {
-    public string GenerateTeachList(RobotIrDocument doc, string flowName = "main")
+    public string GenerateTeachList(SnippetMapDocument doc, string flowName = "main")
     {
         var sb = new StringBuilder();
 
