@@ -125,13 +125,17 @@ public static class GeneratorContextBuilder
         {
             var step = EnrichStepActions(entry.Step, variables, library);
             var previousStep = index > 0 ? sequence[index - 1].Step : null;
-            var nextStep = index < sequence.Count - 1 ? sequence[index + 1].Step : null;
+            var isLastStep = index == sequence.Count - 1;
+            var nextStep = isLastStep
+                ? BuildSyntheticNextStep(step, flow.Diagram)
+                : sequence[index + 1].Step;
             var macroBinding = callerBindings.FirstOrDefault(binding => string.Equals(binding.callerStepId, step.Id, StringComparison.OrdinalIgnoreCase));
 
             return new ResolvedStep
             {
                 Index = index,
                 IsFirst = index == 0,
+                IsLast = isLastStep,
                 Step = step,
                 MacroBinding = macroBinding,
                 PreviousStep = previousStep,
@@ -188,6 +192,31 @@ public static class GeneratorContextBuilder
         }, variables, library);
 
         return new ResolvedFlowBuildResult(resolvedFlow, runtimePlan);
+    }
+
+    /// <summary>
+    /// Creates a synthetic "next step" for the last step in a sequence.
+    /// The synthetic step carries an auto-incremented ExecAddress so that
+    /// templates can always use <c>{{NextStep.ExecAddress}}</c> without
+    /// checking for null on the final step.
+    /// </summary>
+    private static Step? BuildSyntheticNextStep(Step lastStep, DiagramInfo? diagram)
+    {
+        if (string.IsNullOrWhiteSpace(lastStep.ExecAddress)) return null;
+
+        if (!StepAddressHelper.TryParseStepExecAddress(lastStep.ExecAddress, diagram, out var parsed))
+            return null;
+
+        var nextAddress = StepAddressHelper.IncrementParsedAddress(parsed);
+        return new Step
+        {
+            Id = string.Empty,
+            Number = lastStep.Number + 1,
+            Label = string.Empty,
+            ExecAddress = nextAddress,
+            DoneAddress = string.Empty,
+            IsInitial = false
+        };
     }
 
     private sealed record ResolvedFlowBuildResult(ResolvedFlow Flow, DiagramRuntimePlan RuntimePlan);

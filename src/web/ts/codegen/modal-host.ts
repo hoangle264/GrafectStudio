@@ -55,8 +55,8 @@ function cgBuildPayloadContext(): GrafcetStudioCodegenPayload.PayloadContext {
   return context;
 }
 
-function resolveStepAddress(step: GrafcetStudioProject.Step, flow: GrafcetStudioProject.DiagramMeta): GrafcetStudioCodegenPayload.ResolvedStepAddress {
-  return cgGetPayloadApi()!.resolveStepAddress(step, flow);
+function resolveStepAddress(step: GrafcetStudioProject.Step, flow: GrafcetStudioProject.DiagramMeta, platform?: string): GrafcetStudioCodegenPayload.ResolvedStepAddress {
+  return cgGetPayloadApi()!.resolveStepAddress(step, flow, platform);
 }
 
 function cgBuildCSharpPayload(platform: string, unitId?: string): MhCodegenPayload {

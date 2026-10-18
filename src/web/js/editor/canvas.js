@@ -173,7 +173,20 @@ function buildStepEl(s) {
 
   g.addEventListener('mousedown',e=>elDown(e,s.id,'step'));
   g.addEventListener('click',e=>{e.stopPropagation();selectEl(s.id,'step',e);});
+  // Double-click: navigate into macro step's flowchart
+  g.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (s.kind !== 'macro') return;
+    if (s.macroFlowId) {
+      openTab(s.macroFlowId);
+    } else {
+      toast('⚠ Macro step chưa được gán flowchart');
+    }
+  });
+  // Right-click: context menu
+  g.addEventListener('contextmenu', e => showStepContextMenu(e, s));
   return g;
+
 }
 
 function buildStepActionBox(g, s) {

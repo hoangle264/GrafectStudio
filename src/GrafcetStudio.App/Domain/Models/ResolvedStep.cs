@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using GrafcetStudio.Domain.Enums;
 
 namespace GrafcetStudio.Domain.Models;
@@ -9,6 +10,8 @@ public class ResolvedStep
     public int Index { get; init; }
 
     public bool IsFirst { get; init; }
+
+    public bool IsLast { get; init; }
 
     public Step Step { get; init; } = new();
 
@@ -75,6 +78,56 @@ public class ResolvedStep
     public int? NextStepNumber => NextStep?.Number;
 
     public string? NextStepLabel => NextStep?.Label;
+
+    /// <summary>
+    /// Returns the ExecAddress of the next step when available.
+    /// For the last step in a flow (NextStep is null), automatically generates
+    /// the address by incrementing the current step's ExecAddress by 1.
+    /// Supports both plain numeric addresses (e.g. MR300 → MR301)
+    /// and bit-addressed formats (e.g. DM0.2 → DM0.3).
+    /// Returns null if the current step has no ExecAddress.
+    /// </summary>
+    public string? NextExecAddress
+        => NextStep?.ExecAddress ?? IncrementExecAddress(Step.ExecAddress);
+
+    /// <summary>Lowercase alias for <see cref="NextExecAddress"/>. Used by Handlebars templates via <c>{{nextExecAddress}}</c>.</summary>
+    public string? nextExecAddress => NextExecAddress;
+
+    private static string? IncrementExecAddress(string? address)
+    {
+        if (string.IsNullOrWhiteSpace(address)) return null;
+
+        var trimmed = address.Trim().TrimStart('@');
+        var dotIndex = trimmed.IndexOf('.');
+        var head = dotIndex >= 0 ? trimmed[..dotIndex] : trimmed;
+        var bitText = dotIndex >= 0 ? trimmed[(dotIndex + 1)..] : string.Empty;
+
+        var prefixLength = head.TakeWhile(char.IsLetter).Count();
+        if (prefixLength <= 0 || prefixLength >= head.Length) return null;
+
+        var prefix = head[..prefixLength].ToUpperInvariant();
+        var numberText = head[prefixLength..];
+        if (!int.TryParse(numberText, out var number)) return null;
+
+        var width = numberText.Length > 1 ? numberText.Length : 0;
+
+        // Bit-addressed format: prefix + number + "." + bit  (e.g. DM0.2 → DM0.3)
+        if (int.TryParse(bitText, out var bit))
+        {
+            var formatted = width > 0
+                ? $"{prefix}{number.ToString().PadLeft(width, '0')}.{bit + 1}"
+                : $"{prefix}{number}.{bit + 1}";
+            return formatted;
+        }
+
+        // Plain numeric format: prefix + number  (e.g. MR300 → MR301)
+        {
+            var nextNumber = number + 1;
+            return width > 0
+                ? $"{prefix}{nextNumber.ToString().PadLeft(width, '0')}"
+                : $"{prefix}{nextNumber}";
+        }
+    }
 
     public string? InTransitionId => InTransition?.Id;
 

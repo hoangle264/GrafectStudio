@@ -44,11 +44,11 @@ public static class GrafcetStudioCodegenPayload
             Name = selectedUnit?.Name ?? (unitId == "__none__" ? "No unit" : string.Empty),
             Label = selectedUnit?.Name ?? (unitId == "__none__" ? "No unit" : string.Empty)
         };
-        return BuildPayloadCore(context, platform, unitInfo, diagrams.Select(diagram => BuildFlow(context, diagram)).ToList());
+        return BuildPayloadCore(context, platform, unitInfo, diagrams.Select(diagram => BuildFlow(context, diagram, platform)).ToList());
     }
 
     private static CodegenPayload BuildProjectPayload(PayloadContext context, string platform)
-        => BuildPayloadCore(context, platform, null, context.project.Diagrams.Select(diagram => BuildFlow(context, diagram)).ToList());
+        => BuildPayloadCore(context, platform, null, context.project.Diagrams.Select(diagram => BuildFlow(context, diagram, platform)).ToList());
 
     private static CodegenPayload BuildPayloadCore(PayloadContext context, string platform, UnitInfo? unit, List<FlowBuildResult> flowResults)
     {
@@ -93,13 +93,13 @@ public static class GrafcetStudioCodegenPayload
         };
     }
 
-    private static FlowBuildResult BuildFlow(PayloadContext context, DiagramMeta diagram)
+    private static FlowBuildResult BuildFlow(PayloadContext context, DiagramMeta diagram, string platform)
     {
         context.ensureFlowAddressConfig(diagram, true);
         var state = context.loadDiagramData(diagram.Id)?.State ?? new DiagramState();
         var steps = state.Steps.Select(step =>
         {
-            var address = ResolveStepAddress(step, diagram);
+            var address = ResolveStepAddress(step, diagram, platform);
             return new Step
             {
                 Id = step.Id,
@@ -144,7 +144,9 @@ public static class GrafcetStudioCodegenPayload
                 BoolAddressMode = string.IsNullOrWhiteSpace(diagram.BoolAddressMode) ? "linear" : diagram.BoolAddressMode,
                 BaseMr = diagram.BaseMr?.ToString(),
                 ActiveWord = diagram.ActiveWord,
-                CompleteWord = diagram.CompleteWord
+                ActiveWordTag = diagram.ActiveWordTag,
+                CompleteWord = diagram.CompleteWord,
+                CompleteWordTag = diagram.CompleteWordTag
             },
             Steps = steps,
             Transitions = transitions,
@@ -172,10 +174,40 @@ public static class GrafcetStudioCodegenPayload
         return match;
     }
 
-    private static (string ExecAddress, string DoneAddress) ResolveStepAddress(Step step, DiagramMeta diagram)
+    private static (string ExecAddress, string DoneAddress) ResolveStepAddress(Step step, DiagramMeta diagram, string platform)
     {
+        var stepNumber = Math.Max(1, step.Number);
+        if (string.Equals(diagram.AddressMode, "word", StringComparison.OrdinalIgnoreCase))
+        {
+            var bitIndex = stepNumber - 1;
+            var wordOffset = bitIndex / 16;
+            var bit = bitIndex % 16;
+            var isSiemens = platform.StartsWith("siemens", StringComparison.OrdinalIgnoreCase);
+            var activeTag = diagram.ActiveWordTag;
+            var completeTag = diagram.CompleteWordTag;
+
+            if (isSiemens)
+            {
+                var exec = !string.IsNullOrWhiteSpace(activeTag)
+                    ? (wordOffset > 0 ? $"\"{activeTag}_{wordOffset}\".%X{bit}" : $"\"{activeTag}\".%X{bit}")
+                    : $"{GrafcetStudio.App.Generators.Common.StepAddressHelper.FormatWordAddress(diagram.ActiveWord, wordOffset)}.{bit}";
+                var done = !string.IsNullOrWhiteSpace(completeTag)
+                    ? (wordOffset > 0 ? $"\"{completeTag}_{wordOffset}\".%X{bit}" : $"\"{completeTag}\".%X{bit}")
+                    : $"{GrafcetStudio.App.Generators.Common.StepAddressHelper.FormatWordAddress(diagram.CompleteWord, wordOffset)}.{bit}";
+                return (exec, done);
+            }
+
+            var keyenceExec = !string.IsNullOrWhiteSpace(activeTag)
+                ? (wordOffset > 0 ? $"{activeTag}_{wordOffset}.{bit}" : $"{activeTag}.{bit}")
+                : $"{GrafcetStudio.App.Generators.Common.StepAddressHelper.FormatWordAddress(diagram.ActiveWord, wordOffset)}.{bit}";
+            var keyenceDone = !string.IsNullOrWhiteSpace(completeTag)
+                ? (wordOffset > 0 ? $"{completeTag}_{wordOffset}.{bit}" : $"{completeTag}.{bit}")
+                : $"{GrafcetStudio.App.Generators.Common.StepAddressHelper.FormatWordAddress(diagram.CompleteWord, wordOffset)}.{bit}";
+            return (keyenceExec, keyenceDone);
+        }
+
         var baseMr = diagram.BaseMr ?? 0;
-        var pairOffset = (Math.Max(1, step.Number) - 1) * 2;
+        var pairOffset = (stepNumber - 1) * 2;
         return ($"@MR{baseMr + pairOffset}", $"@MR{baseMr + pairOffset + 1}");
     }
 

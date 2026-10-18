@@ -44,7 +44,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var validationError = ValidateRequest(request);
+        var validationError = SiemensPushRequestHelper.ValidateRequest(request);
         if (validationError is not null)
         {
             return validationError;
@@ -54,7 +54,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         var tempRequestPath = string.Empty;
         try
         {
-            var xmlPath = PrepareXmlFile(request, out tempXmlPath);
+            var xmlPath = SiemensPushRequestHelper.PrepareXmlFile(request, out tempXmlPath);
             var bridgePath = ResolveBridgePath(request);
             if (bridgePath.Result is not null)
             {
@@ -89,12 +89,12 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         {
             if (!string.IsNullOrWhiteSpace(tempRequestPath))
             {
-                TryDeleteFile(tempRequestPath);
+                SiemensPushRequestHelper.TryDeleteFile(tempRequestPath, "Siemens TIA Bridge");
             }
 
             if (!string.IsNullOrWhiteSpace(tempXmlPath))
             {
-                TryDeleteFile(tempXmlPath);
+                SiemensPushRequestHelper.TryDeleteFile(tempXmlPath, "Siemens TIA Bridge");
             }
         }
     }
@@ -102,16 +102,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
     private async Task<SiemensPushResult> InvokeBridgeAsync(string bridgePath, string requestPath, SiemensPushRequest request, CancellationToken cancellationToken)
     {
         using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = bridgePath,
-            Arguments = $"--request \"{requestPath}\"",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = Path.GetDirectoryName(bridgePath) ?? Environment.CurrentDirectory
-        };
+        process.StartInfo = CreateBridgeProcessStartInfo(bridgePath, requestPath);
 
         try
         {
@@ -134,14 +125,8 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = process.StandardError.ReadToEndAsync();
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-
-        try
-        {
-            await process.WaitForExitAsync(timeoutCts.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        var timedOut = await WaitForProcessExitWithTimeoutAsync(process, timeout, cancellationToken);
+        if (timedOut)
         {
             TryKill(process);
             return SiemensPushResult.Failure(
@@ -153,17 +138,50 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
 
+        return ParseBridgeResponse(process.ExitCode, stdout, stderr, request);
+    }
+
+    private static ProcessStartInfo CreateBridgeProcessStartInfo(string bridgePath, string requestPath)
+        => new()
+        {
+            FileName = bridgePath,
+            Arguments = $"--request \"{requestPath}\"",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(bridgePath) ?? Environment.CurrentDirectory
+        };
+
+    private static async Task<bool> WaitForProcessExitWithTimeoutAsync(Process process, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+            return false;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return true;
+        }
+    }
+
+    private static SiemensPushResult ParseBridgeResponse(int exitCode, string stdout, string stderr, SiemensPushRequest request)
+    {
         if (string.IsNullOrWhiteSpace(stdout))
         {
-            var message = process.ExitCode == 0
+            var message = exitCode == 0
                 ? "TIA bridge returned empty stdout."
-                : $"TIA bridge failed with exit code {process.ExitCode} and returned empty stdout.";
+                : $"TIA bridge failed with exit code {exitCode} and returned empty stdout.";
             if (!string.IsNullOrWhiteSpace(stderr))
             {
                 message += " Stderr: " + stderr.Trim();
             }
 
-            return SiemensPushResult.Failure(MapExitCodeStatus(process.ExitCode), message, request);
+            return SiemensPushResult.Failure(MapExitCodeStatus(exitCode), message, request);
         }
 
         TiaBridgeResponse? bridgeResponse;
@@ -190,7 +208,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
                 request);
         }
 
-        var responseMessage = BuildUserMessage(bridgeResponse, process.ExitCode);
+        var responseMessage = BuildUserMessage(bridgeResponse, exitCode);
         if (!string.IsNullOrWhiteSpace(bridgeResponse.Details))
         {
             responseMessage = string.IsNullOrWhiteSpace(responseMessage)
@@ -198,66 +216,17 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
                 : responseMessage + " Details: " + bridgeResponse.Details;
         }
 
-        if (bridgeResponse.Success && process.ExitCode == 0)
+        if (bridgeResponse.Success && exitCode == 0)
         {
             return SiemensPushResult.Success(responseMessage, request, bridgeResponse.ImportedPath ?? request.XmlPath);
         }
 
-        if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(stderr))
+        if (exitCode != 0 && !string.IsNullOrWhiteSpace(stderr))
         {
             responseMessage += " Stderr: " + stderr.Trim();
         }
 
-        return SiemensPushResult.Failure(MapBridgeStatus(bridgeResponse.Status, process.ExitCode), responseMessage, request);
-    }
-
-    private SiemensPushResult? ValidateRequest(SiemensPushRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.DeviceName))
-        {
-            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "DeviceName is required for TIA import.", request);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.PlcName))
-        {
-            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "PlcName is required for TIA import.", request);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.TargetFolderPath))
-        {
-            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "TargetFolderPath is required for TIA import.", request);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.BlockName))
-        {
-            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "BlockName is required for TIA import.", request);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.XmlContent) && string.IsNullOrWhiteSpace(request.XmlPath))
-        {
-            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "Either XmlContent or XmlPath is required for TIA import.", request);
-        }
-
-        return null;
-    }
-
-    private static string PrepareXmlFile(SiemensPushRequest request, out string tempXmlPath)
-    {
-        tempXmlPath = string.Empty;
-        if (!string.IsNullOrWhiteSpace(request.XmlPath))
-        {
-            if (!File.Exists(request.XmlPath))
-            {
-                throw new FileNotFoundException("Siemens block XML file was not found.", request.XmlPath);
-            }
-
-            return Path.GetFullPath(request.XmlPath);
-        }
-
-        var safeBlockName = string.Concat((request.BlockName ?? "Grafcet_LAD").Select(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' ? ch : '_'));
-        tempXmlPath = Path.Combine(Path.GetTempPath(), $"grafcetstudio-{safeBlockName}-{Guid.NewGuid():N}.xml");
-        File.WriteAllText(tempXmlPath, request.XmlContent);
-        return tempXmlPath;
+        return SiemensPushResult.Failure(MapBridgeStatus(bridgeResponse.Status, exitCode), responseMessage, request);
     }
 
     private BridgePathResolution ResolveBridgePath(SiemensPushRequest request)
@@ -362,21 +331,6 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
             TiaBridgeStatus.UnexpectedError when exitCode == 0 => response.Message,
             _ => string.IsNullOrWhiteSpace(response.Message) ? "TIA bridge returned an unexpected result." : response.Message
         };
-
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch
-        {
-            Trace.WriteLine($"[Siemens TIA Bridge] Could not delete temporary file '{path}'.");
-        }
-    }
 
     private static void TryKill(Process process)
     {

@@ -13,9 +13,7 @@ var GrafcetStudioFlowStruct;
         'STRING',
         'BYTE',
         'WORD',
-        'DWORD',
-        'POS',
-        'TOOL'
+        'DWORD'
     ];
     function getSharedFlowStruct(project) {
         if (!project) {

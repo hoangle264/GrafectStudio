@@ -777,6 +777,88 @@ public class GeneratorSmokeTests
     }
 
     [Fact]
+    public void BuildCSharpPayload_Keyence_WordMode_FormatsDirectDotAddresses()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-word",
+                Name = "WordFlow",
+                AddressMode = "word",
+                ActiveWordTag = "Sin",
+                CompleteWordTag = "Sout",
+                UnitId = "unit-1"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-word"] = new List<Step>
+                {
+                    new() { Id = "s1", Number = 1 },
+                    new() { Id = "s16", Number = 16 },
+                    new() { Id = "s17", Number = 17 },
+                    new() { Id = "s32", Number = 32 }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        Assert.Equal(4, flow.Steps.Count);
+        Assert.Equal("Sin.0", flow.Steps[0].ExecAddress);
+        Assert.Equal("Sout.0", flow.Steps[0].DoneAddress);
+        Assert.Equal("Sin.15", flow.Steps[1].ExecAddress);
+        Assert.Equal("Sout.15", flow.Steps[1].DoneAddress);
+        Assert.Equal("Sin_1.0", flow.Steps[2].ExecAddress);
+        Assert.Equal("Sout_1.0", flow.Steps[2].DoneAddress);
+        Assert.Equal("Sin_1.15", flow.Steps[3].ExecAddress);
+        Assert.Equal("Sout_1.15", flow.Steps[3].DoneAddress);
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_Siemens_WordMode_FormatsSliceAddresses()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-word",
+                Name = "WordFlow",
+                AddressMode = "word",
+                ActiveWordTag = "Sin",
+                CompleteWordTag = "Sout",
+                UnitId = "unit-1"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-word"] = new List<Step>
+                {
+                    new() { Id = "s1", Number = 1 },
+                    new() { Id = "s16", Number = 16 },
+                    new() { Id = "s17", Number = 17 },
+                    new() { Id = "s32", Number = 32 }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Siemens", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        Assert.Equal(4, flow.Steps.Count);
+        Assert.Equal("\"Sin\".%X0", flow.Steps[0].ExecAddress);
+        Assert.Equal("\"Sout\".%X0", flow.Steps[0].DoneAddress);
+        Assert.Equal("\"Sin\".%X15", flow.Steps[1].ExecAddress);
+        Assert.Equal("\"Sout\".%X15", flow.Steps[1].DoneAddress);
+        Assert.Equal("\"Sin_1\".%X0", flow.Steps[2].ExecAddress);
+        Assert.Equal("\"Sout_1\".%X0", flow.Steps[2].DoneAddress);
+        Assert.Equal("\"Sin_1\".%X15", flow.Steps[3].ExecAddress);
+        Assert.Equal("\"Sout_1\".%X15", flow.Steps[3].DoneAddress);
+    }
+
+    [Fact]
     public void MultiFileGenerator_ProjectScopedPayload_EmitsOneUnitFilePerUnit()
     {
         var generator = new MultiFileGenerator(

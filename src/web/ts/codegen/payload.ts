@@ -154,7 +154,11 @@ namespace GrafcetStudioCodegenPayload {
     return base + offset;
   }
 
-  export function resolveStepAddress(step: Step, flow: DiagramMeta): ResolvedStepAddress {
+  function isSiemensPlatform(platform?: string): boolean {
+    return String(platform || '').trim().toLowerCase().startsWith('siemens');
+  }
+
+  export function resolveStepAddress(step: Step, flow: DiagramMeta, platform?: string): ResolvedStepAddress {
     const stepNumber = Number(step && step.number);
     if (!Number.isInteger(stepNumber) || stepNumber < 1) {
       throw new Error('Step number must be an integer >= 1');
@@ -168,12 +172,24 @@ namespace GrafcetStudioCodegenPayload {
       const bit = bitIndex % 16;
       const activeWordTag = String((flow && (flow as any).activeWordTag) || '').trim();
       const completeWordTag = String((flow && (flow as any).completeWordTag) || '').trim();
+
+      if (isSiemensPlatform(platform)) {
+        return {
+          execAddress: activeWordTag
+            ? formatSiemensBitSlice(wordOffset > 0 ? activeWordTag + '_' + wordOffset : activeWordTag, bit)
+            : formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
+          doneAddress: completeWordTag
+            ? formatSiemensBitSlice(wordOffset > 0 ? completeWordTag + '_' + wordOffset : completeWordTag, bit)
+            : formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
+        };
+      }
+
       return {
         execAddress: activeWordTag
-          ? formatSiemensBitSlice(wordOffset > 0 ? activeWordTag + '_' + wordOffset : activeWordTag, bit)
+          ? (wordOffset > 0 ? activeWordTag + '_' + wordOffset : activeWordTag) + '.' + bit
           : formatWordAddress(flow.activeWord || 'DM0', wordOffset) + '.' + bit,
         doneAddress: completeWordTag
-          ? formatSiemensBitSlice(wordOffset > 0 ? completeWordTag + '_' + wordOffset : completeWordTag, bit)
+          ? (wordOffset > 0 ? completeWordTag + '_' + wordOffset : completeWordTag) + '.' + bit
           : formatWordAddress(flow.completeWord || 'DM100', wordOffset) + '.' + bit
       };
     }
@@ -330,13 +346,13 @@ namespace GrafcetStudioCodegenPayload {
     return vars;
   }
 
-  export function buildCSharpFlow(context: PayloadContext, diagramId: string): FlowBuildResult {
+  export function buildCSharpFlow(context: PayloadContext, diagramId: string, platform?: string): FlowBuildResult {
     const diagram = (context.project.diagrams || []).find(item => item.id === diagramId) || ({ id: diagramId, name: diagramId, mode: '' } as DiagramMeta);
     const data = context.loadDiagramData(diagramId);
     const state = ((data && data.state) || { steps: [], transitions: [], connections: [], vars: [] }) as DiagramState & { vars?: ProjectVariable[] };
     if (context.ensureFlowAddressConfig) context.ensureFlowAddressConfig(diagram, true);
     const steps = (state.steps || []).map(step => {
-      const address = resolveStepAddress(step, diagram);
+      const address = resolveStepAddress(step, diagram, platform);
       return {
         id: step.id || '',
         number: Number(step.number || 0),
@@ -570,7 +586,7 @@ namespace GrafcetStudioCodegenPayload {
     );
     validateUnitAddressConfig(context, unitDiagrams);
 
-    const flowResults = unitDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
+    const flowResults = unitDiagrams.map(diagram => buildCSharpFlow(context, diagram.id, platform));
     const unit = {
       id: selectedUnit ? (selectedUnit.id || '') : (unitId || ''),
       name: selectedUnit ? (selectedUnit.name || selectedUnit.id || '') : (unitId === '__none__' ? 'No unit' : ''),
@@ -595,7 +611,7 @@ namespace GrafcetStudioCodegenPayload {
       validateUnitAddressConfig(context, unitDiagrams);
     });
 
-    const flowResults = allDiagrams.map(diagram => buildCSharpFlow(context, diagram.id));
+    const flowResults = allDiagrams.map(diagram => buildCSharpFlow(context, diagram.id, platform));
     return buildCSharpPayloadCore(context, platform, null, flowResults);
   }
 
@@ -610,11 +626,11 @@ namespace GrafcetStudioCodegenPayload {
 
   export interface CodegenPayloadApi {
     buildCSharpPayload(context: PayloadContext, platform: string, unitId?: string): CodegenPayload;
-    buildCSharpFlow(context: PayloadContext, diagramId: string): FlowBuildResult;
+    buildCSharpFlow(context: PayloadContext, diagramId: string, platform?: string): FlowBuildResult;
     buildCSharpUnitPayload(context: PayloadContext, platform: string, unitId: string): CodegenPayload;
     buildCSharpProjectPayload(context: PayloadContext, platform: string): CodegenPayload;
     validateUnitAddressConfig(context: PayloadContext, unitDiagrams: DiagramMeta[]): void;
-    resolveStepAddress(step: Step, flow: DiagramMeta): ResolvedStepAddress;
+    resolveStepAddress(step: Step, flow: DiagramMeta, platform?: string): ResolvedStepAddress;
   }
 
   export const api: CodegenPayloadApi = {

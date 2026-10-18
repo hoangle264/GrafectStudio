@@ -3,9 +3,9 @@
 ;{{CommandId}}
 {{#each FlowCommands~}}
 {{#if IsFirst~}}
-LD   {{SourceExecuteBit}}
+LD   {{SourceDoneBit}}
 {{else~}}
-AND   {{SourceExecuteBit}}
+AND   {{SourceDoneBit}}
 {{/if~}}
 {{/each~}}
 {{#if (eq CommandId "CoilA")~}}

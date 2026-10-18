@@ -29,5 +29,9 @@ public class DiagramMeta
 
     public string ActiveWord { get; init; } = string.Empty;
 
+    public string? ActiveWordTag { get; init; }
+
     public string CompleteWord { get; init; } = string.Empty;
+
+    public string? CompleteWordTag { get; init; }
 }
