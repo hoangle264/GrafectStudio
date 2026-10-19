@@ -586,11 +586,17 @@ const resetCanvasInteraction = () => {
 };
 
 const onKey = (e) => {
-  if (isEditableTarget(e)) return;
   const key = e.key.toLowerCase();
+  const mod = e.ctrlKey || e.metaKey;
+  if (key === 's' && mod) {
+    e.preventDefault();
+    saveDiagram();
+    return;
+  }
+  if (isEditableTarget(e)) return;
 
-  if (keyToolMap[key]) setTool(keyToolMap[key]);
-  if (key === 'f') fitView();
+  if (keyToolMap[key] && !mod && !e.altKey) setTool(keyToolMap[key]);
+  if (key === 'f' && !mod) fitView();
   if (e.key === '+' || e.key === '=') zoomIn();
   if (e.key === '-') zoomOut();
   if (e.key === 'Escape') resetCanvasInteraction();

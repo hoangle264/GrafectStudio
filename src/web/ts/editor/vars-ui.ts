@@ -533,11 +533,11 @@ function gvtDeleteVar(source: string, key: string | number): void {
   if(source === 'excel') {
     const idx = parseInt(String(key), 10);
     if(!project.excelVars||idx<0||idx>=project.excelVars.length) return;
-    if(!confirm('Xa "'+project.excelVars[idx].label+'" khi Global Vars?')) return;
+    if(!confirm('Xóa "'+project.excelVars[idx].label+'" khỏi Global Vars?')) return;
     project.excelVars.splice(idx,1);
   } else if(source === 'unit') {
     if(!project.unitConfig || !project.unitConfig[key as string]) return;
-    if(!confirm('Xa unit "'+(project.unitConfig[key as string].label||key)+'" khi Global Vars?')) return;
+    if(!confirm('Xóa unit "'+(project.unitConfig[key as string].label||key)+'" khỏi Global Vars?')) return;
     delete project.unitConfig[key as string];
   } else {
     return;

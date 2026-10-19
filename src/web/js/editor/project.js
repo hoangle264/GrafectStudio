@@ -194,7 +194,7 @@ function closeTab(id, e) {
 function saveDiagram() {
   if (!activeDiagramId) return;
   flushState();
-  toast('âœ“ Saved');
+  toast('✓ Saved');
 }
 
 function markModified(id, yes=true) {

@@ -36,12 +36,12 @@ function eiParsePhysicalIOCSV(rows: string[][]): GrafcetStudioProject.PhysicalIO
 
 function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImportOptions): EiExcelImportResult {
   const rows = eiParseCSV(csvText);
-  if (!rows.length) return { ok: false, message: 'File CSV trong hoac khong doc duoc.', added: 0 };
+  if (!rows.length) return { ok: false, message: 'File CSV trống hoặc không đọc được.', added: 0 };
 
   if (csvType === 'physical-io') {
     if (typeof ensureProjectIOMapping === 'function') ensureProjectIOMapping();
     const parsed = eiParsePhysicalIOCSV(rows);
-    if (parsed.errors.length) return { ok: false, message: 'Loi validate:\n' + parsed.errors.join('\n'), added: 0 };
+    if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
     project.ioMapping.physicalIOs = parsed.physicalIOs;
     if (typeof ioAutoMatchEntries === 'function') ioAutoMatchEntries();
     if (typeof saveProject === 'function') saveProject();
@@ -50,8 +50,8 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
 
   if (csvType === 'unit') {
     const parsed = eiParseUnitCSV(rows);
-    if (parsed.errors.length) return { ok: false, message: 'Loi validate:\n' + parsed.errors.join('\n'), added: 0 };
-    if (!parsed.configs.length) return { ok: false, message: 'Khong tim thay dong Unit Station hop le.', added: 0 };
+    if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
+    if (!parsed.configs.length) return { ok: false, message: 'Không tìm thấy dòng Unit Station hợp lệ.', added: 0 };
 
     if (!project.unitConfig) project.unitConfig = {};
     parsed.configs.forEach(function (cfg) { project.unitConfig[cfg.label] = cfg; });
@@ -62,11 +62,11 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
   }
 
   const selectedStructType = (options && options.structType) || '';
-  if (!selectedStructType) return { ok: false, message: 'Vui long chon Struct Data truoc khi import.', added: 0 };
+  if (!selectedStructType) return { ok: false, message: 'Vui lòng chọn Struct Data trước khi import.', added: 0 };
 
   const parsed = eiParseStructCSV(rows, selectedStructType);
-  if (parsed.errors.length) return { ok: false, message: 'Loi validate:\n' + parsed.errors.join('\n'), added: 0 };
-  if (!parsed.vars.length) return { ok: false, message: 'Khong tim thay dong du lieu hop le cho "' + selectedStructType + '".', added: 0 };
+  if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
+  if (!parsed.vars.length) return { ok: false, message: 'Không tìm thấy dòng dữ liệu hợp lệ cho "' + selectedStructType + '".', added: 0 };
 
   if (typeof ensureProjectVariables === 'function') ensureProjectVariables();
   if (!project.excelVars) project.excelVars = [];

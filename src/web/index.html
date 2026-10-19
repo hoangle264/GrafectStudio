@@ -36,15 +36,11 @@
                     <button onclick="showGenerateCodeModal()">Code</button> 
                     <button onclick="toggleAiChatPanel(true)">AI Preview</button> 
                 </div>
-            </div> 
-            <button class="btn" onclick="newProject()">New Project</button> 
-            <button class="btn a" onclick="saveDiagram()">Save</button> 
-            <button class="btn g" onclick="exportHTML()">Export HTML</button> 
-            <button class="btn p" onclick="exportProject()">Export Project</button> 
-            <button class="btn btn-cyan" onclick="showExportTablesModal()">Tables</button> 
-            <button class="btn btn-purple" onclick="showGenerateCodeModal()">Code</button> 
-            <button class="btn btn-cyan" onclick="toggleAiChatPanel(true)">AI Preview</button> 
-            <button class="btn" onclick="triggerImport()">Import</button> 
+            </div>
+            <div class="header-actions">
+                <button class="btn a" onclick="saveDiagram()" title="Save (Ctrl+S)">Save</button>
+                <button class="btn btn-purple" onclick="showGenerateCodeModal()">Generate Code</button>
+            </div>
             <input type="file" id="file-input" accept=".json,.grafcet,.grafcet2" class="is-hidden" onchange="handleImport(event)">
             <input type="file" id="struct-import-input" accept=".json" class="is-hidden" onchange="handleStructImport(event)">
         </nav>
