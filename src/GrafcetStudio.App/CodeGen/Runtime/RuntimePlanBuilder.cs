@@ -1,4 +1,4 @@
-﻿using GrafcetStudio.CodeGen.Runtime.Models;
+using GrafcetStudio.CodeGen.Runtime.Models;
 using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.CodeGen.Runtime;
@@ -23,7 +23,7 @@ public static class RuntimePlanBuilder
             }
 
             var resolverResults = step.Actions
-                .Select(action => DeviceCommandResolver.Resolve(action, step.ExecAddress, variables, library))
+                .Select(action => action.DeviceCommandResolutionAttempted ? action.ResolvedCommand : DeviceCommandResolver.Resolve(action, step.ExecAddress, variables, library))
                 .Where(result => result is not null)
                 .Cast<ActionResolveResult>()
                 .ToList();
@@ -58,9 +58,17 @@ public static class RuntimePlanBuilder
         return new DiagramRuntimePlan
         {
             Diagram = diagram,
-            BaseMr = flow.Diagram?.BaseMr ?? 0,
+            BaseMr = ParseBaseMrNumber(flow.Diagram?.BaseMr),
             StepPlans = stepPlans,
             OutputBindingPlan = outputBindingPlan
         };
+    }
+
+    private static int ParseBaseMrNumber(string? value)
+    {
+        var text = (value ?? string.Empty).Trim().TrimStart('@');
+        var prefixLength = text.TakeWhile(char.IsLetter).Count();
+        if (prefixLength <= 0 || prefixLength >= text.Length) return 0;
+        return int.TryParse(text[prefixLength..], out var number) ? number : 0;
     }
 }

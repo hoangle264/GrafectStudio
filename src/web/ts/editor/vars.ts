@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioVars {
+namespace GrafcetStudioVars {
   type Project = GrafcetStudioProject.Project;
   type ProjectVariable = GrafcetStudioProject.ProjectVariable;
   type DeviceSignal = GrafcetStudioProject.DeviceSignal;
@@ -114,33 +114,65 @@
     return devSigs.map(function(sig) { return Object.assign({}, sig, { path: unitPaths[sig.id] || sig.path || sig.id }); });
   }
 
+  function findNestedDeviceType(context: VarsContext, sig: DeviceSignal): GrafcetStudioProject.DeviceType | undefined {
+    const nestedTypeId = (sig.nestedTypeId || '').trim();
+    const dataType = (sig.dataType || '').trim();
+    return (context.project.devices || []).find(function(device) {
+      if (!device) return false;
+      if (nestedTypeId && device.id === nestedTypeId) return true;
+      return !!dataType && device.name === dataType;
+    });
+  }
+
+  function expandDeviceSignals(
+    context: VarsContext,
+    signals: DeviceSignal[],
+    depth: number,
+    parentPath: string,
+    visitedTypeIds: Record<string, boolean>
+  ): DeviceSignal[] {
+    const out: DeviceSignal[] = [];
+    (signals || []).forEach(function(sig) {
+      if (!sig) return;
+      const signalName = sig.name || sig.id || '';
+      const currentPath = parentPath && signalName ? parentPath + '.' + signalName : (parentPath || sig.path || signalName);
+      const nestedType = findNestedDeviceType(context, sig);
+      if (!nestedType) {
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      if (depth >= GrafcetStudioStoreHelpers.MAX_NESTING_DEPTH) {
+        console.warn('Struct nesting depth limit reached for signal:', currentPath, 'max:', GrafcetStudioStoreHelpers.MAX_NESTING_DEPTH);
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      if (nestedType.id && visitedTypeIds[nestedType.id]) {
+        console.warn('Struct nesting cycle skipped for signal:', currentPath, 'type:', nestedType.name || nestedType.id);
+        out.push(parentPath ? Object.assign({}, sig, { path: currentPath }) : sig);
+        return;
+      }
+      const nextVisited = Object.assign({}, visitedTypeIds);
+      if (nestedType.id) nextVisited[nestedType.id] = true;
+      out.push.apply(out, expandDeviceSignals(context, nestedType.signals || [], depth + 1, currentPath, nextVisited));
+    });
+    return out;
+  }
+
   export function gvtGetSigList(context: VarsContext, variable: ProjectVariable): DeviceSignal[] {
     const devType = (context.project.devices || []).find(device => device.name === (variable.format || ''));
     const devSigs = devType ? (devType.signals || []) : [];
     if (variable.format === 'Cylinder') return devSigs.length ? devSigs : CYL_SIGNALS;
-    return devSigs;
+    if (!devSigs.some(function(sig) { return !!findNestedDeviceType(context, sig); })) return devSigs;
+    const visitedTypeIds: Record<string, boolean> = {};
+    if (devType && devType.id) visitedTypeIds[devType.id] = true;
+    return expandDeviceSignals(context, devSigs, 1, '', visitedTypeIds);
   }
 
   export function gvtGetExcelSignalAddress(variable: ProjectVariable | null | undefined, sig: DeviceSignal | null | undefined): string {
     const sAddr = (variable && variable.signalAddresses) || {};
     if (!sig) return '';
-    if ((variable && variable.format) === 'Cylinder') {
-      const key = String(sig.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (key === 'lsh') return sAddr.cyl_lsh || sAddr.LSH || '';
-      if (key === 'lsl') return sAddr.cyl_lsl || sAddr.LSL || '';
-      if (key === 'locka') return sAddr.cyl_lockA || sAddr.LockA || '';
-      if (key === 'lockb') return sAddr.cyl_lockB || sAddr.LockB || '';
-      if (key === 'dissnslsh' || key === 'dissnsh') return sAddr.cyl_disSnsH || sAddr.DisSnsLSH || sAddr.DisSnsH || '';
-      if (key === 'dissnslsl' || key === 'dissnsl') return sAddr.cyl_disSnsL || sAddr.DisSnsLSL || sAddr.DisSnsL || '';
-      if (key === 'state') return sAddr.cyl_state || sAddr.State || '';
-      if (key === 'errora' || key === 'erra') return sAddr.cyl_errA || sAddr.ErrorA || sAddr.ErrA || '';
-      if (key === 'errorb' || key === 'errb') return sAddr.cyl_errB || sAddr.ErrorB || sAddr.ErrB || '';
-      if (key === 'coila') return sAddr.cyl_coilA || sAddr.CoilA || '';
-      if (key === 'coilb') return sAddr.cyl_coilB || sAddr.CoilB || '';
-      if (key === 'hmimanbtn' || key === 'hmiman') return sAddr.cyl_hmiMan || sAddr.HmiManBtn || sAddr.HmiMan || '';
-    }
-    if (sig.id && sAddr[sig.id]) return sAddr[sig.id];
-    return '';
+    const key = sig.name || sig.id || '';
+    return (key && sAddr[key]) || '';
   }
 
   export function getVars(context: VarsContext): ProjectVariable[] {
@@ -163,7 +195,7 @@
   export function gvtEditVar(context: VarsContext, source: string, key: string | number, field: string, value: unknown): ResolveEntryResult {
     const hit = gvtResolveEntry(context, source, key);
     if (!hit.item) return hit;
-    (hit.item as Record<string, unknown>)[field] = value;
+    (hit.item as unknown as Record<string, unknown>)[field] = value;
     if (field === 'format') {
       hit.item.dataType = String(value || '');
       const devType = (context.project.devices || []).find(device => device.name === value);

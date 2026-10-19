@@ -1,0 +1,1731 @@
+using GrafcetStudio.App.Generators;
+using GrafcetStudio.CodeGen.Runtime.Models;
+using GrafcetStudio.CodeGen.Template;
+using GrafcetStudio.App.Generators.Siemens;
+using GrafcetStudio.Domain.Resolution;
+using HandlebarsDotNet;
+using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Enums;
+using Xunit;
+using Xunit.Abstractions;
+using GrafcetStudio.App.Generators.Common;
+using System.IO;
+using System.Text.Json;
+
+namespace GrafcetStudio.App.Tests;
+
+public class GeneratorSmokeTests
+{
+    private readonly ITestOutputHelper _output;
+
+    public GeneratorSmokeTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
+    [Fact]
+    public void MapIOGenerator_ReturnsExpectedSections()
+    {
+        var generator = new MapIOGenerator();
+        var payload = BuildPayload();
+        var output = generator.Generate(payload, Array.Empty<AggregatedOutputBinding>());
+        Assert.Contains("ioMapping", output);
+        Assert.Contains("unit", output);
+    }
+
+    [Fact]
+    public void CodeGeneratorService_RendersMapIOTemplate_FromMnmFile()
+    {
+        var handlebars = Handlebars.Create();
+        var templateManager = new TemplateManager(handlebars);
+        
+        templateManager.RegisterTemplates(new List<TemplateEntry>
+        {
+            new()
+            {
+                Id = "simple.MapIO",
+                Name = "MapIO.hbs",
+                Content = "; IO {{#each ioMap}}{{this.name}} => {{this.address}}{{/each}}",
+                IsPartial = false
+            }
+        });
+
+        var mapIoGenerator = new MapIOGenerator();
+        var keyenceGenerator = new KeyenceGenerator(templateManager, new SequenceResolver());
+        var multiFileGenerator = new MultiFileGenerator(
+            keyenceGenerator,
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator(),
+            mapIoGenerator
+        );
+
+        var service = new CodeGeneratorService(new[] { multiFileGenerator }, templateManager);
+
+        var payload = BuildPayload();
+        payload.TemplateProfile = "simple";
+        payload.IOMapping = new GrafcetStudio.Domain.Models.IOMapping
+        {
+            PhysicalIOs = new List<GrafcetStudio.Domain.Models.PhysicalIO>
+            {
+                new() { Id = "io-1", PlcAddress = "X000" }
+            },
+            Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
+            {
+                new() { PhysicalIOId = "io-1", AppVariable = "Var1" }
+            }
+        };
+
+        var output = service.Generate("Keyence", payload);
+        var ioMappingFile = output.Files.FirstOrDefault(f => f.Path == "Devices/IOMapping.mnm");
+        Assert.NotNull(ioMappingFile);
+        Assert.Contains("; IO Var1 => X000", ioMappingFile.Content);
+    }
+
+    [Fact]
+    public void CodeGeneratorService_CompilesExpressionsAndNegatedInputs_EndToEnd()
+    {
+        var handlebars = Handlebars.Create();
+        var templateManager = new TemplateManager(handlebars);
+        
+        templateManager.RegisterTemplates(new List<TemplateEntry>
+        {
+            new()
+            {
+                Id = "simple.MapIO",
+                Name = "MapIO.hbs",
+                Content = "{{#each ioMap}}{{#if (eq this.direction \"Output\")}}{{this.name}} -> OUT {{this.address}}\n{{else}}{{this.address}} -> OUT {{this.name}}\n{{/if}}{{/each}}",
+                IsPartial = false
+            }
+        });
+
+        var mapIoGenerator = new MapIOGenerator();
+        var keyenceGenerator = new KeyenceGenerator(templateManager, new SequenceResolver());
+        var multiFileGenerator = new MultiFileGenerator(
+            keyenceGenerator,
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator(),
+            mapIoGenerator
+        );
+
+        var service = new CodeGeneratorService(new[] { multiFileGenerator }, templateManager);
+
+        var payload = BuildPayload();
+        payload.TemplateProfile = "simple";
+        payload.Variables = new List<GrafcetStudio.Domain.Models.DeviceVariable>
+        {
+            new() { Label = "MyVarOne", Address = "MR100" },
+            new() { Label = "MyVarTwo", Address = "MR101" }
+        };
+        payload.IOMapping = new GrafcetStudio.Domain.Models.IOMapping
+        {
+            PhysicalIOs = new List<GrafcetStudio.Domain.Models.PhysicalIO>
+            {
+                new() { Id = "io-out", PlcAddress = "Y000", Direction = "Output" },
+                new() { Id = "io-in-neg", PlcAddress = "!X000", Direction = "Input" },
+                new() { Id = "io-out-fallback", PlcAddress = "Y001" },
+                new() { Id = "io-in-fallback", PlcAddress = "X001" }
+            },
+            Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
+            {
+                new() { PhysicalIOId = "io-out", AppVariable = "MyVarOne & !MyVarTwo" },
+                new() { PhysicalIOId = "io-in-neg", AppVariable = "MyVarOne" },
+                new() { PhysicalIOId = "io-out-fallback", AppVariable = "MyVarOne" },
+                new() { PhysicalIOId = "io-in-fallback", AppVariable = "MyVarOne" }
+            }
+        };
+
+        var output = service.Generate("Keyence", payload);
+        var ioMappingFile = output.Files.FirstOrDefault(f => f.Path == "Devices/IOMapping.mnm");
+        Assert.NotNull(ioMappingFile);
+        
+        var content = ioMappingFile.Content;
+
+        Assert.Contains("LD   MR100", content);
+        Assert.Contains("ANB  MR101", content);
+        Assert.Contains("OUT  Y000", content);
+
+        Assert.Contains("LDB  X000", content);
+        Assert.Contains("OUT  MR100", content);
+
+        Assert.Contains("LD   MR100", content);
+        Assert.Contains("OUT  Y001", content);
+
+        Assert.Contains("LD   X001", content);
+        Assert.Contains("OUT  MR100", content);
+    }
+
+    [Fact]
+    public void ErrorGenerator_ReturnsErrorsAndDeviceGroups()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        var output = generator.Generate(payload);
+        Assert.Contains("\"errors\"", output);
+        Assert.Contains("\"deviceGroups\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_IncludesUnit_WhenUnitIsSet()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload(); // Unit = { Name = "Main" }
+        var output = generator.Generate(payload);
+        Assert.Contains("\"unit\"", output);
+        Assert.Contains("\"Main\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_OmitsUnit_WhenUnitIsNull()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Unit = null;
+        var output = generator.Generate(payload);
+        Assert.DoesNotContain("\"unit\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_FiltersPrimitiveTypes_FromDeviceGroups()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Clamp",  Format = "Cylinder" },
+            new() { Label = "Flag",   Format = "BOOL" },
+            new() { Label = "Count",  Format = "INT" },
+            new() { Label = "Weight", Format = "REAL" },
+            new() { Label = "Motor1", Format = "Motor" }
+        };
+        var output = generator.Generate(payload);
+
+        // Device types → có trong output
+        Assert.Contains("\"Cylinder\"", output);
+        Assert.Contains("\"Motor\"", output);
+
+        // Primitive types → bị lọc bỏ
+        Assert.DoesNotContain("\"BOOL\"", output);
+        Assert.DoesNotContain("\"INT\"", output);
+        Assert.DoesNotContain("\"REAL\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_IncludesSystemControl_WhenVariableExists()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Machine", Format = "SystemControl",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["stateAuto"]   = "M100",
+                        ["stateManual"] = "M101",
+                        ["stateError"]  = "M102"
+                    }},
+            new() { Label = "Clamp", Format = "Cylinder" }
+        };
+        var output = generator.Generate(payload);
+
+        // systemControl field có trong output
+        Assert.Contains("\"systemControl\"", output);
+        Assert.Contains("\"Machine\"", output);
+        Assert.Contains("\"stateAuto\"", output);
+
+        // SystemControl không xuất hiện trong deviceGroups
+        Assert.DoesNotContain("\"SystemControl\"", output);
+    }
+
+    [Fact]
+    public void ErrorGenerator_OmitsSystemControl_WhenNoVariableExists()
+    {
+        var generator = new ErrorGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Clamp", Format = "Cylinder" }
+        };
+        var output = generator.Generate(payload);
+
+        Assert.DoesNotContain("\"systemControl\"", output);
+    }
+
+    [Fact]
+    public void DeviceManagerGenerator_ReturnsDeviceTypes()
+    {
+        var generator = new DeviceManagerGenerator();
+        var payload = BuildPayload();
+        var output = generator.Generate(payload);
+        Assert.Contains("deviceTypes", output);
+        Assert.Contains("devices", output);
+        Assert.Contains("DeviceManager_", output);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_ReturnsSystemAndUnits()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Units = new List<UnitInfo>
+        {
+            new() { Id = "unit-a", Name = "Unit A", Label = "Unit A" },
+            new() { Id = "unit-b", Name = "Unit B", Label = "Unit B" }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"units\"", output);
+        Assert.Contains("\"Unit A\"", output);
+        Assert.Contains("\"Unit B\"", output);
+        // No legacy single-unit field
+        Assert.DoesNotContain("\"flows\"", output);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_MapsSystemControlVariable()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "Machine",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["stateAuto"]   = "M100",
+                    ["stateManual"] = "M101",
+                    ["stateError"]  = "M102"
+                }
+            }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"signalAddresses\"", output);
+        Assert.Contains("\"stateAuto\": \"M100\"", output);
+        Assert.Contains("\"stateManual\": \"M101\"", output);
+        Assert.Contains("\"stateError\": \"M102\"", output);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_NoSystemVariable_ReturnsEmptySignals()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        // No "SystemControl" format variable
+        payload.Variables = new List<DeviceVariable>
+        {
+            new() { Label = "Motor1", Format = "Motor", Address = "@M1" }
+        };
+
+        var output = generator.GenerateSystem(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"signalAddresses\"", output);
+        // signalAddresses should be empty object, not null
+        Assert.DoesNotContain("null", output.Split("\"system\"")[1].Split("\"units\"")[0]);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateSystem_SupportsDotNotationInHandlebars()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "SysCtrl",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["StartSystem"] = "%M0.0",
+                    ["StopSystem"]  = "%M0.1"
+                }
+            },
+            new()
+            {
+                Label = "OUT_bStartLamp",
+                Format = "Lamp",
+                SignalAddresses = new Dictionary<string, string>
+                {
+                    ["Q"] = "%Q0.0"
+                }
+            }
+        };
+
+        var jsonOutput = generator.GenerateSystem(payload);
+
+        var handlebars = HandlebarsDotNet.Handlebars.Create();
+        var templates = new GrafcetStudio.CodeGen.Template.TemplateManager(handlebars);
+        templates.LoadTemplate("simple.System", ";Start {{system.signalAddresses.StartSystem}} Lamp {{variables.OUT_bStartLamp.signalAddresses.Q}}");
+
+        var stubGenerator = new TestSystemGenerator(generator);
+        var service = new CodeGeneratorService(new ICodeGenerator[] { stubGenerator }, templates);
+
+        var result = service.Generate("Keyence", payload);
+        var systemFile = result.Files.FirstOrDefault(f => f.Path == "System.mnm");
+
+        Assert.NotNull(systemFile);
+        Assert.Equal(";Start %M0.0 Lamp %Q0.0", systemFile.Content);
+    }
+
+    [Fact]
+    public void SystemControlGenerator_GenerateOrchestrator_ContainsSystemAndFlows()
+    {
+        var generator = new SystemControlGenerator();
+        var payload = BuildPayload();
+        payload.Variables = new List<DeviceVariable>
+        {
+            new()
+            {
+                Label = "Machine",
+                Format = "SystemControl",
+                SignalAddresses = new Dictionary<string, string> { ["stateAuto"] = "M100" }
+            }
+        };
+        payload.Flows.Add(new FlowInfo
+        {
+            Id = "orch-1",
+            Name = "Orchestrator",
+            Category = "orchestrator",
+            ControlState = "Auto",
+            OrchestratorConfig = new OrchestratorConfig
+            {
+                Elements = new List<OrchestratorElement> { new() { Type = "noop" } }
+            }
+        });
+
+        var output = generator.GenerateOrchestrator(payload);
+
+        Assert.Contains("\"system\"", output);
+        Assert.Contains("\"stateAuto\": \"M100\"", output);
+        Assert.Contains("\"orchestratorFlows\"", output);
+        Assert.Contains("\"skeleton\"", output);
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_CustomHbsTextTemplateOverridesDefaultTemplate()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "default.lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME DefaultTemplate_Should_Not_Be_Used
+        BLOCK_NUMBER 99
+
+        NETWORK default
+        TITLE DefaultTemplateNetwork
+        EXPR M9.0
+        COIL REF M9.1
+        END
+        """);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME {{unit.label}}_CustomOverride_LAD
+        BLOCK_NUMBER 10
+
+        NETWORK activation
+        TITLE CustomOverrideActivation
+        COMMENT custom root siemens-lad.hbs override
+        EXPR M0.1 & M0.2
+        COIL REF M0.0
+        END
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+            payload.Unit = new UnitInfo { Id = "unit-1", Name = "Main Unit", Label = "MainUnit" };
+
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
+
+            Assert.Equal("MainUnit_CustomOverride_LAD.xml", file.Path);
+            Assert.Contains("SW.Blocks.FC", file.Content);
+            Assert.Contains("FlgNet", file.Content);
+            Assert.Contains("Name=\"Contact\"", file.Content);
+            Assert.Contains("Name=\"Coil\"", file.Content);
+            Assert.Contains("CustomOverrideActivation", file.Content);
+            Assert.DoesNotContain("DefaultTemplate_Should_Not_Be_Used", file.Content);
+            Assert.DoesNotContain("DefaultTemplateNetwork", file.Content);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void SiemensLadTextTemplateParser_ParsesNetworkFieldsAndExpression()
+    {
+        var template = SiemensLadTextTemplateParser.Parse("""
+        TIA_VERSION 17
+        BLOCK_NAME Demo_LAD
+        BLOCK_NUMBER 3
+
+        NETWORK n1
+        TITLE Activate step
+        STATUS ready
+        COMMENT first comment line
+        COMMENT second comment line
+        EXPR M0.0 & (I0.0 | I0.1)
+        SET_COIL REF M0.1
+        END
+        """, "inline.lad.hbs");
+
+        Assert.Equal((uint)17, template.TiaVersion);
+        Assert.Equal("Demo_LAD", template.BlockName);
+        Assert.Equal((uint)3, template.BlockNumber);
+        var network = Assert.Single(template.Networks);
+        Assert.Equal("n1", network.Id);
+        Assert.Equal("Activate step", network.Title);
+        Assert.Equal("ready", network.Status);
+        Assert.Contains("first comment line", network.Comment);
+        Assert.Contains("second comment line", network.Comment);
+        Assert.Equal("set_coil", network.Output!.Type);
+        Assert.Equal("M0.1", network.Output.Ref);
+        Assert.Equal("AND", network.Expression!.Type);
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_RepeatNetworksUseRenderedHbsTextContext()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-repeat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME {{unit.label}}_Repeat_LAD
+        BLOCK_NUMBER 11
+
+        {{#each flows}}
+        {{#each steps}}
+        NETWORK step_{{id}}
+        TITLE Step {{../name}} {{number}} {{label}}
+        COMMENT Done for {{label}}
+        EXPR {{execAddress}}
+        COIL REF {{doneAddress}}
+        END
+
+        {{#each actions}}
+        NETWORK action_{{../id}}_{{@index}}
+        TITLE Action {{variable}} on {{../label}}
+        COMMENT Action variable {{variable}}
+        EXPR {{../execAddress}}
+        COIL REF {{address}}
+        END
+        {{/each}}
+        {{/each}}
+
+        {{#each transitions}}
+        NETWORK transition_{{id}}
+        TITLE Transition {{label}} in {{../name}}
+        COMMENT Condition {{label}}
+        EXPR {{condition}}
+        COIL REF {{condition}}
+        END
+        {{/each}}
+        {{/each}}
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+            payload.Unit = new UnitInfo { Id = "unit-1", Name = "Main Unit", Label = "MainUnit" };
+            payload.Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-1",
+                    Name = "MainFlow",
+                    Diagram = new DiagramInfo { Id = "diag-1", Name = "MainFlow", UnitId = "unit-1", Unit = "MainUnit" },
+                    Steps = new List<Step>
+                    {
+                        new()
+                        {
+                            Id = "s1",
+                            Number = 1,
+                            Label = "Start",
+                            ExecAddress = "M0.0",
+                            DoneAddress = "M0.1",
+                            Actions = new List<StepAction> { new() { Variable = "ValveA", Address = "Q0.0" } }
+                        },
+                        new()
+                        {
+                            Id = "s2",
+                            Number = 2,
+                            Label = "Clamp",
+                            ExecAddress = "M0.2",
+                            DoneAddress = "M0.3",
+                            Actions = new List<StepAction> { new() { Variable = "ValveB", Address = "Q0.1" } }
+                        }
+                    },
+                    Transitions = new List<Transition>
+                    {
+                        new() { Id = "t1", Label = "T1", Condition = "I0.0" },
+                        new() { Id = "t2", Label = "T2", Condition = "I0.1" }
+                    }
+                }
+            };
+
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
+
+            Assert.Equal("MainUnit_Repeat_LAD.xml", file.Path);
+            Assert.Equal(6, CountOccurrences(file.Content, "<SW.Blocks.CompileUnit"));
+            Assert.Contains("Step MainFlow 1 Start", file.Content);
+            Assert.Contains("Step MainFlow 2 Clamp", file.Content);
+            Assert.Contains("Transition T1 in MainFlow", file.Content);
+            Assert.Contains("Transition T2 in MainFlow", file.Content);
+            Assert.Contains("Action ValveA on Start", file.Content);
+            Assert.Contains("Action ValveB on Clamp", file.Content);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_SetAndResetCoils_GenerateXml()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-set-reset-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME Main_SetReset_LAD
+
+        NETWORK set_done
+        TITLE SetDone
+        EXPR M0.0
+        SET_COIL REF M0.1
+        END
+
+        NETWORK reset_exec
+        TITLE ResetExec
+        EXPR M0.1
+        RESET_COIL REF M0.0
+        END
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
+
+            Assert.Equal("Main_SetReset_LAD.xml", file.Path);
+            Assert.Contains("SetDone", file.Content);
+            Assert.Contains("ResetExec", file.Content);
+            Assert.Contains("Name=\"SCoil\"", file.Content);
+            Assert.Contains("Name=\"RCoil\"", file.Content);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_InvalidRenderedText_ReturnsNetworkAndLineError()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => SiemensLadTextTemplateParser.Parse("""
+        TIA_VERSION 17
+        BLOCK_NAME Bad_LAD
+
+        NETWORK n1
+        TITLE BadExpr
+        EXPR M0.0 $
+        COIL REF M0.1
+        END
+        """, "bad.lad.hbs"));
+
+        Assert.Contains("bad.lad.hbs", ex.Message);
+        Assert.Contains("Network 'n1'", ex.Message);
+        Assert.Contains("line 6", ex.Message);
+        Assert.Contains("Invalid ladder expression", ex.Message);
+        Assert.Contains("unexpected '$'", ex.Message);
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_DoesNotFallbackToJsonTemplate()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-json-not-used-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.json"), """
+        {
+          "platform": "siemens-lad",
+          "blockName": "Json_Should_Not_Be_Used",
+          "networks": []
+        }
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var ex = Assert.Throws<FileNotFoundException>(() => new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload).ToList());
+            Assert.Contains("Cannot find Siemens LAD HBS text template", ex.Message);
+            Assert.Contains("siemens-lad.hbs", ex.Message);
+            Assert.Contains("default.lad.hbs", ex.Message);
+            Assert.DoesNotContain("siemens-lad.json", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void SiemensLadDslGenerator_UnsupportedInstructionReportsClearError()
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-ton-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME Main_TON_LAD
+
+        NETWORK timer
+        TITLE Timer
+        STATUS partial
+        EXPR M0.0
+        TON T1
+        PT LIT T#5s
+        Q REF M0.1
+        END_TON
+        END
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload).ToList());
+            Assert.Contains("Network 'timer'", ex.Message);
+            Assert.Contains("instruction 'TON'", ex.Message);
+            Assert.Contains("XML generation is not implemented yet", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_KeepsLegacyControlStateAsAuto()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta { Id = "diag-legacy", Name = "Legacy", Mode = "Main", UnitId = "unit-1" }
+        }));
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+
+        Assert.Single(payload.Flows);
+        Assert.Equal("Auto", payload.Flows[0].ControlState);
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_PreservesMultipleUnitFilesAndControlStates()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta { Id = "diag-a", Name = "Unit A", Mode = "Main", ControlState = "Auto", UnitId = "unit-a" },
+            new DiagramMeta { Id = "diag-b", Name = "Unit B", Mode = "Manual", ControlState = "Manual", UnitId = "unit-b" }
+        }, new[]
+        {
+            new Unit { Id = "unit-a", Name = "Unit A" },
+            new Unit { Id = "unit-b", Name = "Unit B" }
+        }));
+
+        var payloadA = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-a");
+        var payloadB = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-b");
+
+        Assert.Single(payloadA.Flows);
+        Assert.Single(payloadB.Flows);
+        Assert.Equal("Auto", payloadA.Flows[0].ControlState);
+        Assert.Equal("Manual", payloadB.Flows[0].ControlState);
+    }
+    [Fact]
+    public void BuildCSharpPayload_AllUnits_IncludesUnitsAndFlowsAcrossProject()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta { Id = "diag-a", Name = "Unit A", Mode = "Main", ControlState = "Auto", UnitId = "unit-a", Unit = "Unit A" },
+            new DiagramMeta { Id = "diag-b", Name = "Unit B", Mode = "Manual", ControlState = "Manual", UnitId = "unit-b", Unit = "Unit B" }
+        }, new[]
+        {
+            new Unit { Id = "unit-a", Name = "Unit A" },
+            new Unit { Id = "unit-b", Name = "Unit B" }
+        }));
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "__all__");
+
+        Assert.Equal(2, payload.Units.Count);
+        Assert.Equal(2, payload.Flows.Count);
+        Assert.Contains(payload.Flows, flow => flow.Diagram?.UnitId == "unit-a");
+        Assert.Contains(payload.Flows, flow => flow.Diagram?.UnitId == "unit-b");
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_Keyence_WordMode_FormatsDirectDotAddresses()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-word",
+                Name = "WordFlow",
+                AddressMode = "word",
+                ActiveWordTag = "Sin",
+                CompleteWordTag = "Sout",
+                UnitId = "unit-1"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-word"] = new List<Step>
+                {
+                    new() { Id = "s1", Number = 1 },
+                    new() { Id = "s16", Number = 16 },
+                    new() { Id = "s17", Number = 17 },
+                    new() { Id = "s32", Number = 32 }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        Assert.Equal(4, flow.Steps.Count);
+        Assert.Equal("Sin.0", flow.Steps[0].ExecAddress);
+        Assert.Equal("Sout.0", flow.Steps[0].DoneAddress);
+        Assert.Equal("Sin.15", flow.Steps[1].ExecAddress);
+        Assert.Equal("Sout.15", flow.Steps[1].DoneAddress);
+        Assert.Equal("Sin_1.0", flow.Steps[2].ExecAddress);
+        Assert.Equal("Sout_1.0", flow.Steps[2].DoneAddress);
+        Assert.Equal("Sin_1.15", flow.Steps[3].ExecAddress);
+        Assert.Equal("Sout_1.15", flow.Steps[3].DoneAddress);
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_Siemens_WordMode_FormatsSliceAddresses()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-word",
+                Name = "WordFlow",
+                AddressMode = "word",
+                ActiveWordTag = "Sin",
+                CompleteWordTag = "Sout",
+                UnitId = "unit-1"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-word"] = new List<Step>
+                {
+                    new() { Id = "s1", Number = 1 },
+                    new() { Id = "s16", Number = 16 },
+                    new() { Id = "s17", Number = 17 },
+                    new() { Id = "s32", Number = 32 }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Siemens", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        Assert.Equal(4, flow.Steps.Count);
+        Assert.Equal("\"Sin\".%X0", flow.Steps[0].ExecAddress);
+        Assert.Equal("\"Sout\".%X0", flow.Steps[0].DoneAddress);
+        Assert.Equal("\"Sin\".%X15", flow.Steps[1].ExecAddress);
+        Assert.Equal("\"Sout\".%X15", flow.Steps[1].DoneAddress);
+        Assert.Equal("\"Sin_1\".%X0", flow.Steps[2].ExecAddress);
+        Assert.Equal("\"Sout_1\".%X0", flow.Steps[2].DoneAddress);
+        Assert.Equal("\"Sin_1\".%X15", flow.Steps[3].ExecAddress);
+        Assert.Equal("\"Sout_1\".%X15", flow.Steps[3].DoneAddress);
+    }
+
+    [Fact]
+    public void MultiFileGenerator_ProjectScopedPayload_EmitsOneUnitFilePerUnit()
+    {
+        var generator = new MultiFileGenerator(
+            new KeyenceGenerator(new TemplateManager(Handlebars.Create()), new SequenceResolver()),
+            new ErrorGenerator(),
+            new DeviceManagerGenerator(),
+            new SystemControlGenerator(),
+            new MapIOGenerator());
+
+        var payload = BuildPayload();
+        payload.Unit = null;
+        payload.Units = new List<UnitInfo>
+        {
+            new() { Id = "unit-a", Name = "Unit A", Label = "Unit A" },
+            new() { Id = "unit-b", Name = "Unit B", Label = "Unit B" }
+        };
+        payload.Flows = new List<FlowInfo>
+        {
+            new()
+            {
+                Id = "flow-a",
+                Name = "Flow A",
+                Diagram = new DiagramInfo { Id = "diag-a", UnitId = "unit-a", Unit = "Unit A", BaseMr = "100" },
+                Steps = new List<Step> { new() { Id = "step-a", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } },
+                Transitions = new List<Transition>()
+            },
+            new()
+            {
+                Id = "flow-b",
+                Name = "Flow B",
+                Diagram = new DiagramInfo { Id = "diag-b", UnitId = "unit-b", Unit = "Unit B", BaseMr = "200" },
+                Steps = new List<Step> { new() { Id = "step-b", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" } },
+                Transitions = new List<Transition>()
+            }
+        };
+
+        var files = generator.GenerateFiles(payload).ToList();
+
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_A.mnm");
+        Assert.Contains(files, file => file.Path == "Units/Unit_Unit_B.mnm");
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_OrchestratorFlowKeepsSystemControlCategory()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-orch",
+                Name = "System Control",
+                Category = "orchestrator",
+                ControlState = "Auto",
+                UnitId = "unit-1",
+                OrchestratorConfig = new OrchestratorConfig
+                {
+                    Elements = new List<OrchestratorElement> { new() { Type = "noop" } }
+                }
+            }
+        }));
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+
+        Assert.Single(payload.Flows);
+        Assert.Equal("orchestrator", payload.Flows[0].Category);
+        Assert.NotNull(payload.Flows[0].OrchestratorConfig);
+    }
+
+
+    [Fact]
+    public void BuildCSharpPayload_IncludesMacroPayloadFields()
+    {
+        var context = new TestPayloadContext(BuildProject(new[]
+        {
+            new DiagramMeta
+            {
+                Id = "diag-macro",
+                Name = "Pick",
+                DiagramType = "Macro",
+                UnitId = "unit-1",
+                Unit = "Main"
+            }
+        }))
+        {
+            StepsByDiagram = new Dictionary<string, List<Step>>
+            {
+                ["diag-macro"] = new()
+                {
+                    new() { Id = "s10", Number = 10, Kind = "macro", MacroFlowId = "diag-macro-step" }
+                }
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+        var flow = Assert.Single(payload.Flows);
+        var step = Assert.Single(flow.Steps);
+
+        Assert.Equal("Macro", flow.DiagramType);
+        Assert.Equal("Macro", flow.Diagram?.DiagramType);
+        Assert.Equal("unit-1", flow.Diagram?.UnitId);
+        Assert.Equal("Main", flow.Diagram?.Unit);
+        Assert.Equal("macro", step.Kind);
+        Assert.Equal("diag-macro-step", step.MacroFlowId);
+    }
+
+    [Fact]
+    public void BuildCSharpPayload_ResolvesAllDeviceTypes()
+    {
+        var context = new TestPayloadContext(BuildProject(Array.Empty<DiagramMeta>(), deviceTypes: new[]
+        {
+            new DeviceType { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" } } },
+            new DeviceType { Name = "Cylinder", Signals = new List<DeviceSignal> { new() { Id = "state", Name = "State" } } }
+        }))
+        {
+            ProjectVariables = new ProjectVariables
+            {
+                Imported = new List<ProjectVariable>
+                {
+                    new() { Label = "M1", Format = "Motor", SignalAddresses = new Dictionary<string, string> { ["Run"] = "Q0.0" } },
+                    new() { Label = "C1", Format = "Cylinder", SignalAddresses = new Dictionary<string, string> { ["State"] = "M100" } }
+                },
+                User = new List<ProjectVariable>()
+            }
+        };
+
+        var payload = GrafcetStudioCodegenPayload.buildCSharpPayload(context, "Keyence", "unit-1");
+
+        Assert.Equal(2, payload.DeviceTypes.Count);
+    }
+
+
+    [Fact]
+    public void KeyenceGenerator_Phase1_PopulatesStepContextInJsonContext()
+    {
+        var payload = new CodegenPayload
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>
+            {
+                new()
+                {
+                    Label = "Motor1",
+                    Format = "Motor",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["Run"] = "MR10",
+                        ["Done"] = "MR11"
+                    }
+                }
+            },
+            DeviceTypes = new List<DeviceType>
+            {
+                new() { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" }, new() { Id = "done", Name = "Done" } } }
+            },
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-1",
+                    Name = "AutoFlow",
+                    Type = "auto",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", BaseMr = "100" },
+                    Steps = new List<Step>
+                    {
+                        new()
+                        {
+                            Id = "s1",
+                            Number = 1,
+                            Label = "Start",
+                            IsInitial = true,
+                            ExecAddress = "@MR100",
+                            DoneAddress = "@MR101",
+                            Actions = new List<StepAction>
+                            {
+                                new() { Variable = "Motor1.Run", Qualifier = GrafcetStudio.Domain.Enums.ActionQualifier.N, Complete = new StepActionCompletion { Sensor = "Done", SensorLabel = "Motor1.Done", Address = "MR11" } }
+                            }
+                        }
+                    },
+                    Transitions = new List<Transition>
+                    {
+                        new() { Id = "t1", Label = "T1", Condition = "!MR20", FromStepIds = new List<string>{ "s1" }, ToStepIds = new List<string>() }
+                    }
+                }
+            }
+        };
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("\"execAddress\": \"@MR100\"", output);
+        Assert.Contains("\"doneAddress\": \"@MR101\"", output);
+        Assert.Contains("\"OutTransitionCondition\": \"!MR20\"", output);
+        Assert.Contains("\"deviceOutputGroups\"", output);
+    }
+
+
+    [Fact]
+    public void KeyenceGenerator_TemplateExpressionStylePostProcessesSingleOutputRungsToMnemonic()
+    {
+        var templates = new TemplateManager(Handlebars.Create());
+        templates.LoadTemplate("uc.unitAuto", """
+        ; Expression-style template keeps HBS readable
+        {{#each autoFlows}}
+        {{#each steps}}
+        {{#each actions}}
+        {{../execAddress}} -> OUT {{target}}
+        {{/each}}
+        {{execAddress}}{{#each actions}}{{#if complete.address}} & {{complete.address}}{{/if}}{{/each}}{{#if outTransitionCondition}} & {{outTransitionCondition}}{{/if}} -> SET {{doneAddress}}
+        {{/each}}
+        {{/each}}
+        """);
+
+        var payload = new CodegenPayload
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>
+            {
+                new()
+                {
+                    Label = "Motor1",
+                    Format = "Motor",
+                    SignalAddresses = new Dictionary<string, string>
+                    {
+                        ["Run"] = "MR10"
+                    }
+                }
+            },
+            DeviceTypes = new List<DeviceType>
+            {
+                new() { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" } } }
+            },
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-1",
+                    Name = "AutoFlow",
+                    Type = "auto",
+                    Mode = "auto",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", BaseMr = "100" },
+                    Steps = new List<Step>
+                    {
+                        new()
+                        {
+                            Id = "s1",
+                            Number = 1,
+                            Label = "Start",
+                            IsInitial = true,
+                            ExecAddress = "MR100",
+                            DoneAddress = "MR101",
+                            Actions = new List<StepAction>
+                            {
+                                new() { Variable = "Motor1.Run", Qualifier = ActionQualifier.N }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var output = new KeyenceGenerator(templates, new SequenceResolver()).GenerateUnitContent(payload);
+
+        Assert.Contains("LD   MR100", output);
+        Assert.Contains("OUT  MR10", output);
+        Assert.Contains("MR101", output);
+        Assert.DoesNotContain("->", output);
+        Assert.DoesNotContain("MR100 -> OUT MR10", output);
+    }
+    [Fact]
+    public void KeyenceGenerator_Phase2_PopulatesDeviceOutputMnemonicsInJsonContext()
+    {
+        var libraryPath = Path.Combine(Path.GetTempPath(), $"grafcet-device-library-{Guid.NewGuid():N}.json");
+        File.WriteAllText(libraryPath, """
+            {
+              "devices": [
+                {
+                  "deviceId": "Cylinder",
+                  "name": "Cylinder",
+                  "commands": {
+                    "CoilA": {
+                      "actionLabel": "Extend",
+                      "driveSignal": "CoilA",
+                      "interlock": {
+                        "signal": "LockA",
+                        "label": "Cylinder1.LockA",
+                        "requiredState": "1"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+            """);
+
+        try
+        {
+            var payload = new CodegenPayload
+            {
+                Project = new ProjectInfo { Name = "Demo" },
+                Unit = new UnitInfo { Id = "unit-1", Name = "Main", Label = "Main" },
+                DeviceLibraryPath = libraryPath,
+                Variables = new List<DeviceVariable>
+                {
+                    new()
+                    {
+                        Label = "Main",
+                        Format = "Unit",
+                        SignalAddresses = new Dictionary<string, string>
+                        {
+                            ["flagAuto"] = "MR1",
+                            ["flagManual"] = "MR2",
+                            ["flagOrigin"] = "MR3"
+                        }
+                    },
+                    new()
+                    {
+                        Label = "Cylinder1",
+                        Format = "Cylinder",
+                        SignalAddresses = new Dictionary<string, string>
+                        {
+                            ["CoilA"] = "MR10",
+                            ["LockA"] = "MR20"
+                        }
+                    }
+                },
+                DeviceTypes = new List<DeviceType>
+                {
+                    new()
+                    {
+                        Name = "Cylinder",
+                        Signals = new List<DeviceSignal>
+                        {
+                            new() { Id = "coilA", Name = "CoilA" },
+                            new() { Id = "lockA", Name = "LockA" }
+                        }
+                    }
+                },
+                Flows = new List<FlowInfo>
+                {
+                    new()
+                    {
+                        Id = "flow-1",
+                        Name = "AutoFlow",
+                        Type = "auto",
+                        Mode = "auto",
+                        DiagramType = "Macro",
+                        Diagram = new DiagramInfo { Id = "flow-1", Name = "AutoFlow", UnitId = "unit-1", Unit = "Main", Mode = "auto", BaseMr = "100" },
+                        Steps = new List<Step>
+                        {
+                            new()
+                            {
+                                Id = "s1",
+                                Number = 1,
+                                Label = "AutoStep",
+                                IsInitial = true,
+                                ExecAddress = "MR100",
+                                DoneAddress = "MR101",
+                                Actions = new List<StepAction>
+                                {
+                                    new() { Variable = "Cylinder1.CoilA", Qualifier = ActionQualifier.N }
+                                }
+                            }
+                        }
+                    },
+                    new()
+                    {
+                        Id = "flow-2",
+                        Name = "OriginFlow",
+                        Type = "origin",
+                        Mode = "origin",
+                        DiagramType = "Macro",
+                        Diagram = new DiagramInfo { Id = "flow-2", Name = "OriginFlow", UnitId = "unit-1", Unit = "Main", Mode = "origin", BaseMr = "200" },
+                        Steps = new List<Step>
+                        {
+                            new()
+                            {
+                                Id = "s2",
+                                Number = 2,
+                                Label = "OriginStep",
+                                IsInitial = true,
+                                ExecAddress = "MR200",
+                                DoneAddress = "MR201",
+                                Actions = new List<StepAction>
+                                {
+                                    new() { Variable = "Cylinder1.CoilA", Qualifier = ActionQualifier.N }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+            Assert.Contains("\"CommandId\": \"CoilA\"", output);
+            Assert.Contains("\"PhysicalOutputRef\": \"MR10\"", output);
+        }
+        finally
+        {
+            if (File.Exists(libraryPath)) File.Delete(libraryPath);
+        }
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_OneMacroCallsOneMacroStep_GeneratesMacroPort()
+    {
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(BuildMacroPayload());
+
+        Assert.Contains("Clamp_Port", output);
+        Assert.Contains("macroBindings", output);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepCalledTwice_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[0].Steps.Add(new Step { Id = "s20", Label = "S20", Number = 20, Kind = "macro", MacroFlowId = "flow-step", ExecAddress = "@MR104", DoneAddress = "@MR105" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("referenced by multiple macro steps", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepFromAnotherUnit_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[1].Diagram!.UnitId = "unit-b";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("from another unit", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepContainsMacroStep_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Flows[1].Steps.Add(new Step { Id = "nested", Label = "Nested", Number = 99, Kind = "macro", MacroFlowId = "other" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("cannot contain nested macro steps", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_OldProjectDefaultsToMacroNormal_Generates()
+    {
+        var payload = BuildPayload();
+        payload.Flows[0].Id = "old-flow";
+        payload.Flows[0].Name = "Old";
+        payload.Flows[0].DiagramType = null;
+        payload.Flows[0].Diagram = new DiagramInfo { Id = "old-diag", UnitId = "unit-1", Unit = "Main", BaseMr = "100" };
+        payload.Flows[0].Steps = new List<Step> { new() { Id = "old-s1", Number = 1, ExecAddress = "@MR100", DoneAddress = "@MR101" } };
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("old-flow", output);
+        Assert.DoesNotContain("cannot contain nested macro steps", output);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepWithMacroPortVariable_UsesVariablePortData()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable
+        {
+            Label = "Clamp",
+            Format = "MacroPort",
+            SignalAddresses = new Dictionary<string, string>
+            {
+                ["Enable"] = "@MR300",
+                ["Start"] = "@MR301",
+                ["Busy"] = "@MR302",
+                ["Done"] = "@MR303",
+                ["Error"] = "@MR304",
+                ["Reset"] = "@MR305"
+            }
+        });
+
+        var output = BuildUnitConfigGenerator().GenerateUnitContent(payload);
+
+        Assert.Contains("MacroPort", output);
+        Assert.Contains("@MR301", output);
+        Assert.Contains("macroPortVariable", output);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepWithWrongFormatVariable_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "Cylinder" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("expected MacroPort", ex.Message);
+    }
+
+    [Fact]
+    public void UnitConfigGenerator_MacroStepDuplicateVariableName_ReturnsError()
+    {
+        var payload = BuildMacroPayload();
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "MacroPort" });
+        payload.Variables.Add(new DeviceVariable { Label = "Clamp", Format = "MacroPort" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => BuildUnitConfigGenerator().GenerateUnitContent(payload));
+        Assert.Contains("Duplicate MacroPort variable name", ex.Message);
+    }
+
+    private static int CountOccurrences(string value, string search)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(search, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += search.Length;
+        }
+
+        return count;
+    }
+    private static CodegenPayload BuildPayload()
+        => new()
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Name = "Main" },
+            Variables = new List<DeviceVariable>
+            {
+                new() { Label = "UnitMain", Format = "Motor", Address = "@M1" }
+            },
+            DeviceTypes = new List<DeviceType>
+            {
+                new() { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" } } }
+            },
+            Flows = new List<FlowInfo>
+            {
+                new() { Transitions = new List<Transition> { new() { Id = "t1", Label = "T1" } } }
+            }
+        };
+
+    private static Project BuildProject(IEnumerable<DiagramMeta> diagrams, IEnumerable<Unit>? units = null, IEnumerable<DeviceType>? deviceTypes = null)
+        => new()
+        {
+            Id = "project-1",
+            Name = "Demo",
+            MachineName = "Machine",
+            Units = (units ?? new[] { new Unit { Id = "unit-1", Name = "Main" } }).ToList(),
+            Diagrams = diagrams.ToList(),
+            Devices = (deviceTypes ?? new[]
+            {
+                new DeviceType { Name = "Motor", Signals = new List<DeviceSignal> { new() { Id = "run", Name = "Run" } } }
+            }).ToList(),
+            Variables = new ProjectVariables { Imported = new List<ProjectVariable>(), User = new List<ProjectVariable>() },
+            ExcelVars = new List<ProjectVariable>(),
+            UnitConfig = new Dictionary<string, UnitConfig>(),
+            IOMapping = new IOMapping { PhysicalIOs = new List<PhysicalIO>(), Entries = new List<IOMappingEntry>() }
+        };
+
+
+    private static KeyenceGenerator BuildUnitConfigGenerator()
+        => new(new TemplateManager(Handlebars.Create()), new SequenceResolver());
+
+    private static CodegenPayload BuildMacroPayload()
+        => new()
+        {
+            Project = new ProjectInfo { Name = "Demo" },
+            Unit = new UnitInfo { Id = "unit-a", Name = "Main", Label = "Main" },
+            Variables = new List<DeviceVariable>(),
+            DeviceTypes = new List<DeviceType>(),
+            Flows = new List<FlowInfo>
+            {
+                new()
+                {
+                    Id = "flow-macro",
+                    Name = "Pick",
+                    DiagramType = "Macro",
+                    Diagram = new DiagramInfo { Id = "diag-macro", UnitId = "unit-a", Unit = "Main", BaseMr = "100" },
+                    Steps = new List<Step>
+                    {
+                        new() { Id = "s10", Label = "S10", Number = 10, Kind = "macro", MacroFlowId = "flow-step", ExecAddress = "@MR100", DoneAddress = "@MR101" }
+                    },
+                    Transitions = new List<Transition>
+                    {
+                        new() { Id = "t1", Label = "T1", Condition = "I0.0" },
+                        new() { Id = "t2", Label = "T2", Condition = "I0.1" }
+                    }
+                },
+                new()
+                {
+                    Id = "flow-step",
+                    Name = "Clamp",
+                    DiagramType = "MacroStep",
+                    Diagram = new DiagramInfo { Id = "diag-step", UnitId = "unit-a", Unit = "Main", BaseMr = "200" },
+                    Steps = new List<Step>
+                    {
+                        new() { Id = "s1", Label = "S1", Number = 1, ExecAddress = "@MR200", DoneAddress = "@MR201" }
+                    },
+                    Transitions = new List<Transition>
+                    {
+                        new() { Id = "t1", Label = "T1", Condition = "I0.0" },
+                        new() { Id = "t2", Label = "T2", Condition = "I0.1" }
+                    }
+                }
+            }
+        };
+    private sealed class TestPayloadContext : GrafcetStudioCodegenPayload.PayloadContext
+    {
+        public TestPayloadContext(Project project)
+        {
+            Project = project;
+        }
+
+        public Project Project { get; }
+        public ProjectVariables? ProjectVariables { get; set; }
+        public Dictionary<string, List<Step>> StepsByDiagram { get; set; } = new();
+
+        public GrafcetStudioCodegenPayload.CodegenAssets GetAssets() => new()
+        {
+            DeviceLibraryPath = "config/Devices.json",
+            TemplateRootPath = "templates",
+            OutputPath = "out",
+            TemplateProfile = "simple"
+        };
+
+        public StoredDiagramData? LoadDiagramData(string diagramId) => new()
+        {
+            State = new DiagramState
+            {
+                Steps = StepsByDiagram.TryGetValue(diagramId, out var steps) ? steps : new List<Step> { new() { Id = diagramId + "-s1", Number = 1 } },
+                Transitions = new List<Transition>(),
+                Connections = new List<Connection>(),
+                Variables = new List<DeviceVariable>()
+            },
+            NextId = 1,
+            NextStepNum = 2,
+            ViewX = 0,
+            ViewY = 0,
+            ViewScale = 1
+        };
+
+        public bool SyncVariableSignalAddressesFromDeviceTypes() => false;
+
+        public ProjectVariables EnsureProjectVariables() => ProjectVariables ??= new ProjectVariables { Imported = new List<ProjectVariable>(), User = new List<ProjectVariable>() };
+
+        public void SaveProject() { }
+
+        public string GetDefaultUnitId() => "unit-1";
+
+        public DeviceSignal[] UnitSignals => Array.Empty<DeviceSignal>();
+
+        public DeviceSignal[] ProjectUnitStructSignals => Array.Empty<DeviceSignal>();
+
+        Project GrafcetStudioCodegenPayload.PayloadContext.project => Project;
+        StoredDiagramData? GrafcetStudioCodegenPayload.PayloadContext.loadDiagramData(string diagramId) => LoadDiagramData(diagramId);
+        GrafcetStudioCodegenPayload.CodegenAssets GrafcetStudioCodegenPayload.PayloadContext.getAssets() => GetAssets();
+        object? GrafcetStudioCodegenPayload.PayloadContext.ensureFlowAddressConfig(DiagramMeta diagram, bool assignUniqueBase) => null;
+        ProjectVariables GrafcetStudioCodegenPayload.PayloadContext.ensureProjectVariables() => EnsureProjectVariables();
+        bool GrafcetStudioCodegenPayload.PayloadContext.syncVariableSignalAddressesFromDeviceTypes() => SyncVariableSignalAddressesFromDeviceTypes();
+        void GrafcetStudioCodegenPayload.PayloadContext.saveProject() => SaveProject();
+        string GrafcetStudioCodegenPayload.PayloadContext.getDefaultUnitId() => GetDefaultUnitId();
+        DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.unitSignals => UnitSignals;
+        DeviceSignal[] GrafcetStudioCodegenPayload.PayloadContext.projectUnitStructSignals => ProjectUnitStructSignals;
+    }
+
+    [Fact]
+    public void SiemensDbUdtGenerator_GeneratesSharedFlowStructAndInstances()
+    {
+        var generator = new SiemensDbUdtGenerator();
+        var payload = BuildPayload();
+        payload.SharedFlowStruct = new SharedFlowStructSchema
+        {
+            Enabled = true,
+            StructTypeName = "UDT_FlowData",
+            Members = new List<SharedFlowStructMember>
+            {
+                new() { Name = "StartCmd", Type = "BOOL", Comment = "Start command" },
+                new() { Name = "CycleCount", Type = "INT", Comment = "Counter" }
+            }
+        };
+        payload.Flows = new List<FlowInfo>
+        {
+            new() { Name = "MainSequence" },
+            new() { Name = "SubSequence" }
+        };
+
+        var files = generator.GenerateFiles(payload).ToList();
+
+        Assert.Contains(files, f => f.Path == "UDT_FlowData.xml");
+        Assert.Contains(files, f => f.Path == "ST_MainSequence.xml");
+        Assert.Contains(files, f => f.Path == "ST_SubSequence.xml");
+
+        var udtFile = files.First(f => f.Path == "UDT_FlowData.xml");
+        Assert.Contains("UDT_FlowData", udtFile.Content);
+        Assert.Contains("StartCmd", udtFile.Content);
+        Assert.Contains("CycleCount", udtFile.Content);
+
+        var dbFile = files.First(f => f.Path == "ST_MainSequence.xml");
+        Assert.Contains("ST_MainSequence", dbFile.Content);
+        Assert.Contains("UDT_FlowData", dbFile.Content);
+    }
+
+    [Fact]
+    public void LogAndVerify_CodegenPayload_ReceivedByCSharp()
+    {
+        // 1. Giả lập JSON Payload từ WebView2 / JS gửi qua C#
+        var jsonPayload = """
+        {
+          "platform": "siemens-db",
+          "templateRootPath": "C:/Templates",
+          "sharedFlowStruct": {
+            "enabled": true,
+            "structTypeName": "UDT_FlowData",
+            "members": [
+              { "id": "m1", "name": "StartCmd", "type": "BOOL", "comment": "Lenh chay" },
+              { "id": "m2", "name": "TargetSpeed", "type": "REAL", "comment": "Toc do dat" },
+              { "id": "m3", "name": "StepCounter", "type": "INT", "comment": "Dem buoc" }
+            ]
+          },
+          "flows": [
+            {
+              "id": "flow-1",
+              "name": "MainSequence",
+              "type": "Macro",
+              "structInstanceName": "ST_MainSequence",
+              "structTypeName": "UDT_FlowData",
+              "flowVariable": {
+                "label": "ST_MainSequence",
+                "format": "UDT_FlowData",
+                "declarationMode": "SymbolicBlock"
+              },
+              "steps": [ { "id": "step-1", "name": "S1" } ],
+              "transitions": []
+            },
+            {
+              "id": "flow-2",
+              "name": "SubSequence",
+              "type": "Macro",
+              "structInstanceName": "ST_SubSequence",
+              "structTypeName": "UDT_FlowData",
+              "flowVariable": {
+                "label": "ST_SubSequence",
+                "format": "UDT_FlowData",
+                "declarationMode": "SymbolicBlock"
+              },
+              "steps": [],
+              "transitions": []
+            }
+          ],
+          "variables": [
+            { "label": "ST_MainSequence", "format": "UDT_FlowData", "declarationMode": "SymbolicBlock" },
+            { "label": "ST_SubSequence", "format": "UDT_FlowData", "declarationMode": "SymbolicBlock" }
+          ]
+        }
+        """;
+
+        // 2. C# Deserialization sang CodegenPayload
+        var payload = JsonSerializer.Deserialize<CodegenPayload>(jsonPayload);
+        Assert.NotNull(payload);
+
+        // 3. Log thông tin nhận được tại C#
+        _output.WriteLine("=== [LOG PAYLOAD C# NHẬN ĐƯỢC] ===");
+        _output.WriteLine($"Platform: {payload.Platform}");
+        _output.WriteLine($"Shared Struct Enabled: {payload.SharedFlowStruct?.Enabled}");
+        _output.WriteLine($"Shared Struct Type Name: {payload.SharedFlowStruct?.StructTypeName}");
+        _output.WriteLine($"Shared Struct Members Count: {payload.SharedFlowStruct?.Members.Count}");
+
+        foreach (var m in payload.SharedFlowStruct?.Members ?? [])
+        {
+            _output.WriteLine($"   - Member: {m.Name} ({m.Type}) | Comment: '{m.Comment}'");
+        }
+
+        _output.WriteLine($"Flows Count: {payload.Flows.Count}");
+        foreach (var f in payload.Flows)
+        {
+            _output.WriteLine($"   - Flow: '{f.Name}' | StructInstanceName: '{f.StructInstanceName}' | FlowVariable: '{f.FlowVariable?.Label}' (Format: {f.FlowVariable?.Format})");
+        }
+
+        // 4. Verification Assertions
+        Assert.NotNull(payload.SharedFlowStruct);
+        Assert.Equal("UDT_FlowData", payload.SharedFlowStruct.StructTypeName);
+        Assert.Equal(3, payload.SharedFlowStruct.Members.Count);
+        Assert.Equal("ST_MainSequence", payload.Flows[0].StructInstanceName);
+        Assert.Equal("ST_SubSequence", payload.Flows[1].StructInstanceName);
+    }
+
+    [Fact]
+    public void LogAndVerify_CodegenPayload_AutoFallbackFromDeviceType()
+    {
+        // 1. Giả lập JSON payload có sharedFlowStruct.members = [] nhưng deviceTypes chứa UDT_FlowData với 10 signals (giống log thực tế của người dùng)
+        var jsonPayload = """
+        {
+          "platform": "Keyence",
+          "sharedFlowStruct": {
+            "enabled": true,
+            "structTypeName": "UDT_FlowData",
+            "members": []
+          },
+          "deviceTypes": [
+            {
+              "Id": "dev-1784820513771",
+              "Name": "UDT_FlowData",
+              "Signals": [
+                { "Id": "bEnable", "Name": "bEnable", "DataType": "Bool" },
+                { "Id": "bReset", "Name": "bReset", "DataType": "Bool" },
+                { "Id": "bInterlock", "Name": "bInterlock", "DataType": "Bool" },
+                { "Id": "bStepbyStep", "Name": "bStepbyStep", "DataType": "Bool" },
+                { "Id": "bStart", "Name": "bStart", "DataType": "Bool" },
+                { "Id": "nTransStep", "Name": "nTransStep", "DataType": "Bool" },
+                { "Id": "bRunning", "Name": "bRunning", "DataType": "Bool" },
+                { "Id": "nStep", "Name": "nStep", "DataType": "Bool" },
+                { "Id": "nCurrentStep", "Name": "nCurrentStep", "DataType": "Bool" },
+                { "Id": "nJumpStep", "Name": "nJumpStep", "DataType": "Bool" }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var payload = JsonSerializer.Deserialize<CodegenPayload>(jsonPayload);
+        Assert.NotNull(payload);
+        payload.EnrichVariables();
+
+        _output.WriteLine("=== [LOG FALLBACK AUTO-POPULATE MEMBERS FROM DEVICETYPE] ===");
+        _output.WriteLine($"Shared Struct Type: {payload.SharedFlowStruct?.StructTypeName}");
+        _output.WriteLine($"Shared Struct Members Count Sau Khi Enrich: {payload.SharedFlowStruct?.Members.Count}");
+
+        foreach (var m in payload.SharedFlowStruct?.Members ?? [])
+        {
+            _output.WriteLine($"   - Member: {m.Name} ({m.Type})");
+        }
+
+        Assert.Equal(10, payload.SharedFlowStruct?.Members.Count);
+        Assert.Equal("bEnable", payload.SharedFlowStruct?.Members[0].Name);
+        Assert.Equal("nJumpStep", payload.SharedFlowStruct?.Members[9].Name);
+    }
+
+    [Fact]
+    public void GeneratorContextBuilder_BuildsFlowVariableInFlowContext()
+    {
+        var payload = BuildPayload();
+        payload.Flows[0].Name = "AutoFlow";
+        payload.Flows[0].Type = "auto";
+        payload.Flows[0].DiagramType = "Macro";
+        payload.Variables.Add(new DeviceVariable
+        {
+            Label = "ST_AutoFlow",
+            Format = "UDT_FlowData",
+            DeclarationMode = "SymbolicBlock",
+            SignalAddresses = new Dictionary<string, string> { ["bEnable"] = "MR2100" }
+        });
+
+        var context = GeneratorContextBuilder.Build(payload, new SequenceResolver());
+
+        Assert.NotEmpty(context.autoFlows);
+        var autoFlow = context.autoFlows[0];
+        Assert.NotNull(autoFlow.flowVariable);
+        Assert.Equal("ST_AutoFlow", autoFlow.flowVariable.Label);
+        Assert.Equal("MR2100", autoFlow.flowVariable.SignalAddresses["bEnable"]);
+    }
+
+    private class TestSystemGenerator : ICodeGenerator
+    {
+        private readonly SystemControlGenerator _sysGen;
+        public TestSystemGenerator(SystemControlGenerator sysGen) => _sysGen = sysGen;
+        public string Platform => "Keyence";
+        public IEnumerable<CodegenFile> GenerateFiles(CodegenPayload payload)
+        {
+            yield return new CodegenFile { Path = "System.mnm", Content = _sysGen.GenerateSystem(payload) };
+        }
+    }
+}

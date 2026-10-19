@@ -6,10 +6,6 @@ namespace GrafcetStudio.CodeGen.Profile;
 /// <summary>Provides built-in PLC profiles and profile lookup operations.</summary>
 public static class ProfileRegistry
 {
-    public static PlcProfile Kv5500 { get; } = Create("kv-5500", "KEYENCE KV-5500", ".mnm", ";");
-
-    public static PlcProfile Kv8000 { get; } = Create("kv-8000", "KEYENCE KV-8000", ".mnm", ";");
-
     public static PlcProfile Melsec { get; } = Create("melsec", "Mitsubishi MELSEC", ".awl", ";", new Dictionary<string, string>
     {
         ["LDNOT"] = "LDI",
@@ -36,15 +32,13 @@ public static class ProfileRegistry
 
     public static IReadOnlyDictionary<string, PlcProfile> All { get; } = new Dictionary<string, PlcProfile>
     {
-        [Kv5500.Id] = Kv5500,
-        [Kv8000.Id] = Kv8000,
         [Melsec.Id] = Melsec,
         [Omron.Id] = Omron,
         [Siemens.Id] = Siemens
     };
 
     public static PlcProfile Get(string id)
-        => All.TryGetValue(id, out var profile) ? profile : Kv8000;
+        => All.TryGetValue(id, out var profile) ? profile : Siemens;
 
     public static string ApplyProfile(string code, PlcProfile profile)
     {

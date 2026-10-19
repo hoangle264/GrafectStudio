@@ -12,7 +12,8 @@ public static class AiContractGuard
         "create-variable",
         "clone-variable",
         "map-io",
-        "create-flow"
+        "create-flow",
+        "create-structure"
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -105,6 +106,7 @@ public static class AiContractGuard
             "clone-variable" => "clone-variable",
             "map-io" => "map-io",
             "create-flow" => "create-flow",
+            "create-structure" => "create-structure",
             _ => fallback
         };
 
@@ -130,6 +132,7 @@ public static class AiContractGuard
         CopyAllowed(output, context, "ioMapping");
         CopyAllowed(output, context, "flows");
         CopyAllowed(output, context, "selection");
+        CopyAllowed(output, context, "existingStructures");
         return output;
     }
 

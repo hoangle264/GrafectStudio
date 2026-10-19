@@ -1,3 +1,5 @@
+using GrafcetStudio.Domain.Models;
+
 namespace GrafcetStudio.App.Events;
 
 public class GenerateCodePayload
@@ -21,11 +23,32 @@ public class AiRequestPayload
 
 public class ExportCodePayload
 {
-    public string Code { get; set; } = string.Empty;
+    public List<CodegenFile> Files { get; set; } = new();
     public string Platform { get; set; } = string.Empty;
 }
 
 public class BrowseCodegenPathPayload
 {
     public string Target { get; set; } = string.Empty;
+}
+
+public class ReadTemplateFilePayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string RootPath { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+}
+
+public class PushSiemensLadPayload
+{
+    public string DevPath { get; set; } = string.Empty;
+    public string Platform { get; set; } = "siemens-lad";
+    public string TemplatePath { get; set; } = string.Empty;
+    public string OutputPath { get; set; } = string.Empty;
+    public string RawJson { get; set; } = string.Empty;
+    public string ProjectPath { get; set; } = string.Empty;
+    public string DeviceName { get; set; } = string.Empty;
+    public string PlcName { get; set; } = string.Empty;
+    public string TargetFolderPath { get; set; } = string.Empty;
+    public string OverwriteMode { get; set; } = string.Empty;
 }

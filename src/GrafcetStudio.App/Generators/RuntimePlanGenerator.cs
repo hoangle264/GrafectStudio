@@ -4,13 +4,13 @@ using System.Text.Json;
 
 namespace GrafcetStudio.App.Generators;
 
-public class RuntimePlanGenerator : ICodeGenerator
+public class RuntimePlanGenerator : LegacyCodeGeneratorBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string Platform => "runtime-plan";
+    public override string Platform => "runtime-plan";
 
-    public string Generate(CodegenPayload payload)
+    protected override string GenerateLegacy(CodegenPayload payload)
     {
         var sequence = SequenceBuilder.Build(payload).Select((item, index) => new
         {

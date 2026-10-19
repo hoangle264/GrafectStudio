@@ -1,5 +1,5 @@
 ﻿namespace GrafcetStudioAISanitizer {
-  export type AiContextScope = 'variable' | 'unit' | 'diagram' | 'step' | 'io';
+  export type AiContextScope = 'variable' | 'unit' | 'diagram' | 'step' | 'io' | 'structure';
 
   export interface SanitizerOptions {
     intent?: GrafcetStudioAIContracts.AiIntent;
@@ -14,6 +14,7 @@
     steps?: GrafcetStudioProject.Step[];
     transitions?: GrafcetStudioProject.Transition[];
     connections?: GrafcetStudioProject.Connection[];
+    existingStructures?: string[];
   }
 
   export interface SanitizerApi {
@@ -25,16 +26,18 @@
     sanitizeDiagram(raw: unknown): GrafcetStudioProject.DiagramInfo | null;
     sanitizeStep(raw: unknown): GrafcetStudioProject.Step | null;
     sanitizeIoMapping(raw: unknown, maxItems?: number): GrafcetStudioProject.IOMapping;
+    sanitizeExistingStructures(raw: unknown): string[];
   }
 
-  const scopes: readonly AiContextScope[] = ['variable', 'unit', 'diagram', 'step', 'io'];
+  const scopes: readonly AiContextScope[] = ['variable', 'unit', 'diagram', 'step', 'io', 'structure'];
   const defaultMaxItems = 200;
 
   const intentScopeMap: Record<GrafcetStudioAIContracts.AiIntent, readonly AiContextScope[]> = {
     'create-variable': ['variable', 'unit', 'diagram'],
     'clone-variable': ['variable', 'unit', 'diagram'],
     'map-io': ['variable', 'io'],
-    'create-flow': ['variable', 'unit', 'diagram', 'step', 'io']
+    'create-flow': ['variable', 'unit', 'diagram', 'step', 'io'],
+    'create-structure': ['structure']
   };
 
   function isRecord(value: unknown): value is Record<string, unknown> {
@@ -159,7 +162,7 @@
     assignString(result, 'dataType', raw.dataType);
     assignString(result, 'source', raw.source || raw._source);
     if (!result.label || !result.format) return null;
-    return result as GrafcetStudioProject.ProjectVariable;
+    return result as unknown as GrafcetStudioProject.ProjectVariable;
   }
 
   function variableSources(raw: unknown): unknown[] {
@@ -242,6 +245,11 @@
     if (!isRecord(raw)) return null;
     const result: Record<string, unknown> = {};
     assignString(result, 'variable', raw.variable);
+    if (!result.variable && isString(raw.expression)) {
+      const expression = safeString(raw.expression);
+      const variable = expression ? expression.split('=')[0].trim() : undefined;
+      if (variable) result.variable = variable;
+    }
     assignNullableString(result, 'address', raw.address);
     assignString(result, 'qualifier', raw.qualifier);
     if (isFiniteNumber(raw.time) || isString(raw.time)) {
@@ -253,7 +261,7 @@
     if (complete) result.complete = complete;
     assignNullableString(result, 'sensorRef', raw.sensorRef);
     if (!result.variable) return null;
-    return result as GrafcetStudioProject.StepAction;
+    return result as unknown as GrafcetStudioProject.StepAction;
   }
 
   export function sanitizeStep(raw: unknown): GrafcetStudioProject.Step | null {
@@ -272,7 +280,7 @@
     const actions = arrayFrom(raw.actions).map(sanitizeStepAction).filter(function(item): item is GrafcetStudioProject.StepAction { return item !== null; });
     if (actions.length) result.actions = actions;
     if (!result.id) return null;
-    return result as GrafcetStudioProject.Step;
+    return result as unknown as GrafcetStudioProject.Step;
   }
 
   function sanitizeTransition(raw: unknown): GrafcetStudioProject.Transition | null {
@@ -288,7 +296,7 @@
     assignStringArray(result, 'fromStepIds', raw.fromStepIds);
     assignStringArray(result, 'toStepIds', raw.toStepIds);
     if (!result.id) return null;
-    return result as GrafcetStudioProject.Transition;
+    return result as unknown as GrafcetStudioProject.Transition;
   }
 
   function sanitizeConnection(raw: unknown): GrafcetStudioProject.Connection | null {
@@ -363,6 +371,21 @@
     };
   }
 
+
+  export function sanitizeExistingStructures(raw: unknown): string[] {
+    const root = rootRecord(raw);
+    const project = getRecordField(root, 'project');
+    const source = project && Array.isArray(project.devices) ? project.devices : (Array.isArray(root.devices) ? root.devices : []);
+    const result: string[] = [];
+    for (let index = 0; index < source.length && result.length < 50; index++) {
+      const item = source[index];
+      if (!isRecord(item)) continue;
+      const name = safeString(item.name);
+      if (name !== undefined) result.push(name);
+    }
+    return result;
+  }
+
   function isAllowedForIntent(scope: AiContextScope, intent: unknown): boolean {
     if (!GrafcetStudioAIContracts.isAiIntent(intent)) return true;
     return intentScopeMap[intent].indexOf(scope) >= 0;
@@ -387,6 +410,7 @@
           flows: take(parts.flows, maxItems).map(sanitizeFlow).filter(function(item): item is GrafcetStudioAIContracts.AiFlowProposal { return item !== null; })
         };
       case 'io': return sanitizeIoMapping(raw, maxItems);
+      case 'structure': return sanitizeExistingStructures(raw);
       default: return undefined;
     }
   }
@@ -434,6 +458,11 @@
       if (ioMapping.physicalIOs.length || ioMapping.entries.length) result.ioMapping = ioMapping;
     }
 
+    if (hasScope(options, 'structure')) {
+      const existingStructures = sanitizeExistingStructures(raw);
+      if (existingStructures.length) result.existingStructures = existingStructures;
+    }
+
     return result;
   }
 
@@ -445,8 +474,10 @@
     sanitizeUnit,
     sanitizeDiagram,
     sanitizeStep,
-    sanitizeIoMapping
+    sanitizeIoMapping,
+    sanitizeExistingStructures
   };
 }
+
 
 

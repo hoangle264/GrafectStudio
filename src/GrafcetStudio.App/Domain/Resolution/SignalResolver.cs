@@ -7,7 +7,8 @@ namespace GrafcetStudio.Domain.Resolution;
 /// <summary>Provides static helpers to resolve variables, signals, and PLC literal addresses.</summary>
 public static class SignalResolver
 {
-    private static readonly Regex PlcAddressRegex = new("^(@MR\\d+|%[IQM][A-Z]?\\d|[A-Z]{1,3}\\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PlcAddressRegex = new("^(@?[A-Z]{1,3}\\d+(?:\\.\\d+)?|%[IQM][A-Z]?\\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SiemensBitSliceRegex = new(@"^(?:#?(?:""[^""]+""|[A-Za-z_][A-Za-z0-9_]*))(?:\.(?:""[^""]+""|[A-Za-z_][A-Za-z0-9_]*))*\.%X\d+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static string? ResolveAddress(string varOrAddr, IList<DeviceVariable> vars)
         => ResolveSignalInfo(varOrAddr, vars)?.PhysAddr;
@@ -16,6 +17,7 @@ public static class SignalResolver
     {
         if (string.IsNullOrWhiteSpace(varOrAddr)) return null;
         if (IsPlcAddressLiteral(varOrAddr)) return new SignalInfo { PhysAddr = varOrAddr };
+        if (IsSiemensBitSliceLiteral(varOrAddr)) return new SignalInfo { PhysAddr = varOrAddr };
 
         var dotIndex = varOrAddr.IndexOf('.');
         if (dotIndex > 0 && dotIndex < varOrAddr.Length - 1)
@@ -66,4 +68,7 @@ public static class SignalResolver
 
     public static bool IsPlcAddressLiteral(string value)
         => !string.IsNullOrWhiteSpace(value) && PlcAddressRegex.IsMatch(value.Trim());
+
+    public static bool IsSiemensBitSliceLiteral(string value)
+        => !string.IsNullOrWhiteSpace(value) && SiemensBitSliceRegex.IsMatch(value.Trim());
 }

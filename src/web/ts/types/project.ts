@@ -4,16 +4,43 @@ namespace GrafcetStudioProject {
   export interface JsonObject { [key: string]: JsonValue | undefined; }
 
   export type DiagramMode = 'Main' | 'Sub' | 'Error' | 'Manual' | 'Drivers' | string;
-  export type DiagramType = 'Grafcet' | 'Driver' | string;
+  export type FlowCategory = 'normal' | 'orchestrator';
+
+  export type DiagramType = 'Macro' | 'MacroStep' | 'Grafcet' | 'Driver' | string;
+  export type StepKind = 'normal' | 'macro';
   export type AddressMode = 'bool' | 'word' | string;
   export type BoolAddressMode = 'linear' | 'block' | string;
-  export type SignalVarType = 'Input' | 'Output' | 'Var' | string;
+  export type SignalVarType = 'Input' | 'Output' | 'Var' | 'Instance' | string;
   export type IODirection = 'Input' | 'Output' | '' | string;
   export type IOMappingStatus = 'matched' | 'mapped' | 'unmatched' | string;
   export type VariableKind = 'primitive' | 'struct' | string;
   export type VariableSource = 'csv' | 'manual' | 'excel' | string;
-  export type ActionQualifier = 'N' | 'S' | 'R' | 'L' | 'D' | 'P' | 'P0' | 'P1' | string;
+  export type DeclarationMode = 'AddressMapped' | 'SymbolicBlock' | string;
+  export type BlockKind = 'DB' | 'UDT' | 'GVL' | string;
+  export type ActionQualifier = 'N' | 'S' | 'R' | 'P' | 'P0' | 'L' | 'D' | 'SD' | 'DS' | 'SL';
 
+  export interface SharedFlowStructMember {
+    id: string;
+    name: string;
+    type: string;
+    comment?: string;
+    defaultValue?: string;
+  }
+
+  export interface SharedFlowStructSchema {
+    enabled: boolean;
+    structTypeName: string;
+    members: SharedFlowStructMember[];
+  }
+
+  export interface PlcBlock {
+    id: string;
+    name: string;              // vd "DB_Motor", "UDT_Cylinder", "GVL_IO"
+    kind: BlockKind;
+    memberVarIds?: string[];   // ProjectVariable.id references owned by this block
+    comment?: string;
+    [key: string]: unknown;
+  }
   export interface Project {
     id: string;
     name: string;
@@ -27,6 +54,8 @@ namespace GrafcetStudioProject {
     ioMapping: IOMapping;
     plcConfig?: PlcConfig;
     plcName?: string;
+    blocks?: PlcBlock[];
+    sharedFlowStruct?: SharedFlowStructSchema;
     [key: string]: unknown;
   }
 
@@ -41,6 +70,9 @@ namespace GrafcetStudioProject {
     id: string;
     name: string;
     mode: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
     diagramType?: DiagramType;
@@ -51,6 +83,8 @@ namespace GrafcetStudioProject {
     baseMr?: number | string;
     activeWord?: string;
     completeWord?: string;
+    activeWordTag?: string;
+    completeWordTag?: string;
     [key: string]: unknown;
   }
 
@@ -77,30 +111,31 @@ namespace GrafcetStudioProject {
     number?: number;
     label?: string;
     initial?: boolean;
-    isInitial?: boolean;
+    kind?: StepKind;
+    macroFlowId?: string | null;
+    actions?: StepAction[];
+    execAddress?: string | null;
+    doneAddress?: string | null;
+    // canvas-only, not serialized to C#
     x?: number;
     y?: number;
     w?: number;
     h?: number;
-    actions?: StepAction[];
     connections?: Connection[];
-    execAddress?: string | null;
-    doneAddress?: string | null;
-    [key: string]: unknown;
   }
 
   export interface Transition {
     id: string;
     label?: string;
     condition?: string;
+    fromStepIds?: string[];
+    toStepIds?: string[];
+    // canvas-only, not serialized to C#
     x?: number;
     y?: number;
     w?: number;
     h?: number;
-    fromStepIds?: string[];
-    toStepIds?: string[];
     connections?: Connection[];
-    [key: string]: unknown;
   }
 
   export interface Connection {
@@ -115,12 +150,12 @@ namespace GrafcetStudioProject {
   export interface StepAction {
     variable: string;
     address?: string | null;
-    qualifier?: ActionQualifier;
+    qualifier: ActionQualifier;
+    timeMs: number;
+    // UI-only, not serialized to C#
     time?: number | string;
-    timeMs?: number;
     complete?: StepActionCompletion | null;
     sensorRef?: string | null;
-    [key: string]: unknown;
   }
 
   export interface StepActionCompletion {
@@ -148,6 +183,7 @@ namespace GrafcetStudioProject {
     address?: string;
     comment?: string;
     path?: string;
+    nestedTypeId?: string;   // nested DeviceType reference; optional, can be inferred from dataType
     [key: string]: unknown;
   }
 
@@ -156,7 +192,8 @@ namespace GrafcetStudioProject {
     format: string;
     address?: string | null;
     signalAddresses?: Record<string, string>;
-    [key: string]: unknown;
+    declarationMode?: DeclarationMode;   // absent => AddressMapped (legacy behavior)
+    blockId?: string;   // id PlcBlock; '' = no block
   }
 
   export interface ProjectVariable extends DeviceVariable {
@@ -180,9 +217,17 @@ namespace GrafcetStudioProject {
     name?: string;
     type?: string;
     mode?: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
+    diagramType?: DiagramType;
     diagram?: DiagramInfo;
     steps: Step[];
     transitions: Transition[];
+    macroPortVariable?: DeviceVariable | null;
+    structInstanceName?: string;
+    structTypeName?: string;
+    flowVariable?: DeviceVariable | null;
     [key: string]: unknown;
   }
 
@@ -190,33 +235,66 @@ namespace GrafcetStudioProject {
     id?: string;
     name?: string;
     mode?: DiagramMode;
+    controlState?: string;
+    category?: FlowCategory;
+    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
+    diagramType?: DiagramType;
     addressMode?: AddressMode;
     boolAddressMode?: BoolAddressMode;
-    baseMr?: number | null;
+    baseMr?: string | null;
     activeWord?: string;
     completeWord?: string;
+    activeWordTag?: string;
+    completeWordTag?: string;
     [key: string]: unknown;
   }
 
-  export interface AppConfig {
-    platform?: string;
-    templateRootPath?: string;
-    deviceLibraryPath?: string;
-    outputPath?: string;
+  export interface OrchestratorConfig {
+    elements: Array<{ type: string; config: JsonValue }>;
+  }
+
+  export interface CodegenFile {
+    path: string;
+    content: string;
+  }
+
+  export interface CodegenOutput {
+    files: CodegenFile[];
+  }
+
+  export interface CodegenPayload {
+    platform: string;
+    templateRootPath: string;
     project?: ProjectInfo;
     unit?: UnitInfo;
-    flows?: FlowInfo[];
-    variables?: DeviceVariable[];
-    deviceTypes?: DeviceType[];
-    [key: string]: unknown;
+    units: UnitInfo[];
+    flows: FlowInfo[];
+    variables: DeviceVariable[];
+    blocks?: PlcBlock[];
+    deviceTypes: DeviceType[];
+    deviceLibraryPath: string;
+    templateProfile: string;
+    sharedFlowStruct?: SharedFlowStructSchema;
+    ioMapping?: IOMapping;
+    unitConfig?: Record<string, UnitConfig>;
+    system?: SystemControlInfo;
+        // UI-only, not serialized to C#
+    outputPath?: string;
   }
 
   export interface ProjectInfo {
     id?: string;
     name?: string;
     machineName?: string;
+    plc?: PlcPayloadInfo;
+    [key: string]: unknown;
+  }
+
+  export interface PlcPayloadInfo {
+    namePlc?: string;
+    deviceCode?: string;
     [key: string]: unknown;
   }
 
@@ -285,8 +363,19 @@ namespace GrafcetStudioProject {
     errors: string[];
   }
 
+  export interface SystemControlInfo {
+    label: string;
+    signalAddresses: Record<string, string>;
+  }
+
   export interface StructCSVParseResult {
     vars: ProjectVariable[];
+    errors: string[];
+  }
+
+  export interface SiemensBlockCSVParseResult {
+    vars: ProjectVariable[];
+    blocks: PlcBlock[];
     errors: string[];
   }
 
@@ -302,8 +391,13 @@ namespace GrafcetStudioProject {
   }
   export interface PlcConfig {
     name?: string;
+    deviceCode?: string | number;
     ip?: string;
     port?: string | number;
     [key: string]: unknown;
   }
 }
+
+
+
+

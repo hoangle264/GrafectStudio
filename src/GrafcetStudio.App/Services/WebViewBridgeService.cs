@@ -1,3 +1,4 @@
+using GrafcetStudio.Domain.Models;
 using Microsoft.Web.WebView2.Wpf;
 using System;
 using System.Text.Json;
@@ -14,9 +15,10 @@ public class WebViewBridgeService : IWebViewBridgeService
         _webView = webView;
     }
 
-    public async Task SendGeneratedCodeAsync(string code)
+    public async Task SendGeneratedCodeAsync(CodegenOutput output)
     {
-        await ExecuteAsync($"receiveGeneratedCode({JsonSerializer.Serialize(code)});");
+        var payload = JsonSerializer.Serialize(output);
+        await ExecuteAsync($"receiveGeneratedCode({payload});");
     }
 
     public async Task SendAiChunkAsync(string chunk)
@@ -62,6 +64,19 @@ public class WebViewBridgeService : IWebViewBridgeService
     {
         var payload = JsonSerializer.Serialize(new { deviceLibraryPath, templatePath, outputPath });
         await ExecuteAsync($"receiveSavedPaths({payload});");
+    }
+
+
+    public async Task SendTemplateFileAsync(string requestId, string relativePath, string content)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, relativePath, content });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
+    public async Task SendSiemensTiaPushResultAsync(object result)
+    {
+        var payload = JsonSerializer.Serialize(result);
+        await ExecuteAsync($"receiveSiemensTiaPushResult({payload});");
     }
 
     private async Task ExecuteAsync(string script)

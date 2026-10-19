@@ -1,14 +1,14 @@
-﻿// ═══════════════════════════════════════════════════════════════════
-//  store.js — Grafcet Studio
+// -------------------------------------------------------------------
+//  store.js Ã¢â‚¬â€ Grafcet Studio
 //  Project state singleton + localStorage persistence.
 //  Must be loaded BEFORE grafcet-studio-v2.js and grafcet-codegen.js.
 //
 //  NOTE: saveDiagramData / flushState reference runtime globals
 //  (state, nextId, nextStepNum, viewX, viewY, viewScale) that are
-//  declared in grafcet-studio-v2.js. This is intentional — those are
+//  declared in grafcet-studio-v2.js. This is intentional Ã¢â‚¬â€ those are
 //  diagram-render globals and belong with the canvas layer. They are
 //  only accessed at call-time (not parse-time), so load order is safe.
-// ═══════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
 
 type StoreProject = GrafcetStudioProject.Project;
 type StoreDiagramMeta = GrafcetStudioProject.DiagramMeta;
@@ -32,7 +32,7 @@ declare function addDiagram(skipOpen?: boolean): void;
 declare function addStandardDeviceTemplates(): void;
 declare function markModified(id: string, modified: boolean): void;
 
-// ── Project state ───────────────────────────────────────────────
+// -- Project state -----------------------------------------------
 let project: StoreProject = {
   id: 'proj-1',
   name: 'My Project',
@@ -80,6 +80,7 @@ namespace GrafcetStudioStoreHelpers {
   }
 
   export const GF_ADDRESS_DEFAULT_BOOL_SPAN = 200;
+  export const MAX_NESTING_DEPTH = 3;
 
   function normalizeBoolAddressMode(mode: unknown): string {
     const value = String(mode || '').trim().toLowerCase();
@@ -92,10 +93,31 @@ namespace GrafcetStudioStoreHelpers {
     return steps.reduce(function(max, step) { return Math.max(max, Number(step && step.number) || 0); }, 0);
   }
 
+  interface ParsedAddressBase {
+    prefix: string;
+    number: number;
+    width: number;
+  }
+
+  function parseAddressBase(value: unknown, fallback: string): ParsedAddressBase {
+    const source = String(value == null || value === '' ? fallback : value).trim();
+    const match = source.match(/^([A-Za-z]+)(\d+)$/);
+    if (!match) {
+      const fallbackMatch = fallback.match(/^([A-Za-z]+)(\d+)$/)!;
+      return { prefix: fallbackMatch[1].toUpperCase(), number: Number(fallbackMatch[2]), width: fallbackMatch[2].length };
+    }
+    return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+  }
+
+  function formatAddressBase(prefix: string, number: number, width: number): string {
+    const numberText = width > 1 ? String(number).padStart(width, '0') : String(number);
+    return prefix + numberText;
+  }
+
   function getBoolAddressRange(context: StoreContext, flow: DiagramMeta | null | undefined): { start: number; end: number } | null {
     if (!flow || flow.addressMode !== 'bool') return null;
     const maxStepNumber = Math.max(1, getFlowStepMaxNumber(context, flow.id));
-    const start = Number(flow.baseMr || 0);
+    const start = parseAddressBase(flow.baseMr, 'MR100').number;
     return { start, end: start + maxStepNumber * 2 - 1 };
   }
 
@@ -103,7 +125,7 @@ namespace GrafcetStudioStoreHelpers {
     return !!a && !!b && a.start <= b.end && b.start <= a.end;
   }
 
-  export function findNextAvailableBaseMr(context: StoreContext, unitId?: string | null, excludeDiagId?: string): number {
+  export function findNextAvailableBaseMr(context: StoreContext, unitId?: string | null, excludeDiagId?: string): string {
     const currentProject = context.getProject();
     let base = 100;
     while (base < 100000) {
@@ -114,10 +136,10 @@ namespace GrafcetStudioStoreHelpers {
         if ((diag.addressMode || 'bool') !== 'bool' || diag.baseMr === undefined || diag.baseMr === null || diag.baseMr === '') return false;
         return boolAddressRangesOverlap(candidate, getBoolAddressRange(context, diag));
       });
-      if (!overlaps) return base;
+      if (!overlaps) return formatAddressBase('MR', base, 0);
       base += GF_ADDRESS_DEFAULT_BOOL_SPAN;
     }
-    return base;
+    return 'MR100';
   }
 
   export function ensureFlowAddressConfig(context: StoreContext, diag: DiagramMeta | null | undefined, assignUniqueBase: boolean): boolean {
@@ -139,14 +161,8 @@ namespace GrafcetStudioStoreHelpers {
         }
       }
       if (diag.baseMr === undefined || diag.baseMr === null || diag.baseMr === '') {
-        diag.baseMr = assignUniqueBase ? findNextAvailableBaseMr(context, diag.unitId || null, diag.id) : 100;
+        diag.baseMr = assignUniqueBase ? findNextAvailableBaseMr(context, diag.unitId || null, diag.id) : 'MR100';
         changed = true;
-      } else {
-        const n = Number(diag.baseMr);
-        if (Number.isFinite(n) && diag.baseMr !== n) {
-          diag.baseMr = n;
-          changed = true;
-        }
       }
     }
     if (diag.addressMode === 'word') {
@@ -166,6 +182,22 @@ namespace GrafcetStudioStoreHelpers {
     let changed = false;
     (context.getProject().diagrams || []).forEach(function(diag) {
       changed = ensureFlowAddressConfig(context, diag, true) || changed;
+    });
+    return changed;
+  }
+
+  export function migrateFlowControlState(context: StoreContext): boolean {
+    let changed = false;
+    (context.getProject().diagrams || []).forEach(function(diag) {
+      if (!diag) return;
+      if (!diag.controlState) {
+        diag.controlState = diag.mode || 'Auto';
+        changed = true;
+      }
+      if (!diag.category) {
+        diag.category = 'normal';
+        changed = true;
+      }
     });
     return changed;
   }
@@ -245,13 +277,35 @@ namespace GrafcetStudioStoreHelpers {
 
   export function syncVariableSignalAddressesFromDeviceTypes(context: StoreContext): boolean {
     const currentProject = context.getProject();
+    let changed = false;
+
+    // Deduplicate signals in all device types to ensure valid unique signal names
+    (currentProject.devices || []).forEach(function(device) {
+      if (!device || !Array.isArray(device.signals)) return;
+      const seenNames = new Set<string>();
+      const cleanSignals: DeviceSignal[] = [];
+      device.signals.forEach(function(sig) {
+        const sigName = (sig.name || sig.id || '').trim();
+        if (!sigName) return;
+        if (seenNames.has(sigName)) {
+          changed = true;
+          return;
+        }
+        seenNames.add(sigName);
+        cleanSignals.push(Object.assign({}, sig, { id: sigName, name: sigName }));
+      });
+      if (cleanSignals.length !== device.signals.length) {
+        device.signals = cleanSignals;
+        changed = true;
+      }
+    });
+
     const devicesByName = new Map<string, DeviceType>((currentProject.devices || [])
       .filter(function(device): device is DeviceType { return !!device && !!device.name && Array.isArray(device.signals); })
       .map(function(device) { return [device.name, device]; }));
     const groups: ProjectVariable[][] = [];
     const vars = ensureProjectVariables(context);
     groups.push(vars.imported, vars.user, currentProject.excelVars || []);
-    let changed = false;
 
     groups.forEach(function(list) {
       (list || []).forEach(function(v) {
@@ -264,10 +318,12 @@ namespace GrafcetStudioStoreHelpers {
         }
         const signalAddresses = v.signalAddresses;
         (device.signals || []).forEach(function(sig) {
-          const id = sig && (sig.id || sig.name);
-          if (!id || Object.prototype.hasOwnProperty.call(signalAddresses, id)) return;
-          signalAddresses[id] = '';
-          changed = true;
+          const key = sig && (sig.name || sig.id);
+          if (!key) return;
+          if (!Object.prototype.hasOwnProperty.call(signalAddresses, key)) {
+            signalAddresses[key] = '';
+            changed = true;
+          }
         });
       });
     });
@@ -328,9 +384,10 @@ namespace GrafcetStudioStoreHelpers {
     syncVariableSignalAddressesFromDeviceTypes(context: StoreContext): boolean;
     normalizeIOMappingDirection(v: unknown): string;
     ensureProjectIOMapping(context: StoreContext): IOMapping;
-    findNextAvailableBaseMr(context: StoreContext, unitId?: string | null, excludeDiagId?: string): number;
+    findNextAvailableBaseMr(context: StoreContext, unitId?: string | null, excludeDiagId?: string): string;
     ensureFlowAddressConfig(context: StoreContext, diag: DiagramMeta | null | undefined, assignUniqueBase: boolean): boolean;
     migrateFlowAddressConfigs(context: StoreContext): boolean;
+    migrateFlowControlState(context: StoreContext): boolean;
   }
 
   export const api: StoreHelperApi = {
@@ -343,7 +400,8 @@ namespace GrafcetStudioStoreHelpers {
     ensureProjectIOMapping,
     findNextAvailableBaseMr,
     ensureFlowAddressConfig,
-    migrateFlowAddressConfigs
+    migrateFlowAddressConfigs,
+    migrateFlowControlState,
   };
 }
 
@@ -358,8 +416,8 @@ function getStoreContext(): GrafcetStudioStoreHelpers.StoreContext {
   };
 }
 
-// ── Flow address configuration wrappers ─────────────────────────
-function findNextAvailableBaseMr(unitId?: string | null, excludeDiagId?: string): number {
+// -- Flow address configuration wrappers -------------------------
+function findNextAvailableBaseMr(unitId?: string | null, excludeDiagId?: string): string {
   return GrafcetStudioStoreHelpers.findNextAvailableBaseMr(getStoreContext(), unitId, excludeDiagId);
 }
 
@@ -371,7 +429,11 @@ function migrateFlowAddressConfigs(): boolean {
   return GrafcetStudioStoreHelpers.migrateFlowAddressConfigs(getStoreContext());
 }
 
-// ── Persistence wrappers ────────────────────────────────────────
+function migrateFlowControlState(): boolean {
+  return GrafcetStudioStoreHelpers.migrateFlowControlState(getStoreContext());
+}
+
+// -- Persistence wrappers ----------------------------------------
 function saveProject(): void {
   GrafcetStudioStorePersistence.saveProject(project);
 }
@@ -395,7 +457,7 @@ function deleteDiagramData(id: string): void {
   GrafcetStudioStorePersistence.deleteDiagramData(id);
 }
 
-// ── Store helper wrappers ───────────────────────────────────────
+// -- Store helper wrappers ---------------------------------------
 function syncStructDataFromProjectData(): boolean {
   return GrafcetStudioStoreHelpers.syncStructData(getStoreContext());
 }
@@ -428,7 +490,7 @@ function upsertProjectVariable(bucket: string, variableDef: Partial<StoreProject
   return GrafcetStudioStoreHelpers.upsertProjectVariable(getStoreContext(), bucket, variableDef);
 }
 
-// ── Project load ────────────────────────────────────────────────
+// -- Project load ------------------------------------------------
 function loadProject(): void {
   try {
     const raw = localStorage.getItem('gf2-project');
@@ -440,6 +502,7 @@ function loadProject(): void {
       projectChanged = syncStructDataFromProjectData() || projectChanged;
       projectChanged = syncVariableSignalAddressesFromDeviceTypes() || projectChanged;
       projectChanged = migrateFlowAddressConfigs() || projectChanged;
+      projectChanged = migrateFlowControlState() || projectChanged;
       if (projectChanged) saveProject();
       const lastId = localStorage.getItem('gf2-active');
       if (lastId && project.diagrams.find(function(diagram) { return diagram.id === lastId; })) {
@@ -451,13 +514,13 @@ function loadProject(): void {
       }
     } else {
       addDiagram(true);
-      // Auto-seed standard device templates cho project mới
+      // Auto-seed standard device templates cho project m?i
       addStandardDeviceTemplates();
     }
   } catch (e) { addDiagram(true); }
 }
 
-// ── Flush active diagram to localStorage ────────────────────────
+// -- Flush active diagram to localStorage ------------------------
 function flushState(): void {
   if (!activeDiagramId || activeDiagramId === '__vars__' || activeDiagramId === '__io_mapping__' || String(activeDiagramId).startsWith('__struct__:')) return;
   saveDiagramData(activeDiagramId);

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GrafcetStudio.Domain.Enums;
 
 namespace GrafcetStudio.Domain.Models;
@@ -14,4 +15,7 @@ public class DeviceSignal
     public SignalVarType VarType { get; init; }
 
     public string Comment { get; init; } = string.Empty;
+
+    [JsonPropertyName("nestedTypeId")]
+    public string? NestedTypeId { get; init; }
 }

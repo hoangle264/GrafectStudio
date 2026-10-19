@@ -5,5 +5,6 @@ public enum SignalVarType
 {
     Input,
     Output,
-    Var
+    Var,
+    Instance
 }

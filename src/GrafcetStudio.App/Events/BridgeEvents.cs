@@ -25,3 +25,11 @@ public class ExportCodeRequestedEvent : PubSubEvent<ExportCodePayload>
 public class BrowseCodegenPathRequestedEvent : PubSubEvent<BrowseCodegenPathPayload>
 {
 }
+
+public class ReadTemplateFileRequestedEvent : PubSubEvent<ReadTemplateFilePayload>
+{
+}
+
+public class PushSiemensLadRequestedEvent : PubSubEvent<PushSiemensLadPayload>
+{
+}

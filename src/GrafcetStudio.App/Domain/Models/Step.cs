@@ -15,6 +15,12 @@ public class Step
     [JsonPropertyName("label")]
     public string Label { get; init; } = string.Empty;
 
+    [JsonPropertyName("kind")]
+    public string Kind { get; init; } = "normal";
+
+    [JsonPropertyName("macroFlowId")]
+    public string? MacroFlowId { get; init; }
+
     [JsonPropertyName("initial")]
     public bool IsInitial { get; init; }
 
@@ -27,3 +33,4 @@ public class Step
     [JsonPropertyName("actions")]
     public IList<StepAction> Actions { get; init; } = new List<StepAction>();
 }
+

@@ -1,7 +1,7 @@
 ﻿namespace GrafcetStudioAIContracts {
   export const schemaVersion = '1.0.0';
 
-  export type AiIntent = 'create-variable' | 'clone-variable' | 'map-io' | 'create-flow';
+  export type AiIntent = 'create-variable' | 'clone-variable' | 'map-io' | 'create-flow' | 'create-structure';
   export type AiProposalStatus = 'draft' | 'validated' | 'applied' | 'discarded' | 'invalid';
 
   export interface AiContextSelection {
@@ -53,7 +53,7 @@
       id?: string;
       label?: string;
     };
-    variable: AiVariableProposal;
+    variables: AiVariableProposal[];
   }
 
   export interface MapIOProposalData {
@@ -68,7 +68,19 @@
     flow: AiFlowProposal;
   }
 
-  export type AiProposalData = CreateVariableProposalData | CloneVariableProposalData | MapIOProposalData | CreateFlowProposalData;
+  export interface AiSignalProposal {
+    name: string;
+    dataType: string;
+    varType: string;
+    comment?: string;
+  }
+
+  export interface CreateStructureProposalData {
+    name: string;
+    signals: AiSignalProposal[];
+  }
+
+  export type AiProposalData = CreateVariableProposalData | CloneVariableProposalData | MapIOProposalData | CreateFlowProposalData | CreateStructureProposalData;
 
   export interface AiProposal {
     schemaVersion: string;
@@ -108,7 +120,7 @@
     validateAiProposal(value: unknown): ValidationResult<AiProposal>;
   }
 
-  const intents: readonly AiIntent[] = ['create-variable', 'clone-variable', 'map-io', 'create-flow'];
+  const intents: readonly AiIntent[] = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
   const proposalStatuses: readonly AiProposalStatus[] = ['draft', 'validated', 'applied', 'discarded', 'invalid'];
 
   function isRecord(value: unknown): value is Record<string, unknown> {
@@ -231,6 +243,33 @@
     return errors.length === 0;
   }
 
+
+  const allowedStructureDataTypes: readonly string[] = ['Bool', 'Int', 'DInt', 'UInt', 'UDInt', 'Real', 'LReal', 'Word', 'DWord', 'Byte', 'String', 'Time'];
+  const allowedStructureVarTypes: readonly string[] = ['Input', 'Output', 'Var'];
+
+  function validateSignalProposal(value: unknown, errors: string[], path: string): value is AiSignalProposal {
+    if (!isRecord(value)) {
+      errors.push(path + ' must be an object.');
+      return false;
+    }
+    if (!isString(value.name) || !value.name.trim()) errors.push(path + '.name must be a non-empty string.');
+    if (!isString(value.dataType) || allowedStructureDataTypes.indexOf(value.dataType) < 0) errors.push(path + '.dataType must be one of: ' + allowedStructureDataTypes.join(', ') + '.');
+    if (!isString(value.varType) || allowedStructureVarTypes.indexOf(value.varType) < 0) errors.push(path + '.varType must be one of: ' + allowedStructureVarTypes.join(', ') + '.');
+    if (value.comment != null && !isString(value.comment)) errors.push(path + '.comment must be a string when provided.');
+    return errors.length === 0;
+  }
+
+  function validateCreateStructureProposal(value: unknown, errors: string[], path: string): value is CreateStructureProposalData {
+    if (!isRecord(value)) {
+      errors.push(path + ' must be an object.');
+      return false;
+    }
+    if (!isString(value.name) || !value.name.trim()) errors.push(path + '.name must be a non-empty string.');
+    if (!Array.isArray(value.signals) || value.signals.length === 0) errors.push(path + '.signals must be a non-empty array.');
+    else value.signals.forEach(function(signal, index) { validateSignalProposal(signal, errors, path + '.signals[' + index + ']'); });
+    return errors.length === 0;
+  }
+
   function validateProposalData(intent: AiIntent, value: unknown, errors: string[]): value is AiProposalData {
     if (!isRecord(value)) {
       errors.push('proposal.data must be an object.');
@@ -244,7 +283,8 @@
       case 'clone-variable':
         if (!isRecord(value.source)) errors.push('proposal.data.source must be an object.');
         else if (!isOptionalString(value.source.id) || !isOptionalString(value.source.label) || (!value.source.id && !value.source.label)) errors.push('proposal.data.source requires id or label.');
-        validateVariableProposal(value.variable, errors, 'proposal.data.variable');
+        if (!Array.isArray(value.variables) || value.variables.length === 0) errors.push('proposal.data.variables must be a non-empty array.');
+        else value.variables.forEach(function(variable, index) { validateVariableProposal(variable, errors, 'proposal.data.variables[' + index + ']'); });
         break;
       case 'map-io':
         if (!Array.isArray(value.entries)) errors.push('proposal.data.entries must be an array.');
@@ -252,6 +292,9 @@
         break;
       case 'create-flow':
         validateFlowProposal(value.flow, errors, 'proposal.data.flow');
+        break;
+      case 'create-structure':
+        validateCreateStructureProposal(value, errors, 'proposal.data');
         break;
       default:
         errors.push('proposal.intent is not supported.');

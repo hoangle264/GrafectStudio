@@ -1,5 +1,6 @@
 using GrafcetStudio.App.Events;
 using GrafcetStudio.App.Services;
+using GrafcetStudio.Domain.Models;
 using Microsoft.Web.WebView2.Core;
 using Prism.Events;
 using Prism.Ioc;
@@ -9,7 +10,6 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
-
 namespace GrafcetStudio.App;
 
 public partial class MainWindow : Window
@@ -25,13 +25,15 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        await webView.EnsureCoreWebView2Async();
-
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "GrafcetStudio", "WebView2");
+        var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
+        await webView.EnsureCoreWebView2Async(environment);
         var bridge = ((App)System.Windows.Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
-        //webView.CoreWebView2.OpenDevToolsWindow();//test
-        webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
 
+        webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
         var webPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web"));
         if (webPath == null)
         {
@@ -39,17 +41,32 @@ public partial class MainWindow : Window
             System.Windows.MessageBox.Show($"Required 'web' folder not found. Tried the following paths:\n{tried}", "Missing content", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
-
         webView.CoreWebView2.SetVirtualHostNameToFolderMapping("grafcet.local", webPath, CoreWebView2HostResourceAccessKind.Allow);
+
+        var templatesPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "templates"));
+        if (Directory.Exists(templatesPath))
+        {
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping("templates.grafcet.local", templatesPath, CoreWebView2HostResourceAccessKind.Allow);
+        }
         webView.CoreWebView2.NavigationCompleted += async (_, _) =>
         {
             var config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
             await bridge.SendSavedPathsAsync(config.DeviceLibraryPath, config.TemplatePath, config.OutputPath);
-
+            await bridge.SendSiemensTiaPushResultAsync(new
+            {
+                kind = "config",
+                config = new
+                {
+                    projectPath = config.SiemensTia.ProjectPath,
+                    deviceName = config.SiemensTia.DeviceName,
+                    plcName = config.SiemensTia.PlcName,
+                    targetFolderPath = config.SiemensTia.TargetFolderPath,
+                    overwriteMode = config.SiemensTia.OverwriteMode
+                }
+            });
             if (!string.IsNullOrWhiteSpace(config.DeviceLibraryPath) && File.Exists(config.DeviceLibraryPath))
             {
                 var projectJson = await File.ReadAllTextAsync(config.DeviceLibraryPath);
-                //await bridge.LoadProjectDataAsync(projectJson);
             }
         };
         webView.CoreWebView2.Navigate("https://grafcet.local/index.html");
@@ -62,7 +79,6 @@ public partial class MainWindow : Window
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
             return;
         }
-
         DragMove();
     }
 
@@ -80,7 +96,11 @@ public partial class MainWindow : Window
     {
         Close();
     }
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true
+    };
 
     private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -89,94 +109,117 @@ public partial class MainWindow : Window
         {
             return;
         }
-
         var type = typeElement.GetString();
         var payload = doc.RootElement.TryGetProperty("payload", out var payloadElement) ? payloadElement : default;
-
         switch (type)
         {
             case "GENERATE_CODE":
-            {
-                var flowCount = GetOptionalArrayLength(payload, "flows");
-                var variableCount = GetOptionalArrayLength(payload, "variables");
-
-                var message = new GenerateCodePayload
                 {
-                    DevPath=GetOptionalString(payload, "deviceLibraryPath"),
-                    Platform = GetOptionalString(payload, "platform"),
-                    TemplatePath = GetOptionalString(payload, "templateRootPath"),
-                    OutputPath = GetOptionalString(payload, "outputPath"),
-                    RawJson = payload.GetRawText()
-                };
-                _eventAggregator.GetEvent<GenerateCodeRequestedEvent>().Publish(message);
-                break;
-            }
+                    var flowCount = GetOptionalArrayLength(payload, "flows");
+                    var variableCount = GetOptionalArrayLength(payload, "variables");
+                    var message = new GenerateCodePayload
+                    {
+                        DevPath = GetOptionalString(payload, "deviceLibraryPath"),
+                        Platform = GetOptionalString(payload, "platform"),
+                        TemplatePath = GetOptionalString(payload, "templateRootPath"),
+                        OutputPath = GetOptionalString(payload, "outputPath"),
+                        RawJson = payload.GetRawText()
+                    };
+                    _eventAggregator.GetEvent<GenerateCodeRequestedEvent>().Publish(message);
+                    break;
+                }
             case "AI_REQUEST":
-            {
-                var message = new AiRequestPayload
                 {
-                    Type = GetOptionalString(payload, "type"),
-                    Prompt = GetOptionalString(payload, "prompt", "message"),
-                    DiagramContext = GetOptionalString(payload, "diagramContext"),
-                    RequestJson = payload.ValueKind == JsonValueKind.Undefined ? string.Empty : payload.GetRawText(),
-                    FixtureName = GetOptionalString(payload, "fixtureName", "mockFixture"),
-                    Stream = GetOptionalBool(payload, "stream")
-                };
-                _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
-                break;
-            }
+                    var message = new AiRequestPayload
+                    {
+                        Type = GetOptionalString(payload, "type"),
+                        Prompt = GetOptionalString(payload, "prompt", "message"),
+                        DiagramContext = GetOptionalString(payload, "diagramContext"),
+                        RequestJson = payload.ValueKind == JsonValueKind.Undefined ? string.Empty : payload.GetRawText(),
+                        FixtureName = GetOptionalString(payload, "fixtureName", "mockFixture"),
+                        Stream = GetOptionalBool(payload, "stream")
+                    };
+                    _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
+                    break;
+                }
             case "SAVE_FILE":
-            {
-                var projectJson = payload.GetProperty("projectJson").GetString() ?? string.Empty;
-                _eventAggregator.GetEvent<SaveFileRequestedEvent>().Publish(projectJson);
-                break;
-            }
+                {
+                    var projectJson = payload.GetProperty("projectJson").GetString() ?? string.Empty;
+                    _eventAggregator.GetEvent<SaveFileRequestedEvent>().Publish(projectJson);
+                    break;
+                }
             case "OPEN_FILE":
                 _eventAggregator.GetEvent<OpenFileRequestedEvent>().Publish(new object());
                 break;
             case "EXPORT_CODE":
-            {
-                var message = new ExportCodePayload
                 {
-                    Code = payload.GetProperty("code").GetString() ?? string.Empty,
-                    Platform = payload.GetProperty("platform").GetString() ?? string.Empty
-                };
-                _eventAggregator.GetEvent<ExportCodeRequestedEvent>().Publish(message);
-                break;
-            }
+                    var message = new ExportCodePayload
+                    {
+                        Files = payload.TryGetProperty("files", out var filesElement) && filesElement.ValueKind == JsonValueKind.Array ? JsonSerializer.Deserialize<List<CodegenFile>>(filesElement.GetRawText()) ?? new List<CodegenFile>() : new List<CodegenFile>(),
+                        Platform = payload.GetProperty("platform").GetString() ?? string.Empty
+                    };
+                    _eventAggregator.GetEvent<ExportCodeRequestedEvent>().Publish(message);
+                    break;
+                }
             case "BROWSE_CODEGEN_PATH":
-            {
-                var message = new BrowseCodegenPathPayload
                 {
-                    Target = GetOptionalString(payload, "target")
-                };
-                _eventAggregator.GetEvent<BrowseCodegenPathRequestedEvent>().Publish(message);
-                break;
-            }
+                    var message = new BrowseCodegenPathPayload
+                    {
+                        Target = GetOptionalString(payload, "target")
+                    };
+                    _eventAggregator.GetEvent<BrowseCodegenPathRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "READ_TEMPLATE_FILE":
+                {
+                    var message = new ReadTemplateFilePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath")
+                    };
+                    _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
+                    break;
+                }
+            case "PUSH_SIEMENS_LAD":
+                {
+                    var message = new PushSiemensLadPayload
+                    {
+                        DevPath = GetOptionalString(payload, "deviceLibraryPath"),
+                        Platform = GetOptionalString(payload, "platform"),
+                        TemplatePath = GetOptionalString(payload, "templateRootPath"),
+                        OutputPath = GetOptionalString(payload, "outputPath"),
+                        RawJson = payload.TryGetProperty("codegenPayload", out var codegenPayload) && codegenPayload.ValueKind == JsonValueKind.Object ? codegenPayload.GetRawText() : payload.GetRawText(),
+                        ProjectPath = GetOptionalString(payload, "projectPath"),
+                        DeviceName = GetOptionalString(payload, "deviceName"),
+                        PlcName = GetOptionalString(payload, "plcName"),
+                        TargetFolderPath = GetOptionalString(payload, "targetFolderPath"),
+                        OverwriteMode = GetOptionalString(payload, "overwriteMode")
+                    };
+                    _eventAggregator.GetEvent<PushSiemensLadRequestedEvent>().Publish(message);
+                    break;
+                }
         }
     }
 
     private static string GetOptionalString(JsonElement element, string propertyName)
-        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
-            ? property.GetString() ?? string.Empty
-            : string.Empty;
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() ?? string.Empty : string.Empty;
 
     private static string GetOptionalString(JsonElement element, params string[] propertyNames)
     {
         foreach (var propertyName in propertyNames)
         {
             var value = GetOptionalString(element, propertyName);
-            if (!string.IsNullOrWhiteSpace(value)) return value;
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
         }
-
         return string.Empty;
     }
 
-
     private static bool GetOptionalBool(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.True;
+
     private static int GetOptionalArrayLength(JsonElement element, string propertyName)
-        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array
-            ? property.GetArrayLength()
-            : 0;
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array ? property.GetArrayLength() : 0;
 }

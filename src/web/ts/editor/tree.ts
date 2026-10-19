@@ -1,4 +1,4 @@
-﻿namespace GrafcetStudioTree {
+namespace GrafcetStudioTree {
   type Project = GrafcetStudioProject.Project;
   type Unit = GrafcetStudioProject.Unit;
   type DiagramMeta = GrafcetStudioProject.DiagramMeta;
@@ -9,7 +9,7 @@
   export interface TreeContext {
     project: Project;
     now(): number;
-    findNextAvailableBaseMr?: (unitId?: string | null, excludeDiagId?: string) => number;
+    findNextAvailableBaseMr?: (unitId?: string | null, excludeDiagId?: string) => string;
     syncVariableSignalAddressesFromDeviceTypes?: () => boolean;
   }
 
@@ -113,7 +113,7 @@
       name: 'GRAFCET_' + resolvedMode,
       unitId: (unitId || null) as unknown as string | undefined,
       mode: resolvedMode,
-      diagramType: 'Main',
+      diagramType: 'Macro',
       machine: context.project.machineName || context.project.name || 'Machine',
       unit,
       description: '',
@@ -189,7 +189,7 @@
       if (oldId && oldId !== nextId) idMap[oldId] = nextId;
       signals.push({
         id: nextId,
-        name: signalName,
+        name: nextId,
         dataType: signal.dataType || 'Bool',
         varType: signal.varType || 'Input',
         address: signal.address || '',
@@ -258,5 +258,6 @@
 }
 
 GrafcetStudioInterop.registerBridge('tree', GrafcetStudioTree.api);
+
 
 

@@ -10,6 +10,16 @@ public class AppConfig
     public string DeviceLibraryPath { get; set; } = string.Empty;
     public string TemplatePath { get; set; } = string.Empty;
     public string OutputPath { get; set; } = string.Empty;
+    public SiemensTiaConfig SiemensTia { get; set; } = new();
+}
+
+public class SiemensTiaConfig
+{
+    public string ProjectPath { get; set; } = string.Empty;
+    public string DeviceName { get; set; } = string.Empty;
+    public string PlcName { get; set; } = string.Empty;
+    public string TargetFolderPath { get; set; } = "Program blocks";
+    public string OverwriteMode { get; set; } = "FailIfExists";
 }
 
 public class ConfigService
@@ -23,6 +33,11 @@ public class ConfigService
         _configPath = Path.Combine(appData, "GrafcetStudio", "config.json");
     }
 
+    public ConfigService(string configPath)
+    {
+        _configPath = configPath;
+    }
+
     public async Task<AppConfig> LoadAsync()
     {
         if (!File.Exists(_configPath)) return new AppConfig();
@@ -30,7 +45,9 @@ public class ConfigService
         try
         {
             var json = await File.ReadAllTextAsync(_configPath);
-            return JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? new AppConfig();
+            var config = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? new AppConfig();
+            config.SiemensTia ??= new SiemensTiaConfig();
+            return config;
         }
         catch
         {
@@ -40,12 +57,32 @@ public class ConfigService
 
     public async Task SavePathsAsync(string? deviceLibraryPath, string? templatePath, string? outputPath)
     {
-        var config = new AppConfig
+        var config = await LoadAsync();
+        config.DeviceLibraryPath = deviceLibraryPath?.Trim() ?? string.Empty;
+        config.TemplatePath = templatePath?.Trim() ?? string.Empty;
+        config.OutputPath = outputPath?.Trim() ?? string.Empty;
+
+        await SaveAsync(config);
+    }
+
+    public async Task SaveSiemensTiaConfigAsync(string? projectPath, string? deviceName, string? plcName, string? targetFolderPath, string? overwriteMode)
+    {
+        var config = await LoadAsync();
+        config.SiemensTia = new SiemensTiaConfig
         {
-            DeviceLibraryPath = deviceLibraryPath?.Trim() ?? string.Empty,
-            TemplatePath = templatePath?.Trim() ?? string.Empty,
-            OutputPath = outputPath?.Trim() ?? string.Empty
+            ProjectPath = projectPath?.Trim() ?? string.Empty,
+            DeviceName = deviceName?.Trim() ?? string.Empty,
+            PlcName = plcName?.Trim() ?? string.Empty,
+            TargetFolderPath = string.IsNullOrWhiteSpace(targetFolderPath) ? "Program blocks" : targetFolderPath.Trim(),
+            OverwriteMode = string.IsNullOrWhiteSpace(overwriteMode) ? "FailIfExists" : overwriteMode.Trim()
         };
+
+        await SaveAsync(config);
+    }
+
+    private async Task SaveAsync(AppConfig config)
+    {
+        config.SiemensTia ??= new SiemensTiaConfig();
 
         Directory.CreateDirectory(Path.GetDirectoryName(_configPath)!);
         var json = JsonSerializer.Serialize(config, JsonOptions);

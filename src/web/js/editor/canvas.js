@@ -62,19 +62,53 @@ function buildConnEl(c) {
   g.dataset.id=c.id; g.dataset.type='connection';
   const path=svgE('path');
   const dx=fp.x-tp.x, dy=fp.y-tp.y;
+  const isP1Top = (c.fromPort || 'bottom').startsWith('top');
+  const isP2Bottom = (c.toPort || 'top').startsWith('bottom');
+
   let d;
-  if(Math.abs(dx)<2) {
-    d=`M${fp.x},${fp.y} L${tp.x},${tp.y}`;
+  if (!isP1Top && !isP2Bottom) {
+    // bottom to top
+    if (fp.y <= tp.y + 4) {
+      if (Math.abs(dx) < 2) d = `M${fp.x},${fp.y} L${tp.x},${tp.y}`;
+      else {
+        const my = (fp.y + tp.y) / 2;
+        d = `M${fp.x},${fp.y} L${fp.x},${my} L${tp.x},${my} L${tp.x},${tp.y}`;
+      }
+    } else {
+      const LOOP_OFFSET = 70;
+      const ox = fp.x >= tp.x ? Math.max(fp.x, tp.x) + LOOP_OFFSET : Math.min(fp.x, tp.x) - LOOP_OFFSET;
+      d = `M${fp.x},${fp.y} L${ox},${fp.y} L${ox},${tp.y} L${tp.x},${tp.y}`;
+    }
+  } else if (isP1Top && isP2Bottom) {
+    // top to bottom
+    if (fp.y >= tp.y - 4) {
+      if (Math.abs(dx) < 2) d = `M${fp.x},${fp.y} L${tp.x},${tp.y}`;
+      else {
+        const my = (fp.y + tp.y) / 2;
+        d = `M${fp.x},${fp.y} L${fp.x},${my} L${tp.x},${my} L${tp.x},${tp.y}`;
+      }
+    } else {
+      const LOOP_OFFSET = 70;
+      const ox = fp.x >= tp.x ? Math.max(fp.x, tp.x) + LOOP_OFFSET : Math.min(fp.x, tp.x) - LOOP_OFFSET;
+      d = `M${fp.x},${fp.y} L${ox},${fp.y} L${ox},${tp.y} L${tp.x},${tp.y}`;
+    }
+  } else if (!isP1Top && isP2Bottom) {
+    // bottom to bottom (U-shape)
+    const maxY = Math.max(fp.y, tp.y) + 20;
+    d = `M${fp.x},${fp.y} L${fp.x},${maxY} L${tp.x},${maxY} L${tp.x},${tp.y}`;
   } else {
-    const my=(fp.y+tp.y)/2;
-    d=`M${fp.x},${fp.y} L${fp.x},${my} L${tp.x},${my} L${tp.x},${tp.y}`;
+    // top to top (inverted U-shape)
+    const minY = Math.min(fp.y, tp.y) - 20;
+    d = `M${fp.x},${fp.y} L${fp.x},${minY} L${tp.x},${minY} L${tp.x},${tp.y}`;
   }
+
   path.setAttribute('d',d);
   path.setAttribute('marker-end', selIds.has(c.id)?'url(#arr-sel)':'url(#arr)');
   g.appendChild(path);
   g.addEventListener('click', e=>{e.stopPropagation(); selectEl(c.id,'connection',e);});
   return g;
 }
+
 
 // ── Elements ──
 function renderEl() {
@@ -91,7 +125,8 @@ function buildStepEl(s) {
   const sel=selIds.has(s.id);
 
   // Body
-  const body=svgE('rect'); body.setAttribute('class','s-body'+(sel?' sel':''));
+  const isMacroStep = s.kind === 'macro';
+  const body=svgE('rect'); body.setAttribute('class','s-body'+(isMacroStep?' macro':'')+(sel?' sel':''));
   body.setAttribute('x',s.x);body.setAttribute('y',s.y);body.setAttribute('width',SW);body.setAttribute('height',SH);body.setAttribute('rx','2');
   g.appendChild(body);
 
@@ -114,6 +149,14 @@ function buildStepEl(s) {
   num.textContent=String(s.number).padStart(2,'0');
   g.appendChild(num);
 
+  if(isMacroStep){
+    const tag=svgE('text'); tag.setAttribute('class','s-kind');
+    tag.setAttribute('x',s.x+SW-6); tag.setAttribute('y',s.y+10);
+    tag.setAttribute('text-anchor','end');
+    tag.textContent='MACRO STEP';
+    g.appendChild(tag);
+  }
+
   // Label area (right of divider)
   if(s.label){
     const lbl=svgE('text'); lbl.setAttribute('class','s-lbl');
@@ -130,7 +173,20 @@ function buildStepEl(s) {
 
   g.addEventListener('mousedown',e=>elDown(e,s.id,'step'));
   g.addEventListener('click',e=>{e.stopPropagation();selectEl(s.id,'step',e);});
+  // Double-click: navigate into macro step's flowchart
+  g.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (s.kind !== 'macro') return;
+    if (s.macroFlowId) {
+      openTab(s.macroFlowId);
+    } else {
+      toast('⚠ Macro step chưa được gán flowchart');
+    }
+  });
+  // Right-click: context menu
+  g.addEventListener('contextmenu', e => showStepContextMenu(e, s));
   return g;
+
 }
 
 function buildStepActionBox(g, s) {

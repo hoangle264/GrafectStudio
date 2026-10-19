@@ -78,6 +78,12 @@ public class DeviceCommandFlowOutput
     public bool IsLast { get; init; }
 
     public bool IsSingle { get; init; }
+
+    public string actionSymbol { get; init; } = string.Empty;
+
+    public string qualifier { get; init; } = string.Empty;
+
+    public string modeFlagAddress { get; init; } = string.Empty;
 }
 
 public class DeviceOutputGroup

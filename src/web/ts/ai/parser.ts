@@ -106,15 +106,26 @@
     const data = normalized.data as Record<string, unknown>;
     const warnings = normalized.warnings || [];
     const source = firstRecord(data.source) || firstRecord(data.sources);
-    const variable = firstRecord(data.variable) || firstRecord(data.variables);
     if (source && data.source !== source) {
       data.source = source;
       warnings.push('AI returned multiple clone sources; using the first source for this proposal.');
     }
-    if (variable && data.variable !== variable) {
-      data.variable = variable;
-      warnings.push('AI returned multiple clone variables; using the first variable for this proposal. Ask for one variable at a time to apply more clones.');
+
+    let variables: unknown[] | null = null;
+    if (Array.isArray(data.variables) && data.variables.length > 0) variables = data.variables;
+    else if (isRecord(data.variable)) {
+      variables = [data.variable];
+      warnings.push('AI returned single variable; clone is most useful with 2 or more variables. Consider requesting multiple clones.');
     }
+
+    if (variables) {
+      data.variables = variables;
+      if (variables.length === 1 && !warnings.some(function(w) { return w.indexOf('clone is most useful') >= 0; })) {
+        warnings.push('AI returned single variable; clone is most useful with 2 or more variables. Consider requesting multiple clones.');
+      }
+    }
+    if ('variable' in data) delete data.variable;
+    if ('sources' in data) delete data.sources;
     normalized.warnings = warnings;
   }
 
