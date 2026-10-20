@@ -1112,3 +1112,43 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .sfs-table td{padding:6px 12px;}
 .sfs-table td .sfs-input{width:100%;}
 .sfs-footer{padding:14px 20px;background:var(--s3);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px;}
+
+/* ── Table views: utility + semantic classes (et-*) ─────────── */
+.et-c-blue{color:var(--blue);}
+.et-c-green{color:var(--green);}
+.et-c-amber{color:var(--amber);}
+.et-c-purple{color:var(--purple);}
+.et-c-cyan{color:var(--cyan);}
+.et-c-text{color:var(--text);}
+.et-c-text2{color:var(--text2);}
+.et-c-text3{color:var(--text3);}
+.et-b{font-weight:bold;}
+.et-nw{white-space:nowrap;}
+.et-top{vertical-align:top;}
+.et-mono{font-family:monospace;}
+.et-sm{font-size:var(--fs-xs);}
+.et-it{font-style:italic;}
+.et-center{text-align:center;}
+.et-mb3{margin-bottom:3px;}
+.et-mb8{margin-bottom:8px;}
+.et-badge-initial{color:var(--amber);border-color:var(--amber);background:rgba(245,166,35,.1);}
+.et-badge-purple{color:var(--purple);border-color:var(--purple);background:rgba(167,139,250,.1);}
+.et-q-N{color:#4fa3e3;border-color:#4fa3e3;background:#4fa3e318;}
+.et-q-S{color:#39d353;border-color:#39d353;background:#39d35318;}
+.et-q-R{color:#e35a4f;border-color:#e35a4f;background:#e35a4f18;}
+.et-q-P{color:#f5a623;border-color:#f5a623;background:#f5a62318;}
+.et-q-P0{color:#f5a623;border-color:#f5a623;background:#f5a62318;}
+.et-q-L{color:#22d3ee;border-color:#22d3ee;background:#22d3ee18;}
+.et-q-D{color:#a78bfa;border-color:#a78bfa;background:#a78bfa18;}
+.et-q-SD{color:#39d353;border-color:#39d353;background:#39d35318;}
+.et-q-DS{color:#a78bfa;border-color:#a78bfa;background:#a78bfa18;}
+.et-q-SL{color:#22d3ee;border-color:#22d3ee;background:#22d3ee18;}
+.et-q-x{color:#888;border-color:#888;background:#88818;}
+.et-dev-instance td{background:rgba(34,211,238,.05);}
+.et-dev-signal td{background:rgba(34,211,238,.02);font-size:var(--fs-xs);}
+.et-sig-name{padding-left:18px;color:var(--text2);}
+.et-sig-dash{color:rgba(34,211,238,.4);margin-right:4px;}
+.et-sig-tag{margin-left:6px;font-size:var(--fs-xs);padding:1px 5px;border-radius:2px;}
+.et-sig-in{background:rgba(74,222,128,.12);color:#4ade80;border:1px solid rgba(74,222,128,.3);}
+.et-sig-out{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.3);}
+.et-sig-var{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);}
