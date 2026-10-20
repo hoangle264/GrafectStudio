@@ -102,78 +102,68 @@ function showExcelImportModal(defaultType?: string): void {
   el.id = 'modal-excel-import';
   el.className = 'modal-bg show';
   el.innerHTML = `
-    <div class="modal" style="min-width:500px;max-width:90vw;max-height:88vh;
-      display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <div class="modal dlg-modal ei-modal">
 
-      <div style="padding:12px 20px;background:var(--s3);border-bottom:1px solid var(--border);
-        display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="font-size:14px;">📥</span>
-        <span style="font-size:12px;letter-spacing:2px;font-family:'Orbitron',monospace;">EXCEL IMPORT</span>
-        <span style="flex:1;"></span>
+      <div class="dlg-head">
+        <span class="dlg-head-icon">📥</span>
+        <span class="ei-title">EXCEL IMPORT</span>
+        <span class="ei-spacer"></span>
         <button class="btn" onclick="closeModal('modal-excel-import')">✕</button>
       </div>
 
-      <div style="padding:10px 20px;background:var(--s2);border-bottom:1px solid var(--border);
-        font-size:10px;color:var(--text3);flex-shrink:0;display:flex;align-items:center;gap:12px;">
+      <div class="ei-summary">
         Hiện có:
-        <span style="color:var(--cyan);">${varCount} biến</span>
-        <span style="color:var(--cyan);">${unitCount} unit station</span>
+        <span class="ei-accent">${varCount} biến</span>
+        <span class="ei-accent">${unitCount} unit station</span>
         ${varCount > 0
-          ? '<button class="btn" onclick="eiClearExcelVars()" style="font-size:9px;padding:2px 8px;border-color:#f87171;color:#f87171;">🗑 Xoá tất cả</button>'
+          ? '<button class="btn r btn-sm" onclick="eiClearExcelVars()">🗑 Xoá tất cả</button>'
           : ''}
       </div>
 
-      <div style="padding:16px 20px;flex:1;overflow-y:auto;">
-        <div style="margin-bottom:14px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">LOẠI DỮ LIỆU</div>
-          <div style="display:flex;gap:16px;">
-            <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
+      <div class="ei-body">
+        <div class="ei-field">
+          <div class="ei-label">LOẠI DỮ LIỆU</div>
+          <div class="ei-radios">
+            <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="unit" ${initialType === 'unit' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Unit Station
             </label>
-            <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="struct" ${initialType === 'struct' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Struct Data
             </label>
-            <label style="font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="physical-io" ${initialType === 'physical-io' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Physical IO
             </label>
           </div>
         </div>
 
-        <div id="ei-struct-wrap" style="margin-bottom:14px;${initialType === 'struct' ? '' : 'display:none;'}">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">STRUCT DATA TYPE</div>
-          <select id="ei-struct-type"
-            style="width:100%;font-size:10px;color:var(--cyan);background:var(--bg);
-            border:1px solid var(--border);border-radius:3px;padding:4px 8px;">
+        <div id="ei-struct-wrap" class="ei-field${initialType === 'struct' ? '' : ' is-hidden'}">
+          <div class="ei-label">STRUCT DATA TYPE</div>
+          <select id="ei-struct-type" class="ei-select">
             ${structOptions}
           </select>
-          <div style="margin-top:4px;font-size:9px;color:var(--text3);">
+          <div class="ei-note">
             Col 0 = Label · Col 1..N map theo thứ tự signal của Struct Data đã chọn
           </div>
         </div>
 
-        <div style="margin-bottom:14px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">FILE CSV</div>
-          <input type="file" id="ei-file-input" accept=".csv,.txt"
-            style="font-size:10px;color:var(--cyan);background:var(--bg);
-            border:1px solid var(--border);border-radius:3px;padding:4px 8px;width:100%;box-sizing:border-box;"
+        <div class="ei-field">
+          <div class="ei-label">FILE CSV</div>
+          <input type="file" id="ei-file-input" class="ei-file" accept=".csv,.txt"
             onchange="eiPreviewFile(this)">
         </div>
 
-        <div id="ei-preview" style="display:none;margin-bottom:14px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">XEM TRƯỚC</div>
-          <pre id="ei-preview-text" style="font-size:10px;font-family:'JetBrains Mono',monospace;
-            background:var(--bg);border:1px solid var(--border);border-radius:3px;
-            padding:8px;max-height:180px;overflow:auto;color:var(--text2);margin:0;"></pre>
+        <div id="ei-preview" class="ei-field is-hidden">
+          <div class="ei-label">XEM TRƯỚC</div>
+          <pre id="ei-preview-text" class="ei-preview-text"></pre>
         </div>
 
-        <div id="ei-schema-hint" style="font-size:9px;color:var(--text3);line-height:1.6;">
+        <div id="ei-schema-hint" class="ei-schema-hint">
           ${eiGetSchemaHintHtml(initialType)}
         </div>
       </div>
 
-      <div style="padding:10px 20px;border-top:1px solid var(--border);
-        display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
-        <span id="ei-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
+      <div class="dlg-foot">
+        <span id="ei-stat" class="ei-stat"></span>
         <button class="btn" onclick="closeModal('modal-excel-import')">Đóng</button>
         <button class="btn a" id="ei-import-btn" onclick="eiDoImport()" disabled>↓ Import</button>
       </div>
@@ -185,12 +175,12 @@ function showExcelImportModal(defaultType?: string): void {
 
 function eiGetSchemaHintHtml(type: string): string {
   if (type === 'unit') {
-    return '<b style="color:var(--cyan);">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed';
+    return '<b class="ei-accent">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed';
   }
   if (type === 'physical-io') {
-    return '<b style="color:var(--cyan);">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in hoặc output/out';
+    return '<b class="ei-accent">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in hoặc output/out';
   }
-  return '<b style="color:var(--cyan);">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
+  return '<b class="ei-accent">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
 }
 
 function eiGetImportTypeLabel(type: string, structType?: string): string {
@@ -206,7 +196,7 @@ function eiOnImportTypeChange(): void {
   const structWrap = document.getElementById('ei-struct-wrap');
   const schemaHint = document.getElementById('ei-schema-hint');
 
-  if (structWrap) structWrap.style.display = type === 'struct' ? '' : 'none';
+  if (structWrap) structWrap.classList.toggle('is-hidden', type !== 'struct');
   if (schemaHint) {
     schemaHint.innerHTML = eiGetSchemaHintHtml(type);
   }
@@ -236,7 +226,7 @@ function eiPreviewFile(inputEl: HTMLInputElement): void {
     const importBtn  = document.getElementById('ei-import-btn') as HTMLButtonElement | null;
     const stat       = document.getElementById('ei-stat');
 
-    if (previewEl)  previewEl.style.display = '';
+    if (previewEl)  previewEl.classList.remove('is-hidden');
     if (importBtn)  importBtn.disabled = false;
     if (previewTxt) {
       const lines = _eiPendingText!.split(/\r?\n/).slice(0, 10);

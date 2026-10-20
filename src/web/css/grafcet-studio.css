@@ -1064,3 +1064,22 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .dev-sig-input.is-comment{color:var(--text2);}
 .tree-dev-type-acts{opacity:0;}
 .tree-dev-type-head:hover .tree-dev-type-acts{opacity:1;}
+
+/* ── Excel import dialog (ei-*) ────────────────────────────── */
+.ei-modal{min-width:500px;max-height:88vh;}
+.ei-title{font-size:var(--fs-sm);letter-spacing:2px;font-family:var(--font-display);}
+.ei-spacer{flex:1;}
+.ei-summary{padding:10px 20px;background:var(--s2);border-bottom:1px solid var(--border);font-size:var(--fs-xs);color:var(--text2);flex-shrink:0;display:flex;align-items:center;gap:12px;}
+.ei-accent{color:var(--cyan);}
+.ei-body{padding:16px 20px;flex:1;overflow-y:auto;}
+.ei-field{margin-bottom:14px;}
+.ei-label{font-size:var(--fs-xs);color:var(--text2);letter-spacing:1px;margin-bottom:6px;}
+.ei-radios{display:flex;gap:16px;}
+.ei-radio{font-size:var(--fs-xs);color:var(--cyan);display:flex;align-items:center;gap:4px;cursor:pointer;}
+.ei-radio input{width:auto;}
+.ei-select{width:100%;font-size:var(--fs-xs);color:var(--cyan);background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:4px 8px;}
+.ei-note{margin-top:4px;font-size:var(--fs-xs);color:var(--text2);}
+.ei-file{font-size:var(--fs-xs);color:var(--cyan);background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:4px 8px;width:100%;box-sizing:border-box;}
+.ei-preview-text{font-size:var(--fs-xs);font-family:var(--font-mono);background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:8px;max-height:180px;overflow:auto;color:var(--text2);margin:0;}
+.ei-schema-hint{font-size:var(--fs-xs);color:var(--text2);line-height:1.6;}
+.ei-stat{flex:1;font-size:var(--fs-xs);color:var(--text2);align-self:center;}
