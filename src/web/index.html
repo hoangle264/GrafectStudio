@@ -55,8 +55,7 @@
         <aside class="sidebar" id="sidebar" aria-label="Project and tools panels"> <!-- Collapsed strip -->
             <div class="sidebar-strip"> 
                 <button class="sidebar-strip-btn" onclick="toggleSidebar()" title="Open sidebar">▶</button> 
-                <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('proj')" title="Project">📁</button> 
-                <button class="sidebar-strip-btn icon-compact" onclick="switchSidebarTab('tools')" title="Tools">🔧</button>
+                <button class="sidebar-strip-btn icon-compact" onclick="toggleSidebar()" title="Project">📁</button>
                 <div class="sidebar-strip-label">PANELS</div>
             </div>
             <div class="sidebar-content"> <!-- PROJECT Panel-->
@@ -68,157 +67,6 @@
                     <div class="panel-scroll">
                         <div class="tree-body" id="tree-body"></div>
                     </div>
-                </div> <!--  TOOLS Panel  -->
-                <div class="sidebar-panel" id="sidebar-panel-tools"> <!-- Panel header -->
-                    <div class="sub-panel-head"> 
-                        <span class="sub-panel-title">🔧 TOOLS</span> 
-                    </div>
-                    <div class="panel-scroll">
-                        <div class="tools-panel">
-                            <div class="tool-section">
-                                <div class="tool-section-title">TOOLS</div> 
-                                <button class="tbtn active" id="tb-select" onclick="setTool('select')">
-                                    <div class="ticon">
-                                        <svg width="16" height="16" viewBox="0 0 16 16">
-                                            <path d="M3 1 L3 13 L6.5 10 L8.5 14.5 L10 13.8 L8 9.3 L12 9.3Z" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                        </svg>
-                                    </div> Select / Move
-                                    <span class="kbd">V</span>
-                                </button> 
-                                <button class="tbtn" id="tb-step" onclick="setTool('step')">
-                                    <div class="ticon">
-                                        <svg width="28" height="20" viewBox="0 0 28 20">
-                                            <rect x="2" y="2" width="24" height="16" rx="1" fill="#1a2035" stroke="#4fa3e3" stroke-width="1.5" /><text x="14" y="13" text-anchor="middle" fill="#4fa3e3" font-size="9" font-family="monospace">01</text>
-                                        </svg>
-                                    </div> Step
-                                    <span class="kbd">S</span>
-                                </button> <button class="tbtn" id="tb-initstep" onclick="setTool('initstep')">
-                                    <div class="ticon">
-                                        <svg width="28" height="20" viewBox="0 0 28 20">
-                                            <rect x="2" y="2" width="24" height="16" rx="1" fill="#1a2035" stroke="#f5a623" stroke-width="1.5" />
-                                            <rect x="4" y="4" width="20" height="12" fill="none" stroke="#f5a623" stroke-width="0.8" /><text x="14" y="13" text-anchor="middle" fill="#f5a623" font-size="9" font-family="monospace">S0</text>
-                                        </svg>
-                                    </div> Initial Step<span class="kbd">I</span>
-                                </button> <button class="tbtn" id="tb-macrostep" onclick="setTool('macrostep')">
-                                    <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20">
-                                            <rect x="2" y="2" width="24" height="16" rx="1" fill="#1a2035" stroke="#22d3ee" stroke-width="1.5" />
-                                            <path d="M6 6 H22 M6 14 H22" stroke="#22d3ee" stroke-width="1" opacity=".8" />
-                                            <text x="14" y="13" text-anchor="middle" fill="#22d3ee" font-size="8" font-family="monospace">MS</text>
-                                        </svg>
-                                    </div> Macro Step<span class="kbd">M</span>
-                                </button> 
-                                <button class="tbtn" id="tb-transition" onclick="setTool('transition')">
-                                    <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20">
-                                            <line x1="14" y1="0" x2="14" y2="20" stroke="#5a6580" stroke-width="1.5" />
-                                            <rect x="4" y="8" width="20" height="4" rx="0.5" fill="#1a2a1a" stroke="#39d353" stroke-width="1.5" />
-                                        </svg></div> Transition<span class="kbd">T</span>
-                                </button> 
-                                <button class="tbtn" id="tb-par-split" onclick="setTool('par-split')">
-                                    <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20">
-                                            <line x1="14" y1="0" x2="14" y2="8" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="4" y1="8" x2="24" y2="8" stroke="#a78bfa" stroke-width="2" />
-                                            <line x1="4" y1="11" x2="24" y2="11" stroke="#a78bfa" stroke-width="2" />
-                                            <line x1="8" y1="11" x2="8" y2="20" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="14" y1="11" x2="14" y2="20" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="20" y1="11" x2="20" y2="20" stroke="#5a6580" stroke-width="1.5" />
-                                        </svg></div> AND-Split<span class="kbd">P</span>
-                                </button> 
-                                <button class="tbtn" id="tb-par-join" onclick="setTool('par-join')">
-                                    <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20">
-                                            <line x1="8" y1="0" x2="8" y2="8" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="14" y1="0" x2="14" y2="8" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="20" y1="0" x2="20" y2="8" stroke="#5a6580" stroke-width="1.5" />
-                                            <line x1="4" y1="8" x2="24" y2="8" stroke="#a78bfa" stroke-width="2" />
-                                            <line x1="4" y1="11" x2="24" y2="11" stroke="#a78bfa" stroke-width="2" />
-                                            <line x1="14" y1="11" x2="14" y2="20" stroke="#5a6580" stroke-width="1.5" />
-                                        </svg></div> AND-Join<span class="kbd">J</span>
-                                </button> 
-                                <button class="tbtn" id="tb-connect" onclick="setTool('connect')">
-                                    <div class="ticon"><svg width="28" height="20" viewBox="0 0 28 20">
-                                            <circle cx="7" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                            <circle cx="21" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                            <line x1="10" y1="10" x2="18" y2="10" stroke="#f5a623" stroke-width="1.5" stroke-dasharray="3,2" />
-                                            <polygon points="15,7 18,10 15,13" fill="#f5a623" />
-                                        </svg></div> Connect<span class="kbd">C</span>
-                                </button> 
-                                <button class="tbtn" id="tb-delete" onclick="setTool('delete')">
-                                    <div class="ticon"><svg width="16" height="16" viewBox="0 0 16 16">
-                                            <line x1="3" y1="3" x2="13" y2="13" stroke="#e35a4f" stroke-width="1.5" />
-                                            <line x1="13" y1="3" x2="3" y2="13" stroke="#e35a4f" stroke-width="1.5" />
-                                        </svg></div> Delete<span class="kbd">Del</span>
-                                </button>
-                            </div>
-                            <div class="tool-section">
-                                <div class="tool-section-title">VIEW</div> <button class="tbtn" onclick="zoomIn()">
-                                    <div class="ticon">🔍+</div>Zoom In<span class="kbd">+</span>
-                                </button> <button class="tbtn" onclick="zoomOut()">
-                                    <div class="ticon">🔍−</div>Zoom Out<span class="kbd">−</span>
-                                </button> <button class="tbtn" onclick="fitView()">
-                                    <div class="ticon">⛶</div>Fit View<span class="kbd">F</span>
-                                </button>
-                            </div>
-                            <div class="tool-section">
-                                <div class="tool-section-title">SNAP</div> 
-                                <button class="tbtn active" id="tb-snap" onclick="toggleSnap()">
-                                    <div class="ticon">⊞</div>Grid Snap
-                                </button>
-                            </div> <!-- Alignment Panel -->
-                            <div class="align-panel">
-                                <div class="align-panel-title">ALIGN &amp; DISTRIBUTE</div>
-                                <div class="align-group">
-                                    <div class="align-group-label">HORIZONTAL</div>
-                                    <div class="align-row"> <button class="abtn" id="ab-left" onclick="alignSel('left')" title="Align left edges"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="2" y1="0" x2="2" y2="14" stroke="currentColor" stroke-width="1.5" />
-                                                <rect x="2" y="2" width="8" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="2" y="8" width="12" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Left </button> <button class="abtn" id="ab-centerX" onclick="alignSel('centerX')" title="Align centers horizontally"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="9" y1="0" x2="9" y2="14" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,1" />
-                                                <rect x="3" y="2" width="12" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="5" y="8" width="8" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Center </button> <button class="abtn" id="ab-right" onclick="alignSel('right')" title="Align right edges"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="16" y1="0" x2="16" y2="14" stroke="currentColor" stroke-width="1.5" />
-                                                <rect x="6" y="2" width="10" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="4" y="8" width="12" height="4" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Right </button> <button class="abtn" id="ab-distH" onclick="alignSel('distH')" title="Distribute evenly horizontal"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="1" y1="0" x2="1" y2="14" stroke="currentColor" stroke-width="1.2" />
-                                                <line x1="17" y1="0" x2="17" y2="14" stroke="currentColor" stroke-width="1.2" />
-                                                <rect x="3" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="11" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" />
-                                                <line x1="7" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5,1" />
-                                            </svg> Space </button> </div>
-                                </div>
-                                <div class="align-group">
-                                    <div class="align-group-label">VERTICAL</div>
-                                    <div class="align-row"> <button class="abtn" id="ab-top" onclick="alignSel('top')" title="Align top edges"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="0" y1="2" x2="18" y2="2" stroke="currentColor" stroke-width="1.5" />
-                                                <rect x="2" y="2" width="4" height="8" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="8" y="2" width="4" height="12" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="14" y="2" width="2" height="6" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Top </button> <button class="abtn" id="ab-centerY" onclick="alignSel('centerY')" title="Align centers vertically"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="0" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,1" />
-                                                <rect x="2" y="2" width="4" height="10" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="8" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="14" y="3" width="2" height="8" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Middle </button> <button class="abtn" id="ab-bottom" onclick="alignSel('bottom')" title="Align bottom edges"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="0" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.5" />
-                                                <rect x="2" y="4" width="4" height="8" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="8" y="0" width="4" height="12" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="14" y="6" width="2" height="6" rx="1" fill="currentColor" opacity=".6" />
-                                            </svg> Bottom </button> <button class="abtn" id="ab-distV" onclick="alignSel('distV')" title="Distribute evenly vertical"> <svg width="18" height="14" viewBox="0 0 18 14">
-                                                <line x1="0" y1="1" x2="18" y2="1" stroke="currentColor" stroke-width="1.2" />
-                                                <line x1="0" y1="13" x2="18" y2="13" stroke="currentColor" stroke-width="1.2" />
-                                                <rect x="4" y="3" width="10" height="3" rx="1" fill="currentColor" opacity=".6" />
-                                                <rect x="4" y="8" width="10" height="3" rx="1" fill="currentColor" opacity=".6" />
-                                                <line x1="9" y1="6" x2="9" y2="8" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5,1" />
-                                            </svg> Space </button> </div><!-- /align-row vertical -->
-                                </div><!-- /align-group vertical -->
-                            </div><!-- /align-panel -->
-                        </div><!-- /tools-panel -->
-                    </div><!-- /scrollable area tools -->
-                </div><!-- /sidebar-panel-tools --> <!--  Bottom Tab Bar  -->
-                <div class="sidebar-tab-bar"> 
-                    <button class="sidebar-tab active" id="stab-proj" onclick="switchSidebarTab('proj')"> 📁 PROJECT </button> 
-                    <button class="sidebar-tab" id="stab-tools" onclick="switchSidebarTab('tools')"> 🔧 TOOLS </button> 
                 </div>
             </div><!-- /sidebar-content --> 
                 <button class="sidebar-strip-btn sidebar-toggle-floating" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">◀</button>
@@ -266,6 +114,19 @@
                 <button type="button" class="ft-btn" id="ft-zoom-out" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom Out (-)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.5"/><path d="M11.5 11.5L15 15M6 8h4"/></svg></button>
                 <button type="button" class="ft-btn" id="ft-zoom-in" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom In (+)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.5"/><path d="M11.5 11.5L15 15M6 8h4M8 6v4"/></svg></button>
                 <button type="button" class="ft-btn" id="ft-fit" onclick="fitView()" title="Fit View (F)" aria-label="Fit View (F)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6V3h3M12 3h3v3M15 12v3h-3M6 15H3v-3"/></svg></button>
+                <span class="ft-sep" role="separator"></span>
+                <button type="button" class="ft-btn active" id="ft-snap" onclick="toggleSnap()" title="Grid Snap" aria-label="Grid Snap" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 3h12v12H3zM3 9h12M9 3v12"/></svg></button>
+                </div>
+                <div class="float-toolbar float-toolbar-sub is-hidden" id="ft-align-group" role="toolbar" aria-label="Align and distribute">
+                <button type="button" class="ft-btn" id="ab-left" onclick="alignSel('left')" title="Align left edges" aria-label="Align left edges"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="2" y1="0" x2="2" y2="14" stroke="currentColor" stroke-width="1.5" /><rect x="2" y="2" width="8" height="4" rx="1" fill="currentColor" opacity=".6" /><rect x="2" y="8" width="12" height="4" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-centerX" onclick="alignSel('centerX')" title="Align centers horizontally" aria-label="Align centers horizontally"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="9" y1="0" x2="9" y2="14" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,1" /><rect x="3" y="2" width="12" height="4" rx="1" fill="currentColor" opacity=".6" /><rect x="5" y="8" width="8" height="4" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-right" onclick="alignSel('right')" title="Align right edges" aria-label="Align right edges"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="16" y1="0" x2="16" y2="14" stroke="currentColor" stroke-width="1.5" /><rect x="6" y="2" width="10" height="4" rx="1" fill="currentColor" opacity=".6" /><rect x="4" y="8" width="12" height="4" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-distH" onclick="alignSel('distH')" title="Distribute evenly horizontal" aria-label="Distribute evenly horizontal"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="1" y1="0" x2="1" y2="14" stroke="currentColor" stroke-width="1.2" /><line x1="17" y1="0" x2="17" y2="14" stroke="currentColor" stroke-width="1.2" /><rect x="3" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" /><rect x="11" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" /><line x1="7" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5,1" /></svg></button>
+                <span class="ft-sep" role="separator"></span>
+                <button type="button" class="ft-btn" id="ab-top" onclick="alignSel('top')" title="Align top edges" aria-label="Align top edges"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="2" x2="18" y2="2" stroke="currentColor" stroke-width="1.5" /><rect x="2" y="2" width="4" height="8" rx="1" fill="currentColor" opacity=".6" /><rect x="8" y="2" width="4" height="12" rx="1" fill="currentColor" opacity=".6" /><rect x="14" y="2" width="2" height="6" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-centerY" onclick="alignSel('centerY')" title="Align centers vertically" aria-label="Align centers vertically"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,1" /><rect x="2" y="2" width="4" height="10" rx="1" fill="currentColor" opacity=".6" /><rect x="8" y="4" width="4" height="6" rx="1" fill="currentColor" opacity=".6" /><rect x="14" y="3" width="2" height="8" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-bottom" onclick="alignSel('bottom')" title="Align bottom edges" aria-label="Align bottom edges"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.5" /><rect x="2" y="4" width="4" height="8" rx="1" fill="currentColor" opacity=".6" /><rect x="8" y="0" width="4" height="12" rx="1" fill="currentColor" opacity=".6" /><rect x="14" y="6" width="2" height="6" rx="1" fill="currentColor" opacity=".6" /></svg></button>
+                <button type="button" class="ft-btn" id="ab-distV" onclick="alignSel('distV')" title="Distribute evenly vertical" aria-label="Distribute evenly vertical"><svg width="18" height="14" viewBox="0 0 18 14"><line x1="0" y1="1" x2="18" y2="1" stroke="currentColor" stroke-width="1.2" /><line x1="0" y1="13" x2="18" y2="13" stroke="currentColor" stroke-width="1.2" /><rect x="4" y="3" width="10" height="3" rx="1" fill="currentColor" opacity=".6" /><rect x="4" y="8" width="10" height="3" rx="1" fill="currentColor" opacity=".6" /><line x1="9" y1="6" x2="9" y2="8" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5,1" /></svg></button>
                 </div>
                 <div class="mini-map"><svg id="mini-svg"></svg></div>
             </div> <!-- Global Vars Tab Panel (virtual tab  shown when __vars__ tab is active) -->

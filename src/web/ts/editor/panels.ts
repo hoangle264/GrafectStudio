@@ -43,7 +43,7 @@ function applyPanelState(): void {
   if (stb) stb.textContent = panelState.sidebar ? '◀' : '▶';
 
   // Sub panels
-  ['proj', 'tools'].forEach(id => {
+  ['proj'].forEach(id => {
     const sp = document.getElementById('sub-' + id);
     const pb = document.getElementById('pin-' + id);
     if (sp) sp.classList.toggle('sub-closed', !panelState[id]);
@@ -71,19 +71,6 @@ function toggleSidebar(): void {
   savePanelState(); applyPanelState();
 }
 
-// ─── Sidebar bottom-tab switcher ───
-function switchSidebarTab(tab: string): void {
-  // panels
-  document.getElementById('sidebar-panel-proj')?.classList.toggle('active', tab === 'proj');
-  document.getElementById('sidebar-panel-tools')?.classList.toggle('active', tab === 'tools');
-  // tab buttons
-  const tabProj = document.getElementById('stab-proj');
-  const tabTools = document.getElementById('stab-tools');
-  tabProj?.classList.toggle('active', tab === 'proj');
-  tabTools?.classList.toggle('active', tab === 'tools');
-  // ensure sidebar is open
-  if (panelState.sidebar === false) { panelState.sidebar = true; savePanelState(); applyPanelState(); }
-}
 function toggleRPanel(): void {
   panelState.rpanel = !panelState.rpanel;
   savePanelState(); applyPanelState();

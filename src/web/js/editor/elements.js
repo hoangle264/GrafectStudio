@@ -96,6 +96,7 @@ function updateProps() {
 function updateAlignBtns() {
   const multi = selIds.size >= 2;
   const anyEl = selIds.size >= 1;
+  document.getElementById('ft-align-group')?.classList.toggle('is-hidden', !multi);
   const alignIds = ['ab-left','ab-centerX','ab-right','ab-distH','ab-top','ab-centerY','ab-bottom','ab-distV'];
   alignIds.forEach(id=>{
     const btn = document.getElementById(id);

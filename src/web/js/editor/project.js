@@ -258,7 +258,11 @@ async function newProject() {
 //  SNAP & COORDINATES
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function snap(v) { return snapOn ? Math.round(v/GRID)*GRID : Math.round(v); }
-function toggleSnap() { snapOn=!snapOn; document.getElementById('tb-snap').classList.toggle('active',snapOn); }
+function toggleSnap() {
+  snapOn=!snapOn;
+  const b=document.getElementById('ft-snap');
+  if(b){ b.classList.toggle('active',snapOn); b.setAttribute('aria-pressed',String(snapOn)); }
+}
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  VIEWPORT
