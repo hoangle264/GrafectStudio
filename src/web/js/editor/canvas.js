@@ -218,7 +218,7 @@ function buildStepActionBox(g, s) {
     const qt=svgE('text');
     qt.setAttribute('x',s.x+SW+9);qt.setAttribute('y',y0-1);
     qt.setAttribute('text-anchor','middle');qt.setAttribute('font-size','9');
-    qt.setAttribute('font-family','Share Tech Mono,monospace');qt.setAttribute('font-weight','bold');
+    qt.setAttribute('font-family','JetBrains Mono,Consolas,monospace');qt.setAttribute('font-weight','bold');
     qt.setAttribute('fill',qColor);
     qt.textContent=act.qualifier||'N';
     g.appendChild(qt);
@@ -234,7 +234,7 @@ function buildStepActionBox(g, s) {
       const tt=svgE('text');
       tt.setAttribute('x',s.x+SW+ACT_W-3);tt.setAttribute('y',y0-1);
       tt.setAttribute('text-anchor','end');tt.setAttribute('font-size','8');
-      tt.setAttribute('fill','#22d3ee');tt.setAttribute('font-family','Share Tech Mono,monospace');
+      tt.setAttribute('fill','#22d3ee');tt.setAttribute('font-family','JetBrains Mono,Consolas,monospace');
       tt.textContent=act.time;
       g.appendChild(tt);
     }
