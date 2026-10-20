@@ -15,6 +15,8 @@ let cgSavedPaths: { deviceLibraryPath: string; templatePath: string; outputPath:
 let cgSavedSiemensTiaConfig: { projectPath: string; deviceName: string; plcName: string; targetFolderPath: string; overwriteMode: string } = { projectPath: '', deviceName: '', plcName: '', targetFolderPath: 'Program blocks', overwriteMode: 'FailIfExists' };
 let cgPendingSiemensTiaPush = false;
 
+let cgStep = 1;
+
 function showGenerateCodeModal(): void {
   if (activeDiagramId && typeof flushState === 'function') flushState();
   let el = document.getElementById('modal-codegen');
@@ -24,17 +26,23 @@ function showGenerateCodeModal(): void {
   el.className = 'modal-bg show';
 
   el.innerHTML = `
-    <div class="modal" style="min-width:720px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
-      <div style="padding:12px 20px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="font-size:12px;letter-spacing:2px;font-family:'Orbitron',monospace;">GENERATE CODE</span>
-        <span style="flex:1;"></span>
-        <button class="btn" onclick="closeModal('modal-codegen')" style="padding:2px 10px;">X</button>
+    <div class="modal cg-modal" role="dialog" aria-label="Generate code">
+      <div class="cg-head">
+        <span class="cg-title">GENERATE CODE</span>
+        <div class="cg-stepper" id="cg-stepper">
+          <span class="cg-stepper-item" data-step="1" onclick="cgGoStep(1)"><span class="cg-stepper-num">1</span>Target</span>
+          <span class="cg-stepper-item" data-step="2" onclick="cgGoStep(2)"><span class="cg-stepper-num">2</span>Scope</span>
+          <span class="cg-stepper-item" data-step="3"><span class="cg-stepper-num">3</span>Result</span>
+        </div>
+        <button class="btn cg-close" onclick="closeModal('modal-codegen')" title="Close">X</button>
       </div>
 
-      <div style="padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:20px;align-items:center;flex-wrap:wrap;flex-shrink:0;background:var(--s2);">
-        <div>
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">TARGET PLC</div>
-          <select id="cg-target" onchange="cgOnTargetChanged()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;border-radius:3px;outline:none;">
+      <!-- Step 1: Target -->
+      <div class="cg-step" data-step="1">
+        <p class="cg-step-intro">Choose what to generate code for.</p>
+        <div class="cg-field">
+          <div class="cg-field-label">Target PLC</div>
+          <select id="cg-target" class="cg-select cg-select-wide" onchange="cgOnTargetChanged()">
             <option value="Keyence">Keyence Mnemonic List</option>
             <option value="siemens-lad">Siemens LAD XML</option>
             <option value="siemens-db">Siemens DB/UDT XML</option>
@@ -42,70 +50,89 @@ function showGenerateCodeModal(): void {
           </select>
         </div>
 
-        <div id="cg-base-mr-wrap">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">BASE ADDRESS <span style="color:var(--cyan);">@MR</span></div>
-          <input id="cg-base-mr" type="number" min="0" max="9999" value="100" step="2" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:12px;padding:4px 8px;border-radius:3px;outline:none;" oninput="cgUpdatePreview()">
+        <div id="cg-base-mr-wrap" class="is-hidden">
+          <input id="cg-base-mr" type="number" min="0" max="9999" value="100" step="2" oninput="cgUpdatePreview()">
         </div>
 
-        <div id="cg-unit-wrap" style="flex:1;min-width:220px;">
-          <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:8px;">UNIT <button class="btn" onclick="cgGenerateSelectedUnit()" style="padding:2px 8px;font-size:9px;">Send selected</button><button class="btn" onclick="cgGenerateAllUnits()" style="padding:2px 8px;font-size:9px;">Send all</button></div>
-          <div id="cg-unit-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
-          <div id="cg-unit-diag-section" style="display:none;">
-            <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:5px;">DIAGRAMS <button onclick="cgSelectAll(true)" style="margin-left:8px;background:none;border:none;color:var(--cyan);font-size:9px;cursor:pointer;padding:0;">all</button> <button onclick="cgSelectAll(false)" style="background:none;border:none;color:var(--text3);font-size:9px;cursor:pointer;padding:0;">none</button></div>
-            <div id="cg-diag-list" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+        <div id="cg-siemens-lad-panel" class="cg-panel is-hidden">
+          <div class="cg-mode-row">
+            <span class="cg-field-label">Siemens TIA mode</span>
+            <label><input type="radio" name="cg-siemens-lad-mode" value="preview" checked onchange="cgOnSiemensLadConfigChanged()"> Preview XML</label>
+            <label><input type="radio" name="cg-siemens-lad-mode" value="push" onchange="cgOnSiemensLadConfigChanged()"> Push to TIA</label>
+            <span id="cg-siemens-lad-status" class="cg-mode-status">Preview XML mode</span>
+          </div>
+          <div id="cg-siemens-tia-config" class="cg-tia-grid">
+            <label>TIA Project Path</label>
+            <input id="cg-tia-project-path" class="cg-input" oninput="cgOnSiemensLadConfigChanged()" placeholder="Optional if project is already open">
+            <label>Overwrite</label>
+            <select id="cg-tia-overwrite-mode" class="cg-select" onchange="cgOnSiemensLadConfigChanged()"><option value="FailIfExists">Fail if exists</option><option value="Overwrite">Overwrite</option><option value="Rename">Rename</option></select>
+            <label>Device / Station</label>
+            <input id="cg-tia-device-name" class="cg-input" oninput="cgOnSiemensLadConfigChanged()" placeholder="TIA device name">
+            <label>PLC Name</label>
+            <input id="cg-tia-plc-name" class="cg-input" oninput="cgOnSiemensLadConfigChanged()" placeholder="PLC/device item name">
+            <label>Block Folder</label>
+            <input id="cg-tia-target-folder" class="cg-input" oninput="cgOnSiemensLadConfigChanged()" value="Program blocks" placeholder="Program blocks/Generated">
+            <div class="cg-tia-note">Generating XML first, then importing it through the host bridge.</div>
           </div>
         </div>
-      </div>
 
-      <div id="cg-siemens-lad-panel" style="display:none;border-top:1px solid var(--border);background:var(--s2);padding:10px 20px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">SIEMENS TIA MODE</span>
-          <label style="font-size:10px;color:var(--text2);"><input type="radio" name="cg-siemens-lad-mode" value="preview" checked onchange="cgOnSiemensLadConfigChanged()"> Preview XML</label>
-          <label style="font-size:10px;color:var(--text2);"><input type="radio" name="cg-siemens-lad-mode" value="push" onchange="cgOnSiemensLadConfigChanged()"> Push to TIA</label>
-          <span id="cg-siemens-lad-status" style="font-size:10px;color:var(--text3);margin-left:auto;">Preview XML mode</span>
-        </div>
-        <div id="cg-siemens-tia-config" style="display:none;grid-template-columns:130px 1fr 110px 1fr;gap:6px 10px;align-items:center;">
-          <label style="font-size:9px;color:var(--text3);">TIA Project Path</label>
-          <input id="cg-tia-project-path" oninput="cgOnSiemensLadConfigChanged()" placeholder="Optional if project is already open" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
-          <label style="font-size:9px;color:var(--text3);">Overwrite</label>
-          <select id="cg-tia-overwrite-mode" onchange="cgOnSiemensLadConfigChanged()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;"><option value="FailIfExists">Fail if exists</option><option value="Overwrite">Overwrite</option><option value="Rename">Rename</option></select>
-          <label style="font-size:9px;color:var(--text3);">Device / Station</label>
-          <input id="cg-tia-device-name" oninput="cgOnSiemensLadConfigChanged()" placeholder="TIA device name" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
-          <label style="font-size:9px;color:var(--text3);">PLC Name</label>
-          <input id="cg-tia-plc-name" oninput="cgOnSiemensLadConfigChanged()" placeholder="PLC/device item name" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
-          <label style="font-size:9px;color:var(--text3);">Block Folder</label>
-          <input id="cg-tia-target-folder" oninput="cgOnSiemensLadConfigChanged()" value="Program blocks" placeholder="Program blocks/Generated" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;">
-          <div style="font-size:9px;color:var(--text3);grid-column:3 / span 2;">Send selected/all generates XML first, then imports it through the host bridge.</div>
-        </div>
-      </div>
-
-      <div id="cg-robot-safety-panel" style="display:none;background:rgba(239, 68, 68, 0.12);border-top:1px solid #ef4444;border-bottom:1px solid #ef4444;color:#fca5a5;padding:10px 20px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:16px;">⚠️</span>
+        <div id="cg-robot-safety-panel" class="cg-safety">
+          <span class="cg-safety-icon">⚠️</span>
           <div>
-            <strong style="color:#ef4444;letter-spacing:0.5px;">SAFETY WARNING:</strong>
-            <span style="font-size:11px;margin-left:4px;">Review all motion instructions & positions carefully before exporting. Incorrect positions or speed settings can cause physical equipment damage or personal harm. Always teach/verify positions in low speed manual mode (T1).</span>
+            <strong>SAFETY WARNING:</strong>
+            <span class="cg-safety-text">Review all motion instructions &amp; positions carefully before exporting. Incorrect positions or speed settings can cause physical equipment damage or personal harm. Always teach/verify positions in low speed manual mode (T1).</span>
+          </div>
+        </div>
+
+        <div class="cg-advanced">
+          <div class="cg-advanced-toggle" onclick="cgToggleAssetPaths()">
+            <span id="asset-paths-chevron">&gt;</span>Advanced: file paths<span id="asset-paths-summary" class="cg-count"></span>
+          </div>
+          <div id="asset-paths-body" class="cg-advanced-body">
+            <div class="cg-paths-grid">
+              <label>Device Library</label><input id="cg-device-library-path" class="cg-input" value="config/Devices.json" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('deviceLibrary')">Browse...</button>
+              <label>Template Root</label><input id="cg-template-root-path" class="cg-input" value="templates" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('templateRoot')">Browse...</button>
+              <label>Output Folder</label><input id="cg-output-root-path" class="cg-input" value="" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('outputRoot')">Browse...</button>
+            </div>
+            <div id="asset-paths-status" class="cg-paths-status"></div>
           </div>
         </div>
       </div>
 
-      <div style="border-top:1px solid var(--border);background:var(--s2);flex-shrink:0;">
-        <div style="padding:6px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;" onclick="cgToggleAssetPaths()">
-          <span style="font-size:9px;letter-spacing:1px;color:var(--text3);">CODEGEN PATHS</span><span id="asset-paths-chevron" style="font-size:9px;color:var(--text3);">&gt;</span><span id="asset-paths-summary" style="font-size:9px;color:var(--text3);margin-left:4px;"></span>
+      <!-- Step 2: Scope -->
+      <div class="cg-step" data-step="2">
+        <p class="cg-step-intro">Choose the unit to generate, and which of its diagrams to include.</p>
+        <div id="cg-unit-wrap" class="cg-field">
+          <div class="cg-field-label">Unit</div>
+          <div id="cg-unit-list" class="cg-chip-row"></div>
         </div>
-        <div id="asset-paths-body" style="display:none;padding:8px 20px 10px 20px;">
-          <div style="display:grid;grid-template-columns:120px 1fr auto;gap:6px 10px;align-items:center;">
-            <label style="font-size:9px;color:var(--text3);">Device Library</label><input id="cg-device-library-path" value="config/Devices.json" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;"><button class="btn" onclick="cgBrowseCodegenPath('deviceLibrary')" style="padding:3px 8px;font-size:9px;">Browse...</button>
-            <label style="font-size:9px;color:var(--text3);">Template Root</label><input id="cg-template-root-path" value="templates" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;"><button class="btn" onclick="cgBrowseCodegenPath('templateRoot')" style="padding:3px 8px;font-size:9px;">Browse...</button>
-            <label style="font-size:9px;color:var(--text3);">Output Folder</label><input id="cg-output-root-path" value="" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;"><button class="btn" onclick="cgBrowseCodegenPath('outputRoot')" style="padding:3px 8px;font-size:9px;">Browse...</button>
+        <div id="cg-unit-diag-section" class="cg-unit-diag-section">
+          <div class="cg-field-label">Diagrams
+            <button class="cg-link-btn" onclick="cgSelectAll(true)">all</button>
+            <button class="cg-link-btn muted" onclick="cgSelectAll(false)">none</button>
           </div>
-          <div id="asset-paths-status" style="font-size:9px;color:var(--text3);margin-top:6px;"></div>
+          <div id="cg-diag-list" class="cg-chip-row"></div>
         </div>
       </div>
 
-      <div id="cg-files" style="flex:1;overflow:auto;padding:12px 14px;background:var(--bg);"></div>
-      <div style="padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
-        <span id="cg-stat" style="flex:1;font-size:9px;color:var(--text3);align-self:center;"></span>
+      <!-- Step 3: Result -->
+      <div class="cg-step cg-step-result" data-step="3">
+        <div id="cg-files"></div>
+      </div>
+
+      <div class="cg-foot" data-step="1">
+        <span class="cg-foot-spacer"></span>
+        <button class="btn a" onclick="cgGoStep(2)">Next: Scope</button>
+      </div>
+      <div class="cg-foot" data-step="2">
+        <button class="btn" onclick="cgGoStep(1)">Back</button>
+        <span class="cg-foot-spacer"></span>
+        <button class="btn" onclick="cgGenerateAllUnits(); cgGoStep(3)">Generate all units</button>
+        <button class="btn a" onclick="cgGenerateSelectedUnit(); cgGoStep(3)">Generate selected unit</button>
+      </div>
+      <div class="cg-foot" data-step="3">
+        <button class="btn" onclick="cgGoStep(2)">Back</button>
+        <span id="cg-stat" class="cg-stat"></span>
         <button class="btn" onclick="openTemplateEditor()">Template Editor</button>
         <button class="btn" onclick="cgCopyAllFiles()">Copy all</button>
         <button class="btn a" onclick="cgDownloadAllFiles()">Download ZIP</button>
@@ -117,8 +144,22 @@ function showGenerateCodeModal(): void {
   cgApplySavedSiemensTiaConfig();
   cgBuildUnitList();
   cgUpdateAssetPathStatus();
-  cgUpdatePreview();
   cgUpdateSiemensLadPanel();
+  cgGoStep(1);
+  cgUpdatePreview();
+}
+
+function cgGoStep(step: number): void {
+  const root = document.getElementById('modal-codegen');
+  if (!root) return;
+  cgStep = Math.max(1, Math.min(3, step));
+  root.querySelectorAll<HTMLElement>('.cg-step').forEach(el => el.classList.toggle('active', Number(el.dataset.step) === cgStep));
+  root.querySelectorAll<HTMLElement>('.cg-foot').forEach(el => el.classList.toggle('active', Number(el.dataset.step) === cgStep));
+  root.querySelectorAll<HTMLElement>('.cg-stepper-item').forEach(el => {
+    const n = Number(el.dataset.step);
+    el.classList.toggle('active', n === cgStep);
+    el.classList.toggle('done', n < cgStep);
+  });
 }
 
 function cgRenderGeneratedFiles(files: MdCodegenFile[]): void {
@@ -129,12 +170,12 @@ function cgRenderGeneratedFiles(files: MdCodegenFile[]): void {
   (window.GrafcetStudio as unknown as { codegenSelectedFileIndex?: number }).codegenSelectedFileIndex = 0;
 
   if (!files || !files.length) {
-    root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">No files generated yet.</div>';
+    root.innerHTML = '<div class="cg-empty">No files generated yet.</div>';
     return;
   }
 
   const options = files.map((file, index) => `<option value="${index}">${esc2(file && file.path ? String(file.path) : 'file.st')}</option>`).join('');
-  root.innerHTML = `<div style="display:flex;flex-direction:column;height:100%;gap:10px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><label style="font-size:10px;color:var(--text3);letter-spacing:1px;">FILE</label><select id="cg-file-select" onchange="cgShowGeneratedFile(this.value)" style="min-width:260px;background:var(--s1);border:1px solid var(--border);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 8px;border-radius:3px;outline:none;">${options}</select><span style="flex:1;"></span><button class="btn" onclick="cgCopySelectedFile()">Copy file</button><button class="btn" onclick="cgDownloadSelectedFile()">Download file</button></div><div id="cg-file-meta" style="font-size:10px;color:var(--text3);"></div><pre id="cg-file-preview" style="margin:0;flex:1;padding:12px;border:1px solid var(--border);background:var(--s1);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:var(--text2);white-space:pre;overflow:auto;tab-size:4;"></pre></div>`;
+  root.innerHTML = `<div class="cg-file-bar"><label>FILE</label><select id="cg-file-select" class="cg-select cg-file-select" onchange="cgShowGeneratedFile(this.value)">${options}</select><span class="cg-foot-spacer"></span><button class="btn" onclick="cgCopySelectedFile()">Copy file</button><button class="btn" onclick="cgDownloadSelectedFile()">Download file</button></div><div id="cg-file-meta" class="cg-file-meta"></div><pre id="cg-file-preview" class="cg-file-preview"></pre>`;
   cgShowGeneratedFile(0);
 }
 
@@ -202,7 +243,7 @@ function cgOnTargetChanged(): void {
   const target = (document.getElementById('cg-target') as HTMLSelectElement | null)?.value || 'Keyence';
   const isRobot = target === 'abb-rapid' || target === 'ABB Robot';
   const safetyPanel = document.getElementById('cg-robot-safety-panel');
-  if (safetyPanel) safetyPanel.style.display = isRobot ? 'block' : 'none';
+  if (safetyPanel) safetyPanel.style.display = isRobot ? 'flex' : 'none';
   cgUpdatePreview();
   cgUpdateSiemensLadPanel();
 }
@@ -248,7 +289,7 @@ function cgUpdateSiemensLadPanel(): void {
   const config = document.getElementById('cg-siemens-tia-config');
   const status = document.getElementById('cg-siemens-lad-status');
   const isSiemensTarget = target === 'siemens-lad' || target === 'siemens-db';
-  if (panel) panel.style.display = isSiemensTarget ? '' : 'none';
+  if (panel) panel.classList.toggle('is-hidden', !isSiemensTarget);
   if (!isSiemensTarget) return;
   const isPush = cgGetSiemensLadMode() === 'push';
   if (config) (config as HTMLElement).style.display = isPush ? 'grid' : 'none';
@@ -382,8 +423,8 @@ function cgToggleAssetPaths(): void {
   const body = document.getElementById('asset-paths-body');
   const chevron = document.getElementById('asset-paths-chevron');
   if (!body) return;
-  const open = (body as HTMLElement).style.display !== 'none';
-  (body as HTMLElement).style.display = open ? 'none' : '';
+  const open = getComputedStyle(body as HTMLElement).display !== 'none';
+  (body as HTMLElement).style.display = open ? 'none' : 'block';
   if (chevron) chevron.textContent = open ? '>' : 'v';
   if (!open) cgUpdateAssetPathStatus();
 }

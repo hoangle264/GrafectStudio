@@ -15,7 +15,7 @@ function cgBuildUnitList(): void {
   const hasOrphans = allDiags.some(d => !d.unitId);
 
   if (!units.length && !hasOrphans) {
-    wrap.innerHTML = '<span style="font-size:10px;color:var(--text3)">No units found</span>';
+    wrap.innerHTML = '<span class="cg-empty">No units found</span>';
     return;
   }
 
@@ -27,7 +27,7 @@ function cgBuildUnitList(): void {
     lbl.className = 'cg-radio-lbl';
     lbl.innerHTML = `<input type="radio" name="cg-unit-radio" value="${u.id}"
       onchange="cgOnUnitSelect('${u.id}')">${esc2(u.name || u.id)}
-      <span style="color:var(--text3);font-size:8px;margin-left:2px;">(${count})</span>`;
+      <span class="cg-count">(${count})</span>`;
     wrap.appendChild(lbl);
     if (i === 0) firstId = u.id;
   });
@@ -38,7 +38,7 @@ function cgBuildUnitList(): void {
     lbl.className = 'cg-radio-lbl';
     lbl.innerHTML = `<input type="radio" name="cg-unit-radio" value="__none__"
       onchange="cgOnUnitSelect('__none__')">(No unit)
-      <span style="color:var(--text3);font-size:8px;margin-left:2px;">(${count})</span>`;
+      <span class="cg-count">(${count})</span>`;
     wrap.appendChild(lbl);
     if (!firstId) firstId = '__none__';
   }
@@ -56,7 +56,7 @@ function cgOnUnitSelect(unitId: string): void {
   cgBuildDiagForUnit(unitId);
   const root = document.getElementById('cg-files');
   const stat = document.getElementById('cg-stat');
-  if (root) root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">Unit selected. Click Send selected to generate payload.</div>';
+  if (root) root.innerHTML = '<div class="cg-empty">Unit selected. Choose Generate to create code.</div>';
   if (stat) stat.textContent = 'Unit selected';
 }
 
@@ -71,7 +71,7 @@ function cgBuildDiagForUnit(unitId: string): void {
     unitId === '__none__' ? !d.unitId : d.unitId === unitId
   );
 
-  if (section) section.style.display = diags.length ? '' : 'none';
+  if (section) section.style.display = diags.length ? 'block' : 'none';
 
   diags.forEach(d => {
     const modeName = d.mode || 'Auto';
@@ -79,9 +79,9 @@ function cgBuildDiagForUnit(unitId: string): void {
     lbl.className = 'cg-diag-chip';
     lbl.dataset.diagId = d.id;
     lbl.innerHTML = `<input type="checkbox" value="${d.id}" checked
-      onchange="cgUpdatePreview()" style="margin-right:4px;">
+      onchange="cgUpdatePreview()">
       <span>${esc2(d.name || d.id)}</span>
-      <span style="color:var(--text3);font-size:8px;margin-left:2px;">[${modeName}]</span>`;
+      <span class="cg-count">[${modeName}]</span>`;
     listWrap.appendChild(lbl);
   });
 }
@@ -109,7 +109,7 @@ function cgUpdatePreview(): void {
   const stat = document.getElementById('cg-stat');
   if (!root) return;
 
-  root.innerHTML = '<div style="padding:12px;color:var(--text3);font-size:12px;">Select a unit above to generate payload.</div>';
+  root.innerHTML = '<div class="cg-empty">Nothing generated yet. Go back and choose Generate.</div>';
   if (stat) stat.textContent = 'Waiting for unit selection';
 }
 
