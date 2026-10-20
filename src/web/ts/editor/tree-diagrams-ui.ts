@@ -114,16 +114,6 @@ function addDiagramInUnit(unitId: string | null | undefined, mode: string): void
   saveDiagramData(result.diagram.id, result.emptyState, result.nextId, result.nextStepNum, result.viewX, result.viewY, result.viewScale);
   saveProject(); renderTree(); openTab(result.diagram.id);
 }
-function addDriverDiagram(): void {
-  const id='diag-'+Date.now();
-  project.diagrams.push({
-    id, name:'Driver_Device', unitId:undefined,
-    mode:'Drivers', diagramType:'Macro',
-    machine:project.machineName||project.name, unit:'', description:''
-  });
-  saveDiagramData(id, {steps:[],transitions:[],connections:[]} as unknown as GrafcetStudioProject.DiagramState, 1, 1, 100, 80, 1);
-  saveProject(); renderTree(); openTab(id);
-}
 
 // -- Inline Diagram Properties Panel --
 let diagPropsId: string | null = null;
