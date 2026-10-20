@@ -36,12 +36,12 @@ function eiParsePhysicalIOCSV(rows: string[][]): GrafcetStudioProject.PhysicalIO
 
 function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImportOptions): EiExcelImportResult {
   const rows = eiParseCSV(csvText);
-  if (!rows.length) return { ok: false, message: 'File CSV trống hoặc không đọc được.', added: 0 };
+  if (!rows.length) return { ok: false, message: 'CSV file is empty or unreadable.', added: 0 };
 
   if (csvType === 'physical-io') {
     if (typeof ensureProjectIOMapping === 'function') ensureProjectIOMapping();
     const parsed = eiParsePhysicalIOCSV(rows);
-    if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
+    if (parsed.errors.length) return { ok: false, message: 'Validation errors:\n' + parsed.errors.join('\n'), added: 0 };
     project.ioMapping.physicalIOs = parsed.physicalIOs;
     if (typeof ioAutoMatchEntries === 'function') ioAutoMatchEntries();
     if (typeof saveProject === 'function') saveProject();
@@ -50,8 +50,8 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
 
   if (csvType === 'unit') {
     const parsed = eiParseUnitCSV(rows);
-    if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
-    if (!parsed.configs.length) return { ok: false, message: 'Không tìm thấy dòng Unit Station hợp lệ.', added: 0 };
+    if (parsed.errors.length) return { ok: false, message: 'Validation errors:\n' + parsed.errors.join('\n'), added: 0 };
+    if (!parsed.configs.length) return { ok: false, message: 'No valid Unit Station rows found.', added: 0 };
 
     if (!project.unitConfig) project.unitConfig = {};
     parsed.configs.forEach(function (cfg) { project.unitConfig[cfg.label] = cfg; });
@@ -62,11 +62,11 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
   }
 
   const selectedStructType = (options && options.structType) || '';
-  if (!selectedStructType) return { ok: false, message: 'Vui lòng chọn Struct Data trước khi import.', added: 0 };
+  if (!selectedStructType) return { ok: false, message: 'Select a Struct Data type before importing.', added: 0 };
 
   const parsed = eiParseStructCSV(rows, selectedStructType);
-  if (parsed.errors.length) return { ok: false, message: 'Lỗi dữ liệu:\n' + parsed.errors.join('\n'), added: 0 };
-  if (!parsed.vars.length) return { ok: false, message: 'Không tìm thấy dòng dữ liệu hợp lệ cho "' + selectedStructType + '".', added: 0 };
+  if (parsed.errors.length) return { ok: false, message: 'Validation errors:\n' + parsed.errors.join('\n'), added: 0 };
+  if (!parsed.vars.length) return { ok: false, message: 'No valid data rows found for "' + selectedStructType + '".', added: 0 };
 
   if (typeof ensureProjectVariables === 'function') ensureProjectVariables();
   if (!project.excelVars) project.excelVars = [];
@@ -92,7 +92,7 @@ function showExcelImportModal(defaultType?: string): void {
   const structTypes  = (project.devices || []).map(function (d) { return d.name; });
   const structOptions = structTypes.length
     ? structTypes.map(function (n) { return '<option value="' + n + '">' + n + '</option>'; }).join('')
-    : '<option value="">(Chưa có Struct Data)</option>';
+    : '<option value="">(No Struct Data yet)</option>';
 
   const unitCount = Object.keys(project.unitConfig || {}).length;
   const varCount  = (project.excelVars || []).length;
@@ -112,17 +112,17 @@ function showExcelImportModal(defaultType?: string): void {
       </div>
 
       <div class="ei-summary">
-        Hiện có:
-        <span class="ei-accent">${varCount} biến</span>
+        Currently:
+        <span class="ei-accent">${varCount} variables</span>
         <span class="ei-accent">${unitCount} unit station</span>
         ${varCount > 0
-          ? '<button class="btn r btn-sm" onclick="eiClearExcelVars()">🗑 Xoá tất cả</button>'
+          ? '<button class="btn r btn-sm" onclick="eiClearExcelVars()">🗑 Clear all</button>'
           : ''}
       </div>
 
       <div class="ei-body">
         <div class="ei-field">
-          <div class="ei-label">LOẠI DỮ LIỆU</div>
+          <div class="ei-label">DATA TYPE</div>
           <div class="ei-radios">
             <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="unit" ${initialType === 'unit' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Unit Station
@@ -142,7 +142,7 @@ function showExcelImportModal(defaultType?: string): void {
             ${structOptions}
           </select>
           <div class="ei-note">
-            Col 0 = Label · Col 1..N map theo thứ tự signal của Struct Data đã chọn
+            Col 0 = Label · Col 1..N map, in order, to the signals of the selected Struct Data
           </div>
         </div>
 
@@ -153,7 +153,7 @@ function showExcelImportModal(defaultType?: string): void {
         </div>
 
         <div id="ei-preview" class="ei-field is-hidden">
-          <div class="ei-label">XEM TRƯỚC</div>
+          <div class="ei-label">PREVIEW</div>
           <pre id="ei-preview-text" class="ei-preview-text"></pre>
         </div>
 
@@ -164,7 +164,7 @@ function showExcelImportModal(defaultType?: string): void {
 
       <div class="dlg-foot">
         <span id="ei-stat" class="ei-stat"></span>
-        <button class="btn" onclick="closeModal('modal-excel-import')">Đóng</button>
+        <button class="btn" onclick="closeModal('modal-excel-import')">Close</button>
         <button class="btn a" id="ei-import-btn" onclick="eiDoImport()" disabled>↓ Import</button>
       </div>
     </div>`;
@@ -178,7 +178,7 @@ function eiGetSchemaHintHtml(type: string): string {
     return '<b class="ei-accent">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed';
   }
   if (type === 'physical-io') {
-    return '<b class="ei-accent">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in hoặc output/out';
+    return '<b class="ei-accent">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in or output/out';
   }
   return '<b class="ei-accent">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
 }
@@ -205,7 +205,7 @@ function eiOnImportTypeChange(): void {
     const rows = eiParseCSV(_eiPendingText);
     const st   = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
     const stat = document.getElementById('ei-stat');
-    if (stat) stat.textContent = 'Mode: ' + eiGetImportTypeLabel(type, st ? st.value : '') + '  (' + rows.length + ' dòng)';
+    if (stat) stat.textContent = 'Mode: ' + eiGetImportTypeLabel(type, st ? st.value : '') + '  (' + rows.length + ' rows)';
   }
 }
 
@@ -238,7 +238,7 @@ function eiPreviewFile(inputEl: HTMLInputElement): void {
       const st     = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
       const rows   = eiParseCSV(_eiPendingText!);
       const label  = eiGetImportTypeLabel(type, st ? st.value : '');
-      stat.textContent = 'Mode: ' + label + '  (' + rows.length + ' dòng)';
+      stat.textContent = 'Mode: ' + label + '  (' + rows.length + ' rows)';
     }
   };
   reader.readAsText(file);
@@ -271,8 +271,8 @@ function eiDoImport(): void {
 
 // ── Xoá toàn bộ dữ liệu đã import ────────────────────────────────────────
 async function eiClearExcelVars(): Promise<void> {
-  if (!(await confirmDialog('Xóa dữ liệu Excel', 'Xóa toàn bộ dữ liệu Excel đã import?', 'Xóa', true))) return;
-  runUndoableProjectChange('Đã xóa dữ liệu Excel import', () => {
+  if (!(await confirmDialog('Clear Excel data', 'Clear all imported Excel data?', 'Clear', true))) return;
+  runUndoableProjectChange('Excel import data cleared', () => {
     project.excelVars = [];
     project.unitConfig = {};
     if (typeof saveProject === 'function') saveProject();

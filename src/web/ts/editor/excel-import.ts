@@ -128,7 +128,7 @@ namespace GrafcetStudioExcelImport {
         if (key === 'originBaseAddr' || key === 'autoBaseAddr') return;
         const value = io[key as keyof typeof io];
         if (value && !validateAddress(value)) {
-          errors.push('Dòng ' + (rowIndex + 1) + ' [' + unitName + '.' + key + ']: địa chỉ không hợp lệ "' + value + '"');
+          errors.push('Row ' + (rowIndex + 1) + ' [' + unitName + '.' + key + ']: invalid address "' + value + '"');
           hasError = true;
         }
       });
@@ -161,10 +161,10 @@ namespace GrafcetStudioExcelImport {
 
   export function parseStructCSV(rows: string[][], structTypeName: string, deviceTypes: DeviceType[]): StructCSVParseResult {
     const structType = (deviceTypes || []).find(function(device) { return device.name === structTypeName; });
-    if (!structType) return { vars: [], errors: ['Không tìm thấy Struct Data "' + structTypeName + '".'] };
+    if (!structType) return { vars: [], errors: ['Struct Data "' + structTypeName + '" not found.'] };
 
     const signals = structType.signals || [];
-    if (!signals.length) return { vars: [], errors: ['Struct Data "' + structTypeName + '" chưa có signal.'] };
+    if (!signals.length) return { vars: [], errors: ['Struct Data "' + structTypeName + '" has no signals.'] };
 
     const vars: ProjectVariable[] = [];
     const errors: string[] = [];
@@ -193,7 +193,7 @@ namespace GrafcetStudioExcelImport {
         const address = (columnIndex != null ? columns[columnIndex] : '') || '';
         signalMap[key] = address;
         if (address && !validateAddress(address)) {
-          errors.push('Dòng ' + (rowIndex + 1) + ' [' + id + '.' + key + ']: địa chỉ không hợp lệ "' + address + '"');
+          errors.push('Row ' + (rowIndex + 1) + ' [' + id + '.' + key + ']: invalid address "' + address + '"');
           hasError = true;
         }
       });
@@ -249,7 +249,7 @@ namespace GrafcetStudioExcelImport {
       const blockName = (hasHeader ? getHeaderValue(columns, headerIndexMap, ['block', 'db', 'udt']) : (columns[3] || '')).trim();
       if (!name && !dataType && !blockName) return;
       if (!name || !dataType) {
-        errors.push('Dòng ' + (rowIndex + 1) + ': thiếu Name hoặc DataType');
+        errors.push('Row ' + (rowIndex + 1) + ': missing Name or DataType');
         return;
       }
 
@@ -315,11 +315,11 @@ namespace GrafcetStudioExcelImport {
       const direction = normalizeDirection ? normalizeDirection(columns[idxDir] || '') : '';
       const description = String(columns[idxDesc] || '').trim();
       if (!deviceTag || !plcAddress) {
-        errors.push('Dòng ' + (rowIndex + 1) + ': thiếu DeviceTag hoặc PLCAddress');
+        errors.push('Row ' + (rowIndex + 1) + ': missing DeviceTag or PLCAddress');
         return;
       }
       if (!direction) {
-        errors.push('Dòng ' + (rowIndex + 1) + ': Direction phải là input/output');
+        errors.push('Row ' + (rowIndex + 1) + ': Direction must be input/output');
         return;
       }
       physicalIOs.push({ id: 'pio-' + rowIndex + '-' + Date.now(), deviceTag, plcAddress, direction, description });

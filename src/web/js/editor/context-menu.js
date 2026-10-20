@@ -42,7 +42,7 @@
         icon: '📂',
         label: 'Open Flowchart',
         disabled: !hasMacroFlow,
-        title: hasMacroFlow ? '' : 'Macro step chưa được gán flowchart',
+        title: hasMacroFlow ? '' : 'Macro step has no flowchart assigned',
         action: () => {
           if (hasMacroFlow) openTab(step.macroFlowId);
         }

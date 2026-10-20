@@ -156,7 +156,7 @@ function etExportHTML(): void {
   const branchHTML = buildBranchTable(s);
   const varsHTML = buildVarsTable(s);
   const html = `<!DOCTYPE html>
-<html lang="vi"><head><meta charset="UTF-8">
+<html lang="en"><head><meta charset="UTF-8">
 <title>GRAFCET Tables - ${diagName}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -219,7 +219,7 @@ b.blue{color:#4fa3e3;} b.green{color:#39d353;} b.amber{color:#f5a623;} b.purple{
 </style></head>
 <body>
 <h1>GRAFCET TABLES - ${diagName.toUpperCase()}</h1>
-<div class="sub">IEC 60848 - ${project.name} - Generated ${new Date().toLocaleString('vi-VN')}</div>
+<div class="sub">IEC 60848 - ${project.name} - Generated ${new Date().toLocaleString('en-GB')}</div>
 <div class="section">${stepsHTML}</div>
 <div class="section">${transHTML}</div>
 <div class="section">${branchHTML}</div>

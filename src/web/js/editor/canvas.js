@@ -180,7 +180,7 @@ function buildStepEl(s) {
     if (s.macroFlowId) {
       openTab(s.macroFlowId);
     } else {
-      toast('⚠ Macro step chưa được gán flowchart');
+      toast('⚠ Macro step has no flowchart assigned');
     }
   });
   // Right-click: context menu
