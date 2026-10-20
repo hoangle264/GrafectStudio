@@ -1083,3 +1083,32 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .ei-preview-text{font-size:var(--fs-xs);font-family:var(--font-mono);background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:8px;max-height:180px;overflow:auto;color:var(--text2);margin:0;}
 .ei-schema-hint{font-size:var(--fs-xs);color:var(--text2);line-height:1.6;}
 .ei-stat{flex:1;font-size:var(--fs-xs);color:var(--text2);align-self:center;}
+
+/* ── Shared Flow Struct editor (sfs-*) ─────────────────────── */
+.sfs-overlay{z-index:10000;}
+.sfs-container{background:var(--s1);color:var(--text);width:720px;max-width:90vw;max-height:85vh;border-radius:8px;border:1px solid var(--border2);display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden;}
+.sfs-header{padding:14px 20px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.sfs-title{margin:0;font-size:var(--fs-md);color:var(--purple);font-weight:600;}
+.sfs-close{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;}
+.sfs-close:hover{color:var(--text);}
+.sfs-body{padding:20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:16px;}
+.sfs-top{display:flex;gap:20px;align-items:center;background:var(--s2);padding:12px 16px;border-radius:6px;}
+.sfs-check{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:var(--fs-sm);}
+.sfs-check input{width:auto;}
+.sfs-name-row{display:flex;align-items:center;gap:8px;flex:1;}
+.sfs-name-lbl{font-size:var(--fs-sm);color:var(--text2);}
+.sfs-name-row input{flex:1;}
+.sfs-input{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:4px;font-size:var(--fs-sm);outline:none;}
+.sfs-input:focus{border-color:var(--blue);}
+.sfs-table-bar{display:flex;justify-content:space-between;align-items:center;}
+.sfs-table-title{font-weight:600;color:var(--blue);font-size:var(--fs-sm);}
+.sfs-table-wrap{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg);}
+.sfs-empty{padding:30px;text-align:center;color:var(--text2);font-style:italic;font-size:var(--fs-sm);}
+.sfs-table{width:100%;border-collapse:collapse;text-align:left;font-size:var(--fs-sm);}
+.sfs-table thead tr{background:var(--s2);color:var(--text2);}
+.sfs-table th{padding:8px 12px;}
+.sfs-table th.center,.sfs-table td.center{text-align:center;}
+.sfs-table tbody tr{border-bottom:1px solid var(--border);}
+.sfs-table td{padding:6px 12px;}
+.sfs-table td .sfs-input{width:100%;}
+.sfs-footer{padding:14px 20px;background:var(--s3);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px;}
