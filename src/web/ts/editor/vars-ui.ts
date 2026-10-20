@@ -139,8 +139,7 @@ function gvtMakeTypeSelect(entry: VuiVarEntry, v: VuiProjectVariable): HTMLSelec
   const isPrimitive   = GVT_PRIMITIVE_TYPES.includes(currentFormat.toUpperCase());
 
   const sel = document.createElement('select');
-  sel.className = 'vt-cell';
-  sel.style.cssText = 'color:var(--cyan);background:var(--s1);border:none;width:100%;cursor:pointer;';
+  sel.className = 'vt-cell gvt-type-select';
   sel.title = currentFormat;
 
   // Group 1: Primitive
@@ -296,34 +295,34 @@ function gvtRenderPlcBlockManager(): void {
   gvtSyncPlcBlockMemberIds();
   const blockRows = blocks.length ? blocks.map(function(block) {
     const count = gvtVariableEntriesForBlocks().filter(function(entry) { return (entry.data as VuiProjectVariable).blockId === block.id; }).length;
-    const udtNote = String(block.kind || '').toUpperCase() === 'UDT' ? '<span style="color:var(--amber);font-size:9px;">manual import only</span>' : '<span style="color:var(--cyan);font-size:9px;">pushable DB</span>';
+    const udtNote = String(block.kind || '').toUpperCase() === 'UDT' ? '<span class="pb-note-amber">manual import only</span>' : '<span class="pb-note-cyan">pushable DB</span>';
     return '<tr>'
-      + '<td><input value="' + esc2(block.name || '') + '" onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'name\',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:4px 6px;"></td>'
-      + '<td><select onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'kind\',this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:4px 6px;"><option value="DB" ' + (String(block.kind).toUpperCase()==='DB'?'selected':'') + '>DB</option><option value="UDT" ' + (String(block.kind).toUpperCase()==='UDT'?'selected':'') + '>UDT</option></select></td>'
-      + '<td style="font-size:10px;color:var(--text2);">' + count + ' vars<br>' + udtNote + '</td>'
-      + '<td><input value="' + esc2(block.comment || '') + '" onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'comment\',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text2);padding:4px 6px;"></td>'
-      + '<td><button class="btn" onclick="gvtDeletePlcBlock(\'' + esc2(block.id) + '\')" style="padding:2px 7px;color:#f87171;">Delete</button></td>'
+      + '<td><input value="' + esc2(block.name || '') + '" onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'name\',this.value)" class="pb-input pb-w-full"></td>'
+      + '<td><select onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'kind\',this.value)" class="pb-input"><option value="DB" ' + (String(block.kind).toUpperCase()==='DB'?'selected':'') + '>DB</option><option value="UDT" ' + (String(block.kind).toUpperCase()==='UDT'?'selected':'') + '>UDT</option></select></td>'
+      + '<td class="pb-count">' + count + ' vars<br>' + udtNote + '</td>'
+      + '<td><input value="' + esc2(block.comment || '') + '" onchange="gvtUpdatePlcBlock(\'' + esc2(block.id) + '\',\'comment\',this.value)" class="pb-input pb-w-full pb-muted"></td>'
+      + '<td><button class="btn r btn-sm" onclick="gvtDeletePlcBlock(\'' + esc2(block.id) + '\')">Delete</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="5" style="color:var(--text3);padding:8px;">No PLC blocks yet.</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="pb-empty">No PLC blocks yet.</td></tr>';
 
   const variableRows = gvtVariableEntriesForBlocks().map(function(entry) {
     const variable = entry.data as VuiProjectVariable;
     const key = String(entry.key).replace(/'/g, '&#39;');
     return '<tr>'
-      + '<td style="color:var(--text2);">' + esc2(variable.label || '') + '</td>'
-      + '<td style="color:var(--text3);">' + esc2(variable.format || variable.dataType || '') + '</td>'
-      + '<td><select onchange="gvtAssignVariableBlock(\'' + esc2(entry.source) + '\',\'' + key + '\',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:4px 6px;">' + gvtBlockOptionsHtml(variable.blockId || '') + '</select></td>'
-      + '<td style="font-size:10px;color:' + (variable.declarationMode === 'SymbolicBlock' ? 'var(--cyan)' : 'var(--text3)') + ';">' + esc2(variable.declarationMode || 'AddressMapped') + '</td>'
+      + '<td class="pb-cell-label">' + esc2(variable.label || '') + '</td>'
+      + '<td class="pb-cell-type">' + esc2(variable.format || variable.dataType || '') + '</td>'
+      + '<td><select onchange="gvtAssignVariableBlock(\'' + esc2(entry.source) + '\',\'' + key + '\',this.value)" class="pb-input pb-w-full">' + gvtBlockOptionsHtml(variable.blockId || '') + '</select></td>'
+      + '<td class="pb-cell-mode' + (variable.declarationMode === 'SymbolicBlock' ? ' on' : '') + '">' + esc2(variable.declarationMode || 'AddressMapped') + '</td>'
       + '</tr>';
   }).join('');
 
-  body.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0;">'
-    + '<div style="min-width:0;"><div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">BLOCKS</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 80px 1fr auto;gap:6px;margin-bottom:8px;"><input id="gvt-block-name" placeholder="DB_Motor" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:5px 7px;"><select id="gvt-block-kind" style="background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:5px 7px;"><option value="DB">DB</option><option value="UDT">UDT</option></select><input id="gvt-block-comment" placeholder="Comment" style="background:var(--bg);border:1px solid var(--border);color:var(--text2);padding:5px 7px;"><button class="btn" onclick="gvtAddPlcBlockFromModal()" style="padding:4px 8px;">Add</button></div>'
-    + '<div style="max-height:360px;overflow:auto;"><table class="vt-table table-full"><thead><tr><th>Name</th><th>Kind</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody>' + blockRows + '</tbody></table></div></div>'
-    + '<div style="min-width:0;"><div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:6px;">VARIABLE ASSIGNMENT</div>'
-    + '<div style="font-size:9px;color:var(--text3);margin-bottom:8px;">Assigning a variable to a block sets declarationMode=SymbolicBlock and blockId. Clearing it restores AddressMapped.</div>'
-    + '<div style="max-height:410px;overflow:auto;"><table class="vt-table table-full"><thead><tr><th>Variable</th><th>Type</th><th>Block</th><th>Mode</th></tr></thead><tbody>' + (variableRows || '<tr><td colspan="4" style="color:var(--text3);padding:8px;">No variables.</td></tr>') + '</tbody></table></div></div>'
+  body.innerHTML = '<div class="pb-grid">'
+    + '<div class="pb-col"><div class="pb-col-title">BLOCKS</div>'
+    + '<div class="pb-add-row"><input id="gvt-block-name" placeholder="DB_Motor" class="pb-input"><select id="gvt-block-kind" class="pb-input"><option value="DB">DB</option><option value="UDT">UDT</option></select><input id="gvt-block-comment" placeholder="Comment" class="pb-input pb-muted"><button class="btn" onclick="gvtAddPlcBlockFromModal()">Add</button></div>'
+    + '<div class="pb-scroll pb-scroll-360"><table class="vt-table table-full"><thead><tr><th>Name</th><th>Kind</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody>' + blockRows + '</tbody></table></div></div>'
+    + '<div class="pb-col"><div class="pb-col-title">VARIABLE ASSIGNMENT</div>'
+    + '<div class="pb-help">Assigning a variable to a block sets declarationMode=SymbolicBlock and blockId. Clearing it restores AddressMapped.</div>'
+    + '<div class="pb-scroll pb-scroll-410"><table class="vt-table table-full"><thead><tr><th>Variable</th><th>Type</th><th>Block</th><th>Mode</th></tr></thead><tbody>' + (variableRows || '<tr><td colspan="4" class="pb-empty">No variables.</td></tr>') + '</tbody></table></div></div>'
     + '</div>';
 }
 
@@ -335,10 +334,10 @@ function gvtOpenPlcBlockManager(): void {
   const el = document.createElement('div');
   el.id = 'modal-plc-blocks';
   el.className = 'modal-bg show';
-  el.innerHTML = '<div class="modal" style="min-width:900px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">'
-    + '<div style="padding:12px 20px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;"><span style="font-size:12px;letter-spacing:2px;font-family:\'Orbitron\',monospace;">PLC BLOCK MANAGER</span><span style="font-size:10px;color:var(--text3);">DB can be pushed via bridge; UDT generates XML for manual import.</span><span style="flex:1;"></span><button class="btn" onclick="closeModal(\'modal-plc-blocks\')" style="padding:2px 10px;">X</button></div>'
-    + '<div id="gvt-block-manager-body" style="padding:14px 16px;overflow:auto;background:var(--bg);"></div>'
-    + '<div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;background:var(--s3);"><button class="btn a" onclick="gvtSyncPlcBlockMemberIds(); saveProject(); renderGlobalVarTable(); closeModal(\'modal-plc-blocks\')">Done</button></div>'
+  el.innerHTML = '<div class="modal dlg-modal pb-modal">'
+    + '<div class="dlg-head"><span class="pb-title">PLC BLOCK MANAGER</span><span class="pb-sub">DB can be pushed via bridge; UDT generates XML for manual import.</span><span class="dlg-spacer"></span><button class="btn pb-close" onclick="closeModal(\'modal-plc-blocks\')">X</button></div>'
+    + '<div id="gvt-block-manager-body" class="pb-body"></div>'
+    + '<div class="dlg-foot"><button class="btn a" onclick="gvtSyncPlcBlockMemberIds(); saveProject(); renderGlobalVarTable(); closeModal(\'modal-plc-blocks\')">Done</button></div>'
     + '</div>';
   document.body.appendChild(el);
   gvtRenderPlcBlockManager();
@@ -376,7 +375,7 @@ function renderGlobalVarTable(): void {
     const groupName = (entry.bucket || entry.source) === 'user' ? 'User Variables' : 'Imported / Unit Devices';
     if(groupName !== lastGroup) {
       const groupTr = document.createElement('tr');
-      groupTr.innerHTML = `<td colspan="4" style="padding:8px 12px;background:var(--s2);color:var(--amber);font-size:9px;letter-spacing:1.5px;font-family:'Orbitron',monospace;border-top:1px solid var(--border);">${groupName}</td>`;
+      groupTr.innerHTML = `<td colspan="4" class="gvt-group">${groupName}</td>`;
       tbody.appendChild(groupTr);
       lastGroup = groupName;
     }
@@ -388,7 +387,7 @@ function renderGlobalVarTable(): void {
     // col 1: Delete button
     const tdDel=document.createElement('td');
     tdDel.className='vt-rownum';
-    tdDel.innerHTML=`<button onclick="gvtDeleteVar('${entry.source}', '${String(entry.key).replace(/'/g, '\\&#39;')}')" title="Xa" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0 3px;line-height:1;">X</button>`;
+    tdDel.innerHTML=`<button onclick="gvtDeleteVar('${entry.source}', '${String(entry.key).replace(/'/g, '\\&#39;')}')" title="Delete" class="gvt-del-btn">X</button>`;
     tr.appendChild(tdDel);
 
     // col 2: Label input
@@ -403,13 +402,13 @@ function renderGlobalVarTable(): void {
 
     // col 4: Toggle expand / Address input (primitive)
     const tdTog=document.createElement('td');
-    tdTog.style.cssText='padding:0 8px;font-size:9px;color:var(--cyan);cursor:pointer;user-select:none;';
+    tdTog.className='gvt-tog';
 
     if(sigList.length) {
       // Có signals → nút toggle expand
-      tdTog.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px;">
+      tdTog.innerHTML=`<span class="gvt-tog-inner">
         <span>${isExpanded?'▼':'▶'}</span>
-        <span style="opacity:.7;">${sigList.length} address${sigList.length!==1?'es':''}</span>
+        <span class="gvt-tog-count">${sigList.length} address${sigList.length!==1?'es':''}</span>
       </span>`;
       tdTog.addEventListener('click',function(){
         if((entry.source === 'imported' || entry.source === 'user') && project.variables && entry.bucket && project.variables[entry.bucket] && (project.variables[entry.bucket] as VuiProjectVariable[])[entry.key as number]) {
@@ -424,7 +423,6 @@ function renderGlobalVarTable(): void {
     } else {
       // Khng c signals   nhp a ch trc tip
       // Dùng createElement để tránh re-render mất focus khi click
-      tdTog.style.cssText = '';
       tdTog.onclick = null;
 
       const addrInput = document.createElement('input');
@@ -478,7 +476,7 @@ function renderGlobalVarTable(): void {
         // col 3: Type badges
         const tdSType=document.createElement('td');
         tdSType.innerHTML=`<span class="sdcol-type ${tc}">${esc2(sig.dataType||'Bool')}</span>
-          <span class="sdcol-io ${vc}" style="margin-left:3px;">${vs}</span>`;
+          <span class="sdcol-io ${vc} gvt-sig-io">${vs}</span>`;
         subTr.appendChild(tdSType);
 
         // col 4: Address input (signal sub-row)

@@ -1152,3 +1152,37 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .et-sig-in{background:rgba(74,222,128,.12);color:#4ade80;border:1px solid rgba(74,222,128,.3);}
 .et-sig-out{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.3);}
 .et-sig-var{background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);}
+
+/* ── Global Vars table + PLC Block manager (gvt-* / pb-*) ──── */
+.dlg-spacer{flex:1;}
+.vt-cell.gvt-type-select{color:var(--cyan);background:var(--s1);border:none;width:100%;cursor:pointer;}
+.gvt-group{padding:8px 12px;background:var(--s2);color:var(--amber);font-size:var(--fs-xs);letter-spacing:1.5px;font-family:var(--font-display);border-top:1px solid var(--border);}
+.gvt-del-btn{background:none;border:none;color:#f87171;cursor:pointer;font-size:var(--fs-xs);padding:0 3px;line-height:1;}
+.gvt-tog{padding:0 8px;font-size:var(--fs-xs);color:var(--cyan);cursor:pointer;user-select:none;}
+.gvt-tog-inner{display:inline-flex;align-items:center;gap:4px;}
+.gvt-tog-count{opacity:.7;}
+.sdcol-io.gvt-sig-io{margin-left:3px;}
+.pb-modal{min-width:900px;max-width:96vw;max-height:90vh;}
+.pb-title{font-size:var(--fs-sm);letter-spacing:2px;font-family:var(--font-display);}
+.pb-sub{font-size:var(--fs-xs);color:var(--text2);}
+.pb-close{padding:2px 10px;}
+.pb-body{padding:14px 16px;overflow:auto;background:var(--bg);}
+.pb-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0;}
+.pb-col{min-width:0;}
+.pb-col-title{font-size:var(--fs-xs);color:var(--text2);letter-spacing:1px;margin-bottom:6px;}
+.pb-add-row{display:grid;grid-template-columns:1fr 80px 1fr auto;gap:6px;margin-bottom:8px;}
+.pb-input{background:var(--bg);border:1px solid var(--border);color:var(--cyan);padding:4px 6px;}
+.pb-w-full{width:100%;}
+.pb-muted{color:var(--text2);}
+.pb-scroll{overflow:auto;}
+.pb-scroll-360{max-height:360px;}
+.pb-scroll-410{max-height:410px;}
+.pb-help{font-size:var(--fs-xs);color:var(--text2);margin-bottom:8px;}
+.pb-note-amber{color:var(--amber);font-size:var(--fs-xs);}
+.pb-note-cyan{color:var(--cyan);font-size:var(--fs-xs);}
+.pb-count{font-size:var(--fs-xs);color:var(--text2);}
+.pb-empty{color:var(--text3);padding:8px;}
+.pb-cell-label{color:var(--text2);}
+.pb-cell-type{color:var(--text3);}
+.pb-cell-mode{font-size:var(--fs-xs);color:var(--text3);}
+.pb-cell-mode.on{color:var(--cyan);}
