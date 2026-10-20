@@ -86,7 +86,7 @@ var GrafcetStudioFlowStruct;
         const tableHeader = document.createElement('div');
         tableHeader.className = 'sfs-table-bar';
         tableHeader.innerHTML = `
-      <span class="sfs-table-title">Struct Members (Mặc định trống - Người dùng tự thêm)</span>
+      <span class="sfs-table-title">Struct Members (empty by default - add your own)</span>
       <button id="sfsm-add-btn" class="btn g">+ Add Member</button>
     `;
         // Members Table Container
@@ -96,7 +96,7 @@ var GrafcetStudioFlowStruct;
             if (schema.members.length === 0) {
                 tableWrapper.innerHTML = `
           <div class="sfs-empty">
-            Chưa có member nào trong Struct. Bấm <strong>+ Add Member</strong> để thêm biến mới.
+            No members in the Struct yet. Click <strong>+ Add Member</strong> to add a variable.
           </div>
         `;
                 return;
