@@ -102,8 +102,14 @@ function historyUpdateUi(): void {
   const entry = historyIsCanvasDiagram(activeDiagramId) ? diagramHistories.get(activeDiagramId) : undefined;
   const undoBtn = document.getElementById('menu-undo') as HTMLButtonElement | null;
   const redoBtn = document.getElementById('menu-redo') as HTMLButtonElement | null;
-  if (undoBtn) undoBtn.disabled = !entry || entry.undo.length === 0;
-  if (redoBtn) redoBtn.disabled = !entry || entry.redo.length === 0;
+  const ftUndo = document.getElementById('ft-undo') as HTMLButtonElement | null;
+  const ftRedo = document.getElementById('ft-redo') as HTMLButtonElement | null;
+  const canUndo = !!entry && entry.undo.length > 0;
+  const canRedo = !!entry && entry.redo.length > 0;
+  if (undoBtn) undoBtn.disabled = !canUndo;
+  if (redoBtn) redoBtn.disabled = !canRedo;
+  if (ftUndo) ftUndo.disabled = !canUndo;
+  if (ftRedo) ftRedo.disabled = !canRedo;
 }
 
 Object.assign(window, {

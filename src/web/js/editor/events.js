@@ -536,6 +536,7 @@ const clearToolButtonState = () => {
     const el = getById(`tb-${button}`);
     if (el) el.classList.remove('active', 'amber', 'green', 'purple');
   });
+  document.querySelectorAll('.ft-btn.active').forEach((el) => el.classList.remove('active'));
 };
 
 const setToolIndicator = (nextTool) => {
@@ -557,6 +558,8 @@ const setTool = (nextTool) => {
     if (nextTool === 'par-split' || nextTool === 'par-join') el.classList.add('purple');
     if (nextTool === 'macrostep') el.classList.add('green');
   }
+
+  document.querySelectorAll(`.ft-btn[data-tool="${nextTool}"]`).forEach((el) => el.classList.add('active'));
 
   setToolIndicator(nextTool);
   getById('svg-canvas').style.cursor = nextTool === 'select' ? 'default' : 'crosshair';

@@ -554,6 +554,22 @@ body.unified-vars .vartable-panel{display:none;}
 /* Prevent text nodes inside SVG from being selectable */
 #svg-canvas text{pointer-events:none;user-select:none;-webkit-user-select:none;}
 .conn-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(245,166,35,.15);border:1px solid var(--amber);color:var(--amber);padding:5px 14px;font-size:var(--fs-xs);border-radius:3px;pointer-events:none;display:none;z-index:10;}
+.float-toolbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:2px;padding:3px;background:var(--s1);border:1px solid var(--border2);border-radius:6px;box-shadow:var(--shadow-md);max-width:calc(100% - 20px);overflow-x:auto;}
+.ft-btn{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:none;border:1px solid transparent;border-radius:4px;color:var(--text2);cursor:pointer;}
+.ft-btn:hover:not(:disabled){background:var(--s3);color:var(--text);}
+.ft-btn:focus-visible{outline:1px solid var(--blue);outline-offset:-1px;}
+.ft-btn:disabled{opacity:.35;cursor:default;}
+.ft-btn.active{background:var(--blue3);border-color:var(--blue);color:var(--text);}
+.ft-btn.ft-amber.active{background:var(--amber3);border-color:var(--amber);}
+.ft-btn.ft-green.active{background:var(--green3);border-color:var(--green);}
+.ft-btn.ft-purple.active{background:rgba(167,139,250,.1);border-color:var(--purple);}
+.ft-btn.ft-cyan.active{background:rgba(34,211,238,.1);border-color:var(--cyan);}
+.ft-btn.ft-blue svg{color:var(--blue);}
+.ft-btn.ft-amber svg{color:var(--amber);}
+.ft-btn.ft-green svg{color:var(--green);}
+.ft-btn.ft-purple svg{color:var(--purple);}
+.ft-btn.ft-cyan svg{color:var(--cyan);}
+.ft-sep{width:1px;height:18px;margin:0 4px;background:var(--border2);flex-shrink:0;}
 .mini-map{position:absolute;bottom:8px;right:8px;width:150px;height:100px;background:rgba(11,13,17,.9);border:1px solid var(--border);border-radius:3px;overflow:hidden;}
 
 /* ─── Diagram Properties Panel (right panel) ─── */
