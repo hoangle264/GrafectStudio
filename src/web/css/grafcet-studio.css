@@ -308,8 +308,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-item-btn:hover{color:var(--blue);background:rgba(0,122,204,.15);}
 .tree-item-btn.del:hover{color:var(--red);}
 
-.tree-drivers{display:none;}
-.tree-drivers-head{display:none;}
 
 /* ── Devices tree section ── */
 .tree-devices-section{border-top:none;}
@@ -399,7 +397,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .mode-manual .tree-mode-icon,.mode-manual .tree-mode-name{color:#4fa3e3;}
 .mode-origin .tree-mode-icon,.mode-origin .tree-mode-name{color:#f5a623;}
 .mode-error .tree-mode-icon,.mode-error .tree-mode-name{color:#e35a4f;}
-.mode-drivers .tree-mode-icon,.mode-drivers .tree-mode-name{color:#a78bfa;}
 
 /* Tools */
 .tools-panel{flex:1;overflow-y:auto;padding:8px 0;}
@@ -1193,6 +1190,3 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .tree-orphan-head{padding:4px 8px;font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;border-top:1px solid var(--border);}
 .tree-empty-note{padding:3px 8px;font-size:var(--fs-xs);color:var(--text3);font-style:italic;}
 .tree-empty-note.indent{padding-left:34px;}
-.tree-drivers-icon{margin:0 4px;font-size:var(--fs-xs);}
-.tree-drivers-name{flex:1;font-size:var(--fs-xs);letter-spacing:1px;}
-.tree-drivers-list{border-left:2px solid rgba(167,139,250,.3);margin-left:12px;}

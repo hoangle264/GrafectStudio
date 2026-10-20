@@ -242,37 +242,3 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
   wrap.appendChild(head); wrap.appendChild(children);
   return wrap;
 }
-
-function makeDriversSection(): HTMLElement {
-  const wrap = document.createElement('div');
-  wrap.className = 'tree-drivers';
-  const driverDiags = project.diagrams.filter(d=>d.mode==='Drivers');
-  const isOpen = localStorage.getItem('gf2-drivers-open') !== '0';
-
-  const head = document.createElement('div');
-  head.className = 'tree-drivers-head mode-drivers';
-  head.innerHTML = `
-    <span class="tree-unit-toggle ${isOpen?'open':'closed'}">v</span>
-    <span class="tree-drivers-icon">*</span>
-    <span class="tree-drivers-name">ActiveDevices</span>
-    <button class="tree-mode-add" onclick="addDriverDiagram();event.stopPropagation()" title="Add active device diagram">+</button>`;
-  head.addEventListener('click', ()=>{
-    const c=wrap.querySelector<HTMLElement>('.tree-drivers-body');
-    const hidden=c!.classList.toggle('hidden');
-    localStorage.setItem('gf2-drivers-open', hidden?'0':'1');
-  });
-
-  const body2 = document.createElement('div');
-  if(!driverDiags.length){
-    const empty=document.createElement('div');
-    empty.className='tree-empty-note';
-    empty.textContent='no driver diagrams';
-    body2.appendChild(empty);
-  } else {
-    driverDiags.forEach(d=>body2.appendChild(makeDiagItem(d)));
-  }
-  body2.className = 'tree-drivers-body tree-drivers-list' + (isOpen?'':' hidden');
-
-  wrap.appendChild(head); wrap.appendChild(body2);
-  return wrap;
-}
