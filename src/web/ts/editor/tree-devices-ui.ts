@@ -73,7 +73,6 @@ function renderDevicesList(container?: HTMLElement | null): void {
   if(!devs.length){
     const e=document.createElement('div');
     e.className='tree-dev-empty';
-    e.style.cssText='padding:6px 12px;font-size:9px;color:var(--text3);font-style:italic;';
     e.textContent='no struct data defined';
     container.appendChild(e);
     return;
@@ -132,9 +131,6 @@ function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
     else openDeviceTypeModal(dev.id);
   });
 
-  // show/hide action buttons on hover
-  const acts = head.querySelector<HTMLElement>('.tree-dev-type-acts');
-  if(acts){ acts.style.opacity='0'; head.addEventListener('mouseenter',()=>acts.style.opacity='1'); head.addEventListener('mouseleave',()=>acts.style.opacity='0'); }
 
   wrap.appendChild(head); wrap.appendChild(children);
   return wrap;
@@ -148,7 +144,6 @@ function openPlcConfigModal(): void {
   el = document.createElement('div');
   el.id = 'modal-plc-config';
   el.className = 'modal-bg';
-  el.style.cssText = 'align-items:center;justify-content:center;';
 
   const plcOptionsCatalog = [
     { name: 'Siemens S7-1200', deviceCode: '' },
@@ -168,60 +163,53 @@ function openPlcConfigModal(): void {
   const currentDeviceCode = String(cfg.deviceCode ?? (plcOptionsCatalog.find(item => item.name === currentType)?.deviceCode || '')).trim();
 
   el.innerHTML = `
-    <div class="modal" style="width:520px;min-width:360px;max-width:92vw;display:flex;flex-direction:column;padding:0;overflow:hidden;">
-      <div style="padding:12px 20px 10px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="font-size:15px;">${treeIcon('plc','plc')}</span>
-        <span style="font-size:12px;letter-spacing:.3px;font-family:'Segoe UI',sans-serif;font-weight:600;">PLC Configuration</span>
+    <div class="modal dlg-modal dlg-w-520">
+      <div class="dlg-head">
+        <span class="dlg-head-icon">${treeIcon('plc','plc')}</span>
+        <span class="dlg-head-title">PLC Configuration</span>
       </div>
-      <div style="padding:14px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;">
-        <div style="grid-column:1 / -1;">
+      <div class="dlg-grid-2">
+        <div class="dlg-span-all">
           <div class="dev-field-lbl">Name / Model PLC</div>
-          <input id="plc-modal-name" type="text" placeholder="Model PLC" value="${esc2(cfg.name || project.plcName || project.machineName || 'Model PLC')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-name" type="text" placeholder="Model PLC" value="${esc2(cfg.name || project.plcName || project.machineName || 'Model PLC')}" class="dlg-input">
         </div>
-        <div style="grid-column:1 / -1;">
+        <div class="dlg-span-all">
           <div class="dev-field-lbl">PLC</div>
-          <select id="plc-modal-type" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <select id="plc-modal-type" class="dlg-input">
             ${plcOptions}
           </select>
         </div>
         <div>
           <div class="dev-field-lbl">Device code</div>
-          <input id="plc-modal-device-code" type="text" placeholder="e.g. 128" value="${esc2(currentDeviceCode)}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-device-code" type="text" placeholder="e.g. 128" value="${esc2(currentDeviceCode)}" class="dlg-input">
         </div>
         <div>
           <div class="dev-field-lbl">IP Address</div>
-          <input id="plc-modal-ip" type="text" placeholder="192.168.0.1" value="${esc2(cfg.ip || '')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-ip" type="text" placeholder="192.168.0.1" value="${esc2(cfg.ip || '')}" class="dlg-input">
         </div>
         <div>
           <div class="dev-field-lbl">Port</div>
-          <input id="plc-modal-port" type="number" min="0" placeholder="102" value="${esc2(cfg.port ?? '102')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-port" type="number" min="0" placeholder="102" value="${esc2(cfg.port ?? '102')}" class="dlg-input">
         </div>
         <div>
           <div class="dev-field-lbl">Rack</div>
-          <input id="plc-modal-rack" type="number" min="0" placeholder="0" value="${esc2(cfg.rack ?? '0')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-rack" type="number" min="0" placeholder="0" value="${esc2(cfg.rack ?? '0')}" class="dlg-input">
         </div>
         <div>
           <div class="dev-field-lbl">Slot</div>
-          <input id="plc-modal-slot" type="number" min="0" placeholder="1" value="${esc2(cfg.slot ?? '1')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-slot" type="number" min="0" placeholder="1" value="${esc2(cfg.slot ?? '1')}" class="dlg-input">
         </div>
-        <div style="grid-column:1 / -1;">
+        <div class="dlg-span-all">
           <div class="dev-field-lbl">Timeout</div>
-          <input id="plc-modal-timeout" type="number" min="0" placeholder="3000" value="${esc2(cfg.timeout ?? '3000')}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="plc-modal-timeout" type="number" min="0" placeholder="3000" value="${esc2(cfg.timeout ?? '3000')}" class="dlg-input">
         </div>
       </div>
-      <div style="padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="dlg-actions">
         <button class="btn" onclick="plcConnect()">Connect</button>
         <button class="btn" onclick="plcDisconnect()">Disconnect</button>
         <button class="btn" onclick="plcPingTest()">Ping Test</button>
       </div>
-      <div style="padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
+      <div class="dlg-foot">
         <button class="btn" onclick="closeModal('modal-plc-config')">Cancel</button>
         <button class="btn a" onclick="confirmPlcConfig()">Save</button>
       </div>
@@ -282,7 +270,6 @@ function openDeviceTypeModal(devId: string | null): void {
   el=document.createElement('div');
   el.id='modal-device-type';
   el.className='modal-bg';
-  el.style.cssText='align-items:center;justify-content:center;';
 
   const selCatId = dev?.categoryId || 'cat-cylinder';
   const typeOptions = DEV_BUILTIN_CATS.map(c=>
@@ -290,42 +277,41 @@ function openDeviceTypeModal(devId: string | null): void {
   ).join('');
 
   el.innerHTML=`
-    <div class="modal" style="width:800px;min-width:430px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
-      <div style="padding:12px 20px 10px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="font-size:15px;">Struct</span>
-        <span style="font-size:12px;letter-spacing:.3px;font-family:'Segoe UI',sans-serif;font-weight:600;">${devId?'Edit':'New'} Struct Data</span>
+    <div class="modal dlg-modal dlg-w-800">
+      <div class="dlg-head">
+        <span class="dlg-head-icon">Struct</span>
+        <span class="dlg-head-title">${devId?'Edit':'New'} Struct Data</span>
       </div>
-      <div style="padding:12px 20px 4px;display:flex;gap:20px;flex-shrink:0;flex-wrap:wrap;">
-        <div style="flex:1;min-width:180px;">
+      <div class="dlg-row">
+        <div class="dlg-col-grow">
           <div class="dev-field-lbl">Struct data name</div>
-          <input id="dev-modal-name" type="text" placeholder="e.g. CylA, MotorConv..."
-            style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:5px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <input id="dev-modal-name" type="text" placeholder="e.g. CylA, MotorConv..." class="dlg-input">
         </div>
-        <div style="flex:0 0 180px;">
+        <div class="dlg-col-fixed">
           <div class="dev-field-lbl">Type</div>
-          <select id="dev-modal-cat" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:12px;padding:5px 8px;border-radius:3px;outline:none;margin-top:5px;">
+          <select id="dev-modal-cat" class="dlg-input">
             ${typeOptions}
           </select>
         </div>
       </div>
-      <div style="padding:4px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:11px;letter-spacing:.3px;color:var(--cyan);font-family:'Segoe UI',sans-serif;font-weight:600;">Signals</span>
-        <button class="btn" style="border-color:var(--cyan);color:var(--cyan);font-size:9px;" onclick="devModalAddRow()">+ Add Signal</button>
+      <div class="dlg-section-bar">
+        <span class="dlg-section-title">Signals</span>
+        <button class="btn btn-cyan btn-sm" onclick="devModalAddRow()">+ Add Signal</button>
       </div>
-      <div style="flex:1;overflow:auto;padding:0 20px 8px;">
+      <div class="dlg-scroll">
         <table class="dev-sig-table">
           <thead><tr>
-            <th style="width:140px;">Signal name</th>
-            <th style="width:67px;">Data type</th>
-            <th style="width:80px;">Variable type</th>
-            <th style="width:110px;">Address</th>
+            <th class="col-name">Signal name</th>
+            <th class="col-type">Data type</th>
+            <th class="col-var">Variable type</th>
+            <th class="col-addr">Address</th>
             <th>Comment</th>
-            <th style="width:22px;"></th>
+            <th class="col-del"></th>
           </tr></thead>
           <tbody id="dev-modal-tbody"></tbody>
         </table>
       </div>
-      <div style="padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);">
+      <div class="dlg-foot">
         <button class="btn" onclick="closeModal('modal-device-type')">Cancel</button>
         <button class="btn a" onclick="confirmDeviceType()">Save</button>
       </div>
@@ -356,14 +342,14 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
       </select>
     </td>
     <td>
-      <select class="dev-sig-select" data-f="varType" style="color:var(--text);">
+      <select class="dev-sig-select is-plain" data-f="varType">
         <option value="Input"  ${(sig?.varType||'Input')==='Input' ?'selected':''}>Input</option>
         <option value="Output" ${(sig?.varType||'')==='Output'?'selected':''}>Output</option>
         <option value="Var"    ${(sig?.varType||'')==='Var'   ?'selected':''}>Var</option>
       </select>
     </td>
-    <td><input class="dev-sig-input" placeholder="%IX0.0 / %QX0.0" value="${esc2(sig?.address||'')}" data-f="address" style="color:var(--amber);"></td>
-    <td><input class="dev-sig-input" placeholder="e.g. Lower limit sensor" value="${esc2(sig?.comment||'')}" data-f="comment" style="color:var(--text2);"></td>
+    <td><input class="dev-sig-input is-addr" placeholder="%IX0.0 / %QX0.0" value="${esc2(sig?.address||'')}" data-f="address"></td>
+    <td><input class="dev-sig-input is-comment" placeholder="e.g. Lower limit sensor" value="${esc2(sig?.comment||'')}" data-f="comment"></td>
     <td><button class="dev-del-row" onclick="this.closest('tr').remove()">✕</button></td>`;
   tbody.appendChild(tr);
 }

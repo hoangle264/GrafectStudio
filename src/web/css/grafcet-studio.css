@@ -1033,3 +1033,34 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 #cg-files{flex:1;min-height:0;display:flex;flex-direction:column;}
 .cg-mode-row label{white-space:nowrap;}
 .cg-mode-row input[type=radio]{width:auto;}
+
+/* ── Shared dialog building blocks (dlg-*) ─────────────────── */
+.dlg-modal{display:flex;flex-direction:column;padding:0;overflow:hidden;max-width:92vw;}
+.dlg-w-520{width:520px;min-width:360px;}
+.dlg-w-800{width:800px;min-width:430px;max-height:88vh;}
+.dlg-head{padding:12px 20px 10px;background:var(--s3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.dlg-head-icon{font-size:15px;}
+.dlg-head-title{font-size:var(--fs-sm);letter-spacing:.3px;font-family:var(--font-ui);font-weight:600;}
+.dlg-grid-2{padding:14px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+.dlg-span-all{grid-column:1 / -1;}
+.modal .dlg-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font-ui);font-size:var(--fs-sm);padding:6px 8px;border-radius:3px;outline:none;margin-top:5px;}
+.modal .dlg-input:focus{border-color:var(--blue);}
+.dlg-actions{padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap;}
+.dlg-foot{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:var(--s3);}
+.dlg-row{padding:12px 20px 4px;display:flex;gap:20px;flex-shrink:0;flex-wrap:wrap;}
+.dlg-col-grow{flex:1;min-width:180px;}
+.dlg-col-fixed{flex:0 0 180px;}
+.dlg-section-bar{padding:4px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;}
+.dlg-section-title{font-size:var(--fs-xs);letter-spacing:.3px;color:var(--cyan);font-family:var(--font-ui);font-weight:600;}
+.dlg-scroll{flex:1;overflow:auto;padding:0 20px 8px;}
+.btn-sm{font-size:var(--fs-xs);padding:3px 8px;}
+.dev-sig-table th.col-name{width:140px;}
+.dev-sig-table th.col-type{width:67px;}
+.dev-sig-table th.col-var{width:80px;}
+.dev-sig-table th.col-addr{width:110px;}
+.dev-sig-table th.col-del{width:22px;}
+.dev-sig-select.is-plain{color:var(--text);}
+.dev-sig-input.is-addr{color:var(--amber);}
+.dev-sig-input.is-comment{color:var(--text2);}
+.tree-dev-type-acts{opacity:0;}
+.tree-dev-type-head:hover .tree-dev-type-acts{opacity:1;}
