@@ -1,7 +1,6 @@
 type MhCodegenPayload = GrafcetStudioProject.CodegenPayload;
 type MhFlowInfo = GrafcetStudioProject.FlowInfo;
 
-declare function toast(msg: string): void;
 declare function flushState(): void;
 declare function ensureFlowAddressConfig(diag: GrafcetStudioProject.DiagramMeta | null | undefined, assignUniqueBase: boolean): unknown;
 declare function ensureProjectVariables(): GrafcetStudioProject.ProjectVariables;
@@ -86,6 +85,7 @@ function cgGenerateAllUnits(): boolean {
 function cgGenerateViaHost(platform: string, diagId: string): boolean {
   const chromeHost = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
   const stat = document.getElementById('cg-stat');
+  if (stat) stat.classList.remove('cg-stat-error');
   if (!(chromeHost && chromeHost.webview && typeof chromeHost.webview.postMessage === 'function')) {
     const pre = document.getElementById('cg-files');
     if (pre) pre.textContent = 'C# generator is available only inside the WPF host.';
@@ -146,8 +146,8 @@ function cgGenerateViaHost(platform: string, diagId: string): boolean {
     const pre = document.getElementById('cg-files');
     const message = err instanceof Error ? err.message : String(err);
     if (pre) pre.textContent = 'Payload validation error: ' + message;
-    if (stat) stat.textContent = 'Payload validation failed';
-    if (typeof toast === 'function') toast('? ' + message);
+    if (stat) { stat.textContent = 'Payload validation failed'; stat.classList.add('cg-stat-error'); }
+    notifyError('Code generation: ' + message);
     return false;
   }
 }
@@ -178,9 +178,7 @@ function receiveError(payload: { source?: string; message?: string } | string): 
   const data = typeof payload === 'object' && payload ? payload : {};
   const source = data.source ? data.source : 'host';
   const message = data.message ? data.message : String(payload || 'Unknown error');
-  if (typeof toast === 'function' && (source === 'template-loader' || source === 'template-validation')) {
-    toast('? ' + source + ': ' + message);
-  }
+  notifyError('Code generation failed (' + source + '): ' + message);
   if (pre) pre.textContent = source + ' error: ' + message;
-  if (stat) stat.textContent = 'C# host error';
+  if (stat) { stat.textContent = 'C# host error'; stat.classList.add('cg-stat-error'); }
 }

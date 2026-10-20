@@ -65,6 +65,7 @@
       action: () => {
         selectEl(step.id, 'step', null);
         deleteEl(step.id);
+        notifyDeleted(1);
         selIds.clear();
         updateProps();
       }
@@ -88,6 +89,7 @@
         action: () => {
           selectEl(transition.id, 'transition', null);
           deleteEl(transition.id);
+          notifyDeleted(1);
           selIds.clear();
           updateProps();
         }

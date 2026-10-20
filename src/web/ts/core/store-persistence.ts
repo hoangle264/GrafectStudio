@@ -12,11 +12,12 @@
     viewScale: number;
   }
 
-  export function saveProject(project: Project): void {
-    try { localStorage.setItem('gf2-project', JSON.stringify(project)); } catch (e) {}
+  /** Returns false when localStorage rejects the write (e.g. quota exceeded). */
+  export function saveProject(project: Project): boolean {
+    try { localStorage.setItem('gf2-project', JSON.stringify(project)); return true; } catch (e) { return false; }
   }
 
-  export function saveDiagramData(id: string, data: DiagramSaveData): void {
+  export function saveDiagramData(id: string, data: DiagramSaveData): boolean {
     try {
       localStorage.setItem('gf2-diag-' + id, JSON.stringify({
         state: data.state,
@@ -26,7 +27,8 @@
         viewY: data.viewY,
         viewScale: data.viewScale
       }));
-    } catch (e) {}
+      return true;
+    } catch (e) { return false; }
   }
 
   export function loadDiagramData(id: string): StoredDiagramData | null {
@@ -42,8 +44,8 @@
   }
 
   export interface StorePersistenceApi {
-    saveProject(project: Project): void;
-    saveDiagramData(id: string, data: DiagramSaveData): void;
+    saveProject(project: Project): boolean;
+    saveDiagramData(id: string, data: DiagramSaveData): boolean;
     loadDiagramData(id: string): StoredDiagramData | null;
     deleteDiagramData(id: string): void;
   }

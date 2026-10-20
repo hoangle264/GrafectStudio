@@ -81,25 +81,29 @@ function confirmUnit(): void {
   let result: GrafcetStudioTree.MutationResult<GrafcetStudioProject.Unit> | null = null;
   if(unitModalMode==='add'){
     result = treeGetApi().addUnit(treeGetContext(), val);
-    if (!result.ok) { alert(result.message || 'Unable to add unit.'); return; }
+    if (!result.ok) { notifyError(result.message || 'Unable to add unit.'); return; }
     saveProject(); renderTree();
     toast('Unit added: '+val);
   } else if(unitModalMode?.startsWith('rename:')){
     const id=unitModalMode.split(':')[1];
     result = treeGetApi().renameUnit(treeGetContext(), id, val);
-    if (!result.ok) { alert(result.message || 'Unable to rename unit.'); return; }
+    if (!result.ok) { notifyError(result.message || 'Unable to rename unit.'); return; }
     saveProject(); renderTree();
   }
   closeModal('modal-unit');
 }
-function removeUnit(id: string, e?: Event): void {
+async function removeUnit(id: string, e?: Event): Promise<void> {
   if(e) e.stopPropagation();
   const u=(project.units||[]).find(x=>x.id===id);
   const diagsIn=(project.diagrams||[]).filter(d=>d.unitId===id);
-  if(!confirm(`Delete unit "${u?.name}"? ${diagsIn.length>0?diagsIn.length+' diagram(s) will be unassigned.':''}`)) return;
-  const result = treeGetApi().removeUnit(treeGetContext(), id);
-  if (!result.ok) { alert(result.message || 'Unable to delete unit.'); return; }
-  saveProject(); renderTree();
+  const detail = diagsIn.length>0 ? ` ${diagsIn.length} diagram(s) will be unassigned.` : '';
+  if(!(await confirmDialog('Delete unit', `Delete unit "${u?.name}"?${detail}`, 'Delete', true))) return;
+  runUndoableProjectChange(`Deleted unit "${u?.name}"`, () => {
+    const result = treeGetApi().removeUnit(treeGetContext(), id);
+    if (!result.ok) { notifyError(result.message || 'Unable to delete unit.'); return false; }
+    saveProject(); renderTree();
+    return true;
+  });
 }
 function toggleUnitOpen(id: string): void {
   const result = treeGetApi().toggleUnitOpen(treeGetContext(), id);
@@ -370,21 +374,25 @@ function saveDiagPropsPanel(): void {
   toast('Properties saved');
 }
 
-function removeDiagram(id: string, e?: Event): void {
+async function removeDiagram(id: string, e?: Event): Promise<void> {
   if (e) e.stopPropagation();
   const allDiags = project.diagrams.length;
-  if (allDiags <= 1) { toast('Warning: Cannot delete last diagram'); return; }
-  if (!confirm('Delete diagram "'+project.diagrams.find(d=>d.id===id)?.name+'"?')) return;
-  deleteDiagramData(id);
-  project.diagrams = project.diagrams.filter(d=>d.id!==id);
-  openTabs = openTabs.filter(t=>t.id!==id);
-  saveProject();
-  if (activeDiagramId===id) {
-    activeDiagramId=null;
-    if (openTabs.length>0) openTab(openTabs[0].id);
-    else if(project.diagrams.length>0) openTab(project.diagrams[0].id);
-    else { renderTree(); renderTabs(); }
-  } else { renderTree(); renderTabs(); }
+  if (allDiags <= 1) { toast('Cannot delete the last diagram', { kind: 'warn' }); return; }
+  const name = project.diagrams.find(d=>d.id===id)?.name;
+  if (!(await confirmDialog('Delete diagram', 'Delete diagram "'+name+'"?', 'Delete', true))) return;
+  runUndoableProjectChange('Deleted diagram "'+name+'"', () => {
+    deleteDiagramData(id);
+    historyForget(id);
+    project.diagrams = project.diagrams.filter(d=>d.id!==id);
+    openTabs = openTabs.filter(t=>t.id!==id);
+    saveProject();
+    if (activeDiagramId===id) {
+      activeDiagramId=null;
+      if (openTabs.length>0) openTab(openTabs[0].id);
+      else if(project.diagrams.length>0) openTab(project.diagrams[0].id);
+      else { renderTree(); renderTabs(); }
+    } else { renderTree(); renderTabs(); }
+  });
 }
 
 // --- Tree context menu ---

@@ -251,23 +251,31 @@ function gvtUpdatePlcBlock(blockId: string, field: string, value: string): void 
   saveProject();
 }
 
-function gvtDeletePlcBlock(blockId: string): void {
+async function gvtDeletePlcBlock(blockId: string): Promise<void> {
   const blocks = gvtEnsurePlcBlocks();
   const idx = blocks.findIndex(function(block) { return block.id === blockId; });
   if (idx < 0) return;
   const block = blocks[idx];
-  if (!confirm('Delete PLC block "' + (block.name || block.id) + '"? Variables assigned to it will become address-mapped.')) return;
-  blocks.splice(idx, 1);
-  gvtVariableEntriesForBlocks().forEach(function(entry) {
-    const variable = entry.data as VuiProjectVariable;
-    if (variable && variable.blockId === blockId) {
-      variable.blockId = '';
-      variable.declarationMode = 'AddressMapped';
-    }
+  const blockName = block.name || block.id;
+  if (!(await confirmDialog('Delete PLC block', 'Delete PLC block "' + blockName + '"? Variables assigned to it will become address-mapped.', 'Delete', true))) return;
+  runUndoableProjectChange('Deleted PLC block "' + blockName + '"', function() {
+    // Re-resolve: the list may have changed while the dialog was open.
+    const liveBlocks = gvtEnsurePlcBlocks();
+    const liveIdx = liveBlocks.findIndex(function(b) { return b.id === blockId; });
+    if (liveIdx < 0) return false;
+    liveBlocks.splice(liveIdx, 1);
+    gvtVariableEntriesForBlocks().forEach(function(entry) {
+      const variable = entry.data as VuiProjectVariable;
+      if (variable && variable.blockId === blockId) {
+        variable.blockId = '';
+        variable.declarationMode = 'AddressMapped';
+      }
+    });
+    saveProject();
+    renderGlobalVarTable();
+    gvtRenderPlcBlockManager();
+    return true;
   });
-  saveProject();
-  renderGlobalVarTable();
-  gvtRenderPlcBlockManager();
 }
 
 function gvtAssignVariableBlock(source: string, key: string, blockId: string): void {
@@ -519,31 +527,36 @@ function gvtAddUserVar(): void {
   toast('Added user variable');
 }
 
+// Single-row deletes skip the confirm dialog: the toast offers Undo instead.
 function gvtDeleteVar(source: string, key: string | number): void {
   if(source === 'imported' || source === 'user') {
     const hit = gvtResolveEntry(source, key);
     if(!hit.list || !hit.item) return;
-    if(!confirm('Delete "'+(hit.item.label||'variable')+'"?')) return;
-    hit.list.splice(hit.idx,1);
-    saveProject();
-    renderGlobalVarTable();
-    if(typeof updateVarDatalist==='function') updateVarDatalist();
+    const list = hit.list, idx = hit.idx;
+    runUndoableProjectChange('Deleted "'+(hit.item.label||'variable')+'"', function() {
+      list.splice(idx,1);
+      saveProject();
+      renderGlobalVarTable();
+      if(typeof updateVarDatalist==='function') updateVarDatalist();
+    });
     return;
   }
   if(source === 'excel') {
     const idx = parseInt(String(key), 10);
     if(!project.excelVars||idx<0||idx>=project.excelVars.length) return;
-    if(!confirm('Xóa "'+project.excelVars[idx].label+'" khỏi Global Vars?')) return;
-    project.excelVars.splice(idx,1);
+    runUndoableProjectChange('Deleted "'+project.excelVars[idx].label+'"', function() {
+      project.excelVars.splice(idx,1);
+      saveProject();
+      renderGlobalVarTable();
+    });
   } else if(source === 'unit') {
     if(!project.unitConfig || !project.unitConfig[key as string]) return;
-    if(!confirm('Xóa unit "'+(project.unitConfig[key as string].label||key)+'" khỏi Global Vars?')) return;
-    delete project.unitConfig[key as string];
-  } else {
-    return;
+    runUndoableProjectChange('Deleted unit "'+(project.unitConfig[key as string].label||key)+'"', function() {
+      delete project.unitConfig[key as string];
+      saveProject();
+      renderGlobalVarTable();
+    });
   }
-  saveProject();
-  renderGlobalVarTable();
 }
 
 

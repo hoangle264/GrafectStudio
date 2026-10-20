@@ -95,19 +95,20 @@ function renderIOMappingTable(filter?: string): void {
   });
 }
 
-function clearIOMappingImport(): void {
+async function clearIOMappingImport(): Promise<void> {
   if (typeof ensureProjectIOMapping === 'function') ensureProjectIOMapping();
   const hasData = (project.ioMapping.physicalIOs || []).length || (project.ioMapping.entries || []).length;
   if (!hasData) {
     toast('No IO mapping data to clear');
     return;
   }
-  if (!confirm('Clear all imported IO Mapping data?')) return;
-  project.ioMapping.physicalIOs = [];
-  project.ioMapping.entries = [];
-  saveProject();
-  renderIOMappingTable((document.getElementById('iomap-filter') as HTMLSelectElement | null)?.value || 'All');
-  toast('IO Mapping data cleared');
+  if (!(await confirmDialog('Clear IO Mapping', 'Clear all imported IO Mapping data?', 'Clear', true))) return;
+  runUndoableProjectChange('IO Mapping data cleared', () => {
+    project.ioMapping.physicalIOs = [];
+    project.ioMapping.entries = [];
+    saveProject();
+    renderIOMappingTable((document.getElementById('iomap-filter') as HTMLSelectElement | null)?.value || 'All');
+  });
 }
 
 function exportIOCode(): void {

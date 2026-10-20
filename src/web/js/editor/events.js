@@ -372,6 +372,7 @@ const elDown = (e, id, type) => {
 
   if (tool === 'delete') {
     deleteEl(id);
+    notifyDeleted(1);
     return;
   }
   if (tool === 'connect') {
@@ -605,8 +606,13 @@ const onKey = (e) => {
     e.preventDefault();
     selectAll();
   }
-  if (key === 'z' && (e.ctrlKey || e.metaKey)) {
-    // undo placeholder
+  if (key === 'z' && mod) {
+    e.preventDefault();
+    if (e.shiftKey) historyRedo(); else historyUndo();
+  }
+  if (key === 'y' && mod) {
+    e.preventDefault();
+    historyRedo();
   }
 };
 
@@ -668,7 +674,7 @@ const ctxConn = () => {
 
 const ctxDel = () => {
   hideCtx();
-  if (ctxTarget) deleteEl(ctxTarget.id);
+  if (ctxTarget) { deleteEl(ctxTarget.id); notifyDeleted(1); }
 };
 
 // ═══════════════════════════════════════════════════════════

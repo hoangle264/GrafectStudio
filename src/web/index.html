@@ -21,6 +21,12 @@
                     <button onclick="exportProject()">Export Project</button>
                 </div>
             </div>
+            <div class="menu" onmouseenter="historyUpdateUi()"> <button class="menu-btn">Edit</button>
+                <div class="menu-pop">
+                    <button id="menu-undo" onclick="historyUndo()">Undo<span class="menu-kbd">Ctrl+Z</span></button>
+                    <button id="menu-redo" onclick="historyRedo()">Redo<span class="menu-kbd">Ctrl+Y</span></button>
+                </div>
+            </div>
             <div class="menu"> <button class="menu-btn">Project</button>
                 <div class="menu-pop"> 
                     <button onclick="renameProject()">Configure</button> 
@@ -558,7 +564,8 @@
         <span>Trans: <b id="s-trans">0</b></span> 
         <span>Bars: <b id="s-bars">0</b></span> 
         <span>Conns: <b id="s-conns">0</b></span> 
-        <span class="status-spacer">Zoom: <b id="s-zoom">100%</b></span> 
+        <span class="status-spacer s-save" id="s-save" title="All changes are saved automatically">✓ Saved</span>
+        <span>Zoom: <b id="s-zoom">100%</b></span>
         <span>X:<b id="s-cx">0</b> Y:<b id="s-cy">0</b></span>
     </footer> <!-- Context Menu -->
     <div class="ctx" id="ctx">
@@ -620,6 +627,8 @@
     <script src="js/editor/canvas-state.js"></script>
     <script src="js/core/store.js"></script>
     <script src="js/core/constants.js"></script>
+    <script src="js/editor/ui-feedback.js"></script>
+    <script src="js/editor/history.js"></script>
     <script src="js/ai/contracts.js"></script>
     <script src="js/ai/sanitizer.js"></script>
     <script src="js/ai/context-builder.js"></script>

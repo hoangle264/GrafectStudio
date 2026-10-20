@@ -17,11 +17,38 @@ function hide(id: string): void { (document.getElementById(id) as HTMLElement).s
 function closeModal(id: string): void { (document.getElementById(id) as HTMLElement).classList.remove('show'); }
 
 // ── Toast notifications ─────────────────────────────────────
+type ToastKind = 'info' | 'success' | 'warn' | 'error';
+interface ToastOptions {
+  kind?: ToastKind;
+  /** ms before auto-hide; errors and toasts with an action stay longer by default */
+  duration?: number;
+  action?: { label: string; run: () => void };
+}
 let toastTimer: ReturnType<typeof setTimeout>;
-function toast(msg: string): void {
+function toast(msg: string, opts: ToastOptions = {}): void {
   const old=document.querySelector('.toast'); if(old) old.remove();
-  const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+  const kind: ToastKind = opts.kind || 'success';
+  const el=document.createElement('div'); el.className='toast toast-'+kind;
+  el.setAttribute('role', kind==='error' ? 'alert' : 'status');
+  const text=document.createElement('span'); text.className='toast-msg'; text.textContent=msg;
+  el.appendChild(text);
+  const hideToast=(): void => { clearTimeout(toastTimer); el.style.opacity='0'; setTimeout(()=>el.remove(),300); };
+  if (opts.action) {
+    const action=opts.action;
+    const btn=document.createElement('button'); btn.className='toast-action'; btn.textContent=action.label;
+    btn.onclick=()=>{ hideToast(); action.run(); };
+    el.appendChild(btn);
+  }
+  if (kind==='error' || opts.action) {
+    const close=document.createElement('button'); close.className='toast-close'; close.textContent='×'; close.title='Close';
+    close.onclick=hideToast;
+    el.appendChild(close);
+  }
   document.body.appendChild(el);
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); },2500);
+  const duration = opts.duration ?? (kind==='error' ? 8000 : opts.action ? 7000 : 2500);
+  toastTimer=setTimeout(hideToast, duration);
 }
+
+/** Non-blocking replacement for alert() on failures. */
+function notifyError(msg: string): void { toast(msg, { kind: 'error' }); }

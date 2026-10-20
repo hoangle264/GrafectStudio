@@ -3,7 +3,6 @@
 type MdCodegenFile = GrafcetStudioProject.CodegenFile;
 
 declare function esc2(s: unknown): string;
-declare function toast(msg: string): void;
 declare function flushState(): void;
 declare function cgBuildUnitList(): void;
 declare function cgUpdatePreview(): void;
@@ -329,7 +328,7 @@ function cgUpdateAssetPathStatus(): void {
     (status as HTMLElement).style.color = ok ? 'var(--cyan)' : 'var(--amber)';
   }
   if (summary) {
-    summary.textContent = ok ? '? paths ready' : 'missing path';
+    summary.textContent = ok ? '✓ paths ready' : 'missing path';
     (summary as HTMLElement).style.color = ok ? 'var(--cyan)' : 'var(--amber)';
   }
 }

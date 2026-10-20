@@ -98,7 +98,7 @@ function handleImport(e: Event): void {
   const file = input.files && input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => {
     try {
       const raw = JSON.parse(String((ev.target as FileReader).result)) as ImportRawDiagramV1 & ImportRawProjectPayload;
 
@@ -127,14 +127,23 @@ function handleImport(e: Event): void {
       // v2/v3: full project
       if (raw.project && raw.diagrams) {
         const ver = raw.version || '2.0';
-        const mode = confirm(
-          `Import project "${raw.project.name}" (v${ver})?\n\n` +
-          `REPLACE - clear current project and load this one\n` +
-          ` MERGE - to current project\n\n` +
-          `OK = Replace  |  Cancel = Merge`
-        );
+        const choice = await choiceDialog<'replace' | 'merge' | null>({
+          title: 'Import project',
+          message: `Import project "${raw.project.name}" (v${ver}).\n\n` +
+            `Replace: clear the current project and load this one.\n` +
+            `Merge: add its units and diagrams to the current project.`,
+          choices: [
+            { label: 'Merge', value: 'merge', style: 'primary' },
+            { label: 'Replace', value: 'replace', style: 'danger' }
+          ],
+          cancelValue: null
+        });
+        if (!choice) return;
+        const mode = choice === 'replace';
+        const beforeImport = captureProjectSnapshot();
 
         if (mode) {
+          historyReset();
           // REPLACE: clear everything
           project.diagrams.forEach(d => deleteDiagramData(d.id));
           project = {
@@ -238,12 +247,14 @@ function handleImport(e: Event): void {
         saveProject(); renderTree(); renderTabs();
         const firstDiag = project.diagrams[0];
         if (firstDiag) openTab(firstDiag.id);
-        toast(` ${mode ? 'Replaced' : 'Merged'}: ${raw.diagrams.length} diagrams, ${(raw.units || []).length} units`);
+        toast(`${mode ? 'Replaced' : 'Merged'}: ${raw.diagrams.length} diagrams, ${(raw.units || []).length} units`, {
+          action: { label: 'Undo', run: () => { restoreProjectSnapshot(beforeImport); toast('Import undone'); } }
+        });
         return;
       }
 
-      toast('  Unknown file format');
-    } catch (err) { toast(' Import error: ' + (err as Error).message); console.error(err); }
+      notifyError('Unknown file format');
+    } catch (err) { notifyError('Import error: ' + (err as Error).message); console.error(err); }
   };
   reader.readAsText(file); input.value = '';
 }

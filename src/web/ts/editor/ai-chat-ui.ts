@@ -198,6 +198,7 @@ function aiChatReloadActiveCanvasFromStorage(): boolean {
   viewScale = data.viewScale ?? 1;
   if (typeof render === "function") render();
   if (typeof applyView === "function") applyView();
+  if (typeof historyCommit === "function") historyCommit();
   return true;
 }
 

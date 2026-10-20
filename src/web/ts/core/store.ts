@@ -31,6 +31,7 @@ declare function openTab(id: string): void;
 declare function addDiagram(skipOpen?: boolean): void;
 declare function addStandardDeviceTemplates(): void;
 declare function markModified(id: string, modified: boolean): void;
+declare function noteSaveResult(ok: boolean): void;
 
 // -- Project state -----------------------------------------------
 let project: StoreProject = {
@@ -435,18 +436,18 @@ function migrateFlowControlState(): boolean {
 
 // -- Persistence wrappers ----------------------------------------
 function saveProject(): void {
-  GrafcetStudioStorePersistence.saveProject(project);
+  noteSaveResult(GrafcetStudioStorePersistence.saveProject(project));
 }
 
 function saveDiagramData(id: string, s?: StoreDiagramState, nid?: number, nsn?: number, vx?: number, vy?: number, vs?: number): void {
-  GrafcetStudioStorePersistence.saveDiagramData(id, {
+  noteSaveResult(GrafcetStudioStorePersistence.saveDiagramData(id, {
     state: s || state,
     nextId: nid ?? nextId,
     nextStepNum: nsn ?? nextStepNum,
     viewX: vx ?? viewX,
     viewY: vy ?? viewY,
     viewScale: vs ?? viewScale
-  });
+  }));
 }
 
 function loadDiagramData(id: string): StoreStoredDiagramData | null {

@@ -91,6 +91,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
   padding:5px 20px;border-radius:0;cursor:pointer;white-space:nowrap;
 }
 .menu-pop button:hover{background:var(--ide-hover);color:#ffffff;}
+.menu-pop button{display:flex;align-items:center;}
+.menu-pop button:disabled{color:var(--text3);cursor:default;background:transparent;}
+.menu-kbd{margin-left:auto;padding-left:24px;color:var(--text2);font-size:var(--fs-xs);}
 .menu-sep{height:1px;background:var(--border);margin:4px 2px;}
 .btn{padding:5px 12px;border:1px solid var(--border);background:var(--s2);color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:var(--fs-xs);cursor:pointer;border-radius:3px;transition:.15s;white-space:nowrap;letter-spacing:.5px;}
 .btn:hover{border-color:var(--blue);color:var(--text);}
@@ -664,6 +667,9 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .s-dot{width:8px;height:8px;border-radius:50%;background:#4ec9b0;box-shadow:0 0 4px #4ec9b0;flex-shrink:0;}
 .s-dot.a{background:#f5a623;box-shadow:0 0 4px #f5a623;}
 .s-dot.r{background:#e35a4f;box-shadow:0 0 4px #e35a4f;}
+.s-save{opacity:.9;}
+.s-save-error{background:var(--red);color:#fff;font-weight:600;padding:0 8px;opacity:1;}
+.cg-stat-error{color:var(--red)!important;font-weight:600;}
 
 /* ─── Context Menu ─── */
 .ctx{position:fixed;background:#252526;border:1px solid #454545;border-radius:0;padding:2px;z-index:1000;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,.5);display:none;}
@@ -695,7 +701,25 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .modal-select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-sm);padding:6px 8px;border-radius:3px;outline:none;}
 
 /* Toast */
-.toast{position:fixed;bottom:36px;right:14px;background:var(--s2);border:1px solid var(--green);color:var(--green);padding:7px 14px;font-size:var(--fs-xs);border-radius:3px;z-index:2000;transition:opacity .3s;pointer-events:none;}
+.toast{position:fixed;bottom:36px;right:14px;max-width:460px;display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--green);border-left-width:4px;color:var(--text);padding:8px 10px 8px 12px;font-size:var(--fs-sm);border-radius:3px;z-index:2000;transition:opacity .3s;box-shadow:var(--shadow-md);}
+.toast-msg{flex:1;white-space:pre-wrap;word-break:break-word;}
+.toast-success{border-color:var(--green);}
+.toast-info{border-color:var(--blue);}
+.toast-warn{border-color:var(--amber);}
+.toast-error{border-color:var(--red);background:#3a1f1d;}
+.toast-error .toast-msg::before{content:'⚠ ';color:var(--red);font-weight:bold;}
+.toast-action{background:none;border:1px solid var(--blue);color:#4fc1ff;font-size:var(--fs-sm);font-weight:600;padding:3px 10px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+.toast-action:hover{background:var(--blue3);}
+.toast-close{background:none;border:none;color:var(--text2);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;}
+.toast-close:hover{color:var(--text);}
+
+/* ─── Confirm / choice dialog ─── */
+.ui-dialog-bg{z-index:1600;}
+.ui-dialog{max-width:480px;}
+.ui-dialog h2{text-transform:none;font-size:15px;margin-bottom:10px;}
+.ui-dialog-msg{color:var(--text);font-size:var(--fs-md);line-height:1.5;white-space:pre-wrap;margin-bottom:18px;}
+.ui-dialog .btn{font-size:var(--fs-sm);padding:6px 14px;}
+.ui-dialog .btn:focus-visible{outline:2px solid var(--blue);outline-offset:1px;}
 
 /* ─── Export Tables Modal ─── */
 .et-tab{

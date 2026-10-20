@@ -98,6 +98,8 @@ src/web/js/editor/tree-ui.js
 src/web/js/editor/tree.js
 src/web/js/editor/vars-ui.js
 src/web/js/editor/vars.js
+src/web/js/editor/history.js
+src/web/js/editor/ui-feedback.js
 src/web/js/types/project.js
 # Generated icons
 assets/icons/

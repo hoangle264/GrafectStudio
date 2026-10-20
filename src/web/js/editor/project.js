@@ -172,6 +172,7 @@ function openTab(id) {
   renderTree();
   applyView();
   render();
+  historyCommit();
 }
 
 function closeTab(id, e) {
@@ -236,13 +237,16 @@ function showModal(id) { document.getElementById(id).classList.add('show'); setT
 // closeModal â†’ moved to src/js/modules/utils.js
 document.addEventListener('keydown', e=>{ if(e.key==='Enter'&&document.getElementById('modal-rename').classList.contains('show')) confirmRename(); });
 
-function newProject() {
-  if (!confirm('Create new project? Current project will be cleared.')) return;
-  project.diagrams.forEach(d=>deleteDiagramData(d.id));
-  project = { id:'proj-'+Date.now(), name:'New Project', machineName:'Machine', diagrams:[], units:[], devices:[], variables:{imported:[], user:[]}, excelVars:[], unitConfig:{}, ioMapping:{ physicalIOs:[], entries:[] } };
-  openTabs = []; activeDiagramId=null;
-  saveProject();
-  addDiagram(true);
+async function newProject() {
+  if (!(await confirmDialog('New project', 'Create a new project? The current project will be cleared.', 'Create', true))) return;
+  runUndoableProjectChange('New project created', () => {
+    project.diagrams.forEach(d=>deleteDiagramData(d.id));
+    project = { id:'proj-'+Date.now(), name:'New Project', machineName:'Machine', diagrams:[], units:[], devices:[], variables:{imported:[], user:[]}, excelVars:[], unitConfig:{}, ioMapping:{ physicalIOs:[], entries:[] } };
+    openTabs = []; activeDiagramId=null;
+    historyReset();
+    saveProject();
+    addDiagram(true);
+  });
   // Immediately prompt to name the project
   renameMode='project';
   document.getElementById('modal-input').value = 'New Project';

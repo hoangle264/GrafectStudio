@@ -370,7 +370,7 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
 
 function confirmDeviceType(): void {
   const name=((document.getElementById('dev-modal-name') as HTMLInputElement).value||'').trim();
-  if(!name){alert('Please enter a struct data name.');return;}
+  if(!name){notifyError('Please enter a struct data name.');return;}
   const catId=(document.getElementById('dev-modal-cat') as HTMLSelectElement).value;
   const signals=Array.from(document.getElementById('dev-modal-tbody')!.querySelectorAll('tr')).map(tr=>({
     id: String(tr.dataset.sigId || '').trim(),
@@ -386,18 +386,21 @@ function confirmDeviceType(): void {
     categoryId: catId,
     signals
   });
-  if (!result.ok) { alert(result.message || 'Unable to save struct data.'); return; }
+  if (!result.ok) { notifyError(result.message || 'Unable to save struct data.'); return; }
   saveProject(); renderTree();
   closeModal('modal-device-type');
   toast('Struct Data: '+name);
 }
-function removeDeviceType(devId: string, e?: Event): void {
+async function removeDeviceType(devId: string, e?: Event): Promise<void> {
   if(e)e.stopPropagation();
   const d=(project.devices||[]).find(x=>x.id===devId);
-  if(!confirm(`Delete struct data "${d?.name}"?`)) return;
-  const result = treeGetApi().removeDeviceType(treeGetContext(), devId);
-  if (!result.ok) { alert(result.message || 'Unable to delete struct data.'); return; }
-  saveProject(); renderTree();
+  if(!(await confirmDialog('Delete struct data', `Delete struct data "${d?.name}"?`, 'Delete', true))) return;
+  runUndoableProjectChange(`Deleted struct data "${d?.name}"`, () => {
+    const result = treeGetApi().removeDeviceType(treeGetContext(), devId);
+    if (!result.ok) { notifyError(result.message || 'Unable to delete struct data.'); return false; }
+    saveProject(); renderTree();
+    return true;
+  });
 }
 function removeDeviceSignal(devId: string, sigId: string, e?: Event): void {
   if(e)e.stopPropagation();
@@ -444,7 +447,7 @@ function handleStructImport(event: Event): void {
       // Support both wrapped format { struct: {...} } and raw device object
       const incoming = data.struct || data;
       if (!incoming || typeof incoming !== 'object' || !incoming.name) {
-        alert('Invalid struct JSON: missing "name" field.'); return;
+        notifyError('Invalid struct JSON: missing "name" field.'); return;
       }
       if (!project.devices) project.devices = [];
       const existingIdx = project.devices.findIndex(d => d.name === incoming.name);
@@ -462,7 +465,7 @@ function handleStructImport(event: Event): void {
       if (devAfter && typeof openStructTab === 'function') (openStructTab as Function)(devAfter.id);
       toast('Imported struct: ' + incoming.name);
     } catch (err) {
-      alert('Failed to parse JSON: ' + (err as Error).message);
+      notifyError('Failed to parse JSON: ' + (err as Error).message);
     }
   };
   reader.readAsText(file);

@@ -1,3 +1,4 @@
+declare function historyCommit(): void;
 declare function render(): void;
 
 const saveAutoDiagram = (): void => {
@@ -5,8 +6,9 @@ const saveAutoDiagram = (): void => {
 };
 
 const afterChange = (): void => {
+  historyCommit();
   render();
-  markModified(activeDiagramId!, true);
+  // Changes are auto-saved; the status bar shows save state, so tabs no longer get a "modified" dot.
   saveAutoDiagram();
 };
 

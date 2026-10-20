@@ -280,13 +280,14 @@ function eiDoImport(): void {
 }
 
 // ── Xoá toàn bộ dữ liệu đã import ────────────────────────────────────────
-function eiClearExcelVars(): void {
-  if (!confirm('Xoá toàn bộ dữ liệu Excel đã import?\nHành động này không thể hoàn tác.')) return;
-  project.excelVars = [];
-  project.unitConfig = {};
-  if (typeof saveProject === 'function') saveProject();
-  if (typeof toast === 'function') toast('✓ Đã xoá dữ liệu Excel import');
-  if (typeof renderVarTable === 'function') renderVarTable();
-  closeModal('modal-excel-import');
-  showExcelImportModal();
+async function eiClearExcelVars(): Promise<void> {
+  if (!(await confirmDialog('Xóa dữ liệu Excel', 'Xóa toàn bộ dữ liệu Excel đã import?', 'Xóa', true))) return;
+  runUndoableProjectChange('Đã xóa dữ liệu Excel import', () => {
+    project.excelVars = [];
+    project.unitConfig = {};
+    if (typeof saveProject === 'function') saveProject();
+    if (typeof renderVarTable === 'function') renderVarTable();
+    closeModal('modal-excel-import');
+    showExcelImportModal();
+  });
 }

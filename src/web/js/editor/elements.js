@@ -177,7 +177,11 @@ function setPropCoord(coord, val) {
   const p=state.parallels.find(x=>x.id===id);
   if(p){p[coord]=v;afterChange();}
 }
-function delSelected(){[...selIds].forEach(id=>{deleteEl(id);});selIds.clear();updateProps();}
+function delSelected(){const n=selIds.size;[...selIds].forEach(id=>{deleteEl(id);});selIds.clear();updateProps();notifyDeleted(n);}
+// Toast with a one-click Undo after a canvas delete
+function notifyDeleted(n){
+  if(n>0) toast(`Deleted ${n} element${n>1?'s':''}`,{kind:'info',action:{label:'Undo',run:historyUndo}});
+}
 function deleteEl(id){
   state.steps=state.steps.filter(s=>s.id!==id);
   state.transitions=state.transitions.filter(t=>t.id!==id);
