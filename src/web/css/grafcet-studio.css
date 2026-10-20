@@ -216,7 +216,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-program-icon{width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;border:1px solid;border-radius:2px;font-size:var(--fs-xs)!important;font-family:var(--font-mono);font-weight:700;opacity:1;}
 .tree-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
 .tree-item.active .tree-item-name{color:#ffffff;}
-.tree-item-actions{display:flex;gap:2px;opacity:0;transition:.1s;}
+.tree-item-actions{display:flex;gap:2px;opacity:.6;transition:.1s;}
 .tree-item:hover .tree-item-actions{opacity:1;}
 .tree-item-btn{width:16px;height:16px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:var(--fs-xs);padding:0;border-radius:2px;display:flex;align-items:center;justify-content:center;}
 .tree-item-btn:hover{color:var(--blue);background:rgba(0,122,204,.15);}
@@ -232,7 +232,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 /* Machine / Unit tree styles */
 .tree-machine{padding:4px 10px;font-size:var(--fs-xs);letter-spacing:.8px;color:var(--amber);font-family:var(--font-ui);display:flex;align-items:center;gap:7px;font-weight:600;text-transform:uppercase;}
 .tree-machine-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.tree-machine-edit{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-xs);padding:0;opacity:0;}
+.tree-machine-edit{background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-xs);padding:0;opacity:.6;}
 .tree-machine:hover .tree-machine-edit{opacity:1;}
 .tree-machine-edit:hover{color:var(--amber);}
 
@@ -265,7 +265,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-unit-toggle.closed{transform:none;}
 .tree-unit-icon{display:none;}
 .tree-unit-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
-.tree-unit-actions{display:flex;gap:2px;opacity:0;transition:.1s;}
+.tree-unit-actions{display:flex;gap:2px;opacity:.6;transition:.1s;}
 .tree-unit-head:hover .tree-unit-actions{opacity:1;}
 .tree-unit-btn{width:18px;height:18px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:var(--fs-xs);padding:0;border-radius:2px;display:flex;align-items:center;justify-content:center;}
 .tree-unit-btn:hover{color:var(--blue);background:rgba(0,122,204,.15);}
@@ -284,7 +284,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-mode-head:hover{background:var(--ide-hover);color:var(--text2);}
 .tree-mode-icon{font-size:var(--fs-xs);}
 .tree-mode-name{flex:1;}
-.tree-mode-add{opacity:0;background:none;border:1px solid var(--border);color:var(--text2);cursor:pointer;border-radius:2px;font-size:var(--fs-xs);padding:2px 6px;transition:.15s;}
+.tree-mode-add{opacity:.6;background:none;border:1px solid var(--border);color:var(--text2);cursor:pointer;border-radius:2px;font-size:var(--fs-xs);padding:2px 6px;transition:.15s;}
 .tree-mode-head:hover .tree-mode-add{opacity:1;}
 .tree-mode-add:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,122,204,.1);}
 .tree-mode-children{}
@@ -302,7 +302,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
 .tree-item.active .tree-item-name{color:#ffffff;}
 .tree-item-type-badge{font-size:var(--fs-xs);padding:1px 4px;border-radius:2px;border:1px solid;flex-shrink:0;font-family:var(--font-ui);letter-spacing:.3px;}
-.tree-item-actions{display:flex;gap:2px;opacity:0;transition:.1s;}
+.tree-item-actions{display:flex;gap:2px;opacity:.6;transition:.1s;}
 .tree-item:hover .tree-item-actions{opacity:1;}
 .tree-item-btn{width:16px;height:16px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:var(--fs-xs);padding:0;border-radius:2px;display:flex;align-items:center;justify-content:center;}
 .tree-item-btn:hover{color:var(--blue);background:rgba(0,122,204,.15);}
@@ -323,7 +323,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .tree-dev-title{flex:1;font-size:var(--fs-sm);letter-spacing:0;font-weight:500;color:var(--text);}
 .tree-dev-count{font-size:var(--fs-xs);color:var(--text3);margin-right:4px;}
 .dev-class-badge{font-size:var(--fs-xs);padding:1px 5px;background:rgba(79,163,227,.1);border:1px solid #1a3a5c;color:var(--blue);border-radius:2px;font-family:var(--font-display);}
-.tree-dev-add-btn{font-size:var(--fs-xs);padding:1px 6px;background:none;border:1px solid transparent;color:var(--text3);border-radius:2px;cursor:pointer;font-family:var(--font-ui);transition:.1s;opacity:0;}
+.tree-dev-add-btn{font-size:var(--fs-xs);padding:1px 6px;background:none;border:1px solid transparent;color:var(--text3);border-radius:2px;cursor:pointer;font-family:var(--font-ui);transition:.1s;opacity:.6;}
 .tree-devices-head:hover .tree-dev-add-btn,.tree-section-head:hover .tree-mode-add{opacity:1;}
 .tree-dev-add-btn:hover{color:var(--purple);background:rgba(167,139,250,.12);}
 .tree-dev-toggle{width:12px;height:12px;color:var(--text3);flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;}
@@ -374,7 +374,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);display:f
 .vt-input{color:#39d353;background:rgba(57,211,83,.08);}
 .vt-output{color:#f5a623;background:rgba(245,166,35,.08);}
 .vt-var{color:#a78bfa;background:rgba(167,139,250,.08);}
-.tree-dev-sig-del{opacity:0;width:14px;height:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-xs);padding:0;border-radius:2px;flex-shrink:0;margin-left:auto;display:flex;align-items:center;justify-content:center;}
+.tree-dev-sig-del{opacity:.6;width:14px;height:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-xs);padding:0;border-radius:2px;flex-shrink:0;margin-left:auto;display:flex;align-items:center;justify-content:center;}
 .tree-dev-sig-row:hover .tree-dev-sig-del{opacity:1;}
 .tree-dev-sig-del:hover{color:var(--red);}
 
@@ -1060,7 +1060,7 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .dev-sig-select.is-plain{color:var(--text);}
 .dev-sig-input.is-addr{color:var(--amber);}
 .dev-sig-input.is-comment{color:var(--text2);}
-.tree-dev-type-acts{opacity:0;}
+.tree-dev-type-acts{opacity:.6;}
 .tree-dev-type-head:hover .tree-dev-type-acts{opacity:1;}
 
 /* ── Excel import dialog (ei-*) ────────────────────────────── */
