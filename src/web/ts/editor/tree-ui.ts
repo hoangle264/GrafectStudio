@@ -63,7 +63,7 @@ function renderTabs(): void {
     const tab = document.createElement('div');
     tab.className = 'tab' + (t.id===activeDiagramId?' active':'');
     tab.dataset.id = t.id;
-    tab.innerHTML = `<span class="tab-name">${diag.name}</span>${diag.mode?`<span style="font-size:8px;color:var(--text3);margin-left:2px;">[${diag.mode}]</span>`:''}<button class="tab-close" onclick="closeTab('${t.id}',event)">x</button>`;
+    tab.innerHTML = `<span class="tab-name">${diag.name}</span>${diag.mode?`<span class="tab-mode">[${diag.mode}]</span>`:''}<button class="tab-close" onclick="closeTab('${t.id}',event)">x</button>`;
     tab.addEventListener('click', e=>{ if(!(e.target as HTMLElement).classList.contains('tab-close')) openTab(t.id); });
     tab.addEventListener('dblclick', e=>{ if(!(e.target as HTMLElement).classList.contains('tab-close')) renameCurrentDiagram(t.id); });
     bar.appendChild(tab);
@@ -196,7 +196,7 @@ function renderTree(): void {
   const orphans = project.diagrams.filter(d=>!d.unitId && d.mode!=='Drivers');
   if(orphans.length){
     const orphanHead = document.createElement('div');
-    orphanHead.style.cssText='padding:4px 8px;font-size:8px;color:var(--text3);letter-spacing:1px;border-top:1px solid var(--border);';
+    orphanHead.className='tree-orphan-head';
     orphanHead.textContent='- UNASSIGNED';
     body.appendChild(orphanHead);
     orphans.forEach(d=>body.appendChild(makeDiagItem(d)));
@@ -232,7 +232,7 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
   // New tree keeps programs directly under the unit; mode stays in Properties.
   if(!diagsInUnit.length){
     const empty = document.createElement('div');
-    empty.style.cssText='padding:3px 8px 3px 34px;font-size:9px;color:var(--text3);font-style:italic;';
+    empty.className='tree-empty-note indent';
     empty.textContent='no programs';
     children.appendChild(empty);
   } else {
@@ -253,8 +253,8 @@ function makeDriversSection(): HTMLElement {
   head.className = 'tree-drivers-head mode-drivers';
   head.innerHTML = `
     <span class="tree-unit-toggle ${isOpen?'open':'closed'}">v</span>
-    <span style="margin:0 4px;font-size:11px;">*</span>
-    <span style="flex:1;font-size:9px;letter-spacing:1px;">ActiveDevices</span>
+    <span class="tree-drivers-icon">*</span>
+    <span class="tree-drivers-name">ActiveDevices</span>
     <button class="tree-mode-add" onclick="addDriverDiagram();event.stopPropagation()" title="Add active device diagram">+</button>`;
   head.addEventListener('click', ()=>{
     const c=wrap.querySelector<HTMLElement>('.tree-drivers-body');
@@ -263,17 +263,15 @@ function makeDriversSection(): HTMLElement {
   });
 
   const body2 = document.createElement('div');
-  body2.className = 'tree-mode-children' + (isOpen?'':' hidden');
-  body2.style.cssText='border-left:2px solid rgba(167,139,250,.3);margin-left:12px;';
   if(!driverDiags.length){
     const empty=document.createElement('div');
-    empty.style.cssText='padding:3px 8px;font-size:9px;color:var(--text3);font-style:italic;';
+    empty.className='tree-empty-note';
     empty.textContent='no driver diagrams';
     body2.appendChild(empty);
   } else {
     driverDiags.forEach(d=>body2.appendChild(makeDiagItem(d)));
   }
-  body2.className = 'tree-drivers-body' + (isOpen?'':' hidden');
+  body2.className = 'tree-drivers-body tree-drivers-list' + (isOpen?'':' hidden');
 
   wrap.appendChild(head); wrap.appendChild(body2);
   return wrap;

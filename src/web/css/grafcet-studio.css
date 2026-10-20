@@ -1186,3 +1186,12 @@ textarea.prop-input{resize:vertical;min-height:70px;}
 .pb-cell-type{color:var(--text3);}
 .pb-cell-mode{font-size:var(--fs-xs);color:var(--text3);}
 .pb-cell-mode.on{color:var(--cyan);}
+
+/* ── Project tree misc (tree-*) ────────────────────────────── */
+.tab-mode{font-size:var(--fs-xs);color:var(--text3);margin-left:2px;}
+.tree-orphan-head{padding:4px 8px;font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;border-top:1px solid var(--border);}
+.tree-empty-note{padding:3px 8px;font-size:var(--fs-xs);color:var(--text3);font-style:italic;}
+.tree-empty-note.indent{padding-left:34px;}
+.tree-drivers-icon{margin:0 4px;font-size:var(--fs-xs);}
+.tree-drivers-name{flex:1;font-size:var(--fs-xs);letter-spacing:1px;}
+.tree-drivers-list{border-left:2px solid rgba(167,139,250,.3);margin-left:12px;}
