@@ -75,7 +75,108 @@ function aiChatGetBody(): HTMLElement | null {
   return document.getElementById('ai-chat-body');
 }
 
+const AI_CHAT_FLOAT_KEY = 'grafcet.aiChat.float';
+const AI_CHAT_DOCK_PARENT_ID = 'right-panel-content';
+
+interface AiChatFloatRect { left: number; top: number; width: number; height: number; }
+
+function aiChatIsFloating(): boolean {
+  const panel = document.getElementById('ai-chat-panel');
+  return !!panel && panel.classList.contains('ai-floating');
+}
+
+function aiChatLoadFloatRect(): AiChatFloatRect {
+  const fallback: AiChatFloatRect = { left: Math.max(20, window.innerWidth - 640), top: 90, width: 360, height: 480 };
+  try {
+    const raw = localStorage.getItem(AI_CHAT_FLOAT_KEY);
+    if (raw) return Object.assign(fallback, JSON.parse(raw));
+  } catch (_) { /* storage unavailable */ }
+  return fallback;
+}
+
+function aiChatSaveFloatRect(panel: HTMLElement): void {
+  try {
+    localStorage.setItem(AI_CHAT_FLOAT_KEY, JSON.stringify({
+      left: panel.offsetLeft, top: panel.offsetTop, width: panel.offsetWidth, height: panel.offsetHeight
+    }));
+  } catch (_) { /* storage unavailable */ }
+}
+
+function aiChatClampFloat(panel: HTMLElement): void {
+  const maxLeft = Math.max(0, window.innerWidth - Math.min(panel.offsetWidth, 120));
+  const maxTop = Math.max(0, window.innerHeight - 40);
+  panel.style.left = Math.min(Math.max(0, panel.offsetLeft), maxLeft) + 'px';
+  panel.style.top = Math.min(Math.max(0, panel.offsetTop), maxTop) + 'px';
+}
+
+function aiChatInitFloatDrag(panel: HTMLElement): void {
+  const head = panel.querySelector('.ai-chat-head') as HTMLElement | null;
+  if (!head || head.dataset.dragBound) return;
+  head.dataset.dragBound = '1';
+  head.addEventListener('pointerdown', function(ev: PointerEvent) {
+    if (!aiChatIsFloating() || (ev.target as HTMLElement).closest('button')) return;
+    const startX = ev.clientX - panel.offsetLeft;
+    const startY = ev.clientY - panel.offsetTop;
+    head.setPointerCapture(ev.pointerId);
+    const onMove = function(e: PointerEvent) {
+      panel.style.left = (e.clientX - startX) + 'px';
+      panel.style.top = (e.clientY - startY) + 'px';
+      aiChatClampFloat(panel);
+    };
+    const onUp = function() {
+      head.removeEventListener('pointermove', onMove);
+      head.removeEventListener('pointerup', onUp);
+      head.removeEventListener('pointercancel', onUp);
+      aiChatSaveFloatRect(panel);
+    };
+    head.addEventListener('pointermove', onMove);
+    head.addEventListener('pointerup', onUp);
+    head.addEventListener('pointercancel', onUp);
+  });
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(function() { if (aiChatIsFloating()) aiChatSaveFloatRect(panel); }).observe(panel);
+  }
+  window.addEventListener('resize', function() { if (aiChatIsFloating()) aiChatClampFloat(panel); });
+}
+
+function setAiChatFloating(floating: boolean): void {
+  const panel = document.getElementById('ai-chat-panel');
+  const dock = document.getElementById(AI_CHAT_DOCK_PARENT_ID);
+  const btn = document.getElementById('ai-chat-float-btn');
+  if (!panel || !dock || aiChatIsFloating() === floating) return;
+  if (floating) {
+    const rect = aiChatLoadFloatRect();
+    document.body.appendChild(panel);
+    panel.classList.add('ai-floating', 'show');
+    panel.style.left = rect.left + 'px';
+    panel.style.top = rect.top + 'px';
+    panel.style.width = rect.width + 'px';
+    panel.style.height = rect.height + 'px';
+    aiChatClampFloat(panel);
+    aiChatInitFloatDrag(panel);
+    setRightPanelTab('props');
+  } else {
+    panel.classList.remove('ai-floating');
+    ['left', 'top', 'width', 'height'].forEach(function(k) { panel.style.removeProperty(k); });
+    dock.appendChild(panel);
+    setRightPanelTab('ai');
+  }
+  if (btn) {
+    btn.title = floating ? 'Dock to panel' : 'Pop out';
+    btn.innerHTML = floating ? '&#10514;' : '&#10138;';
+  }
+}
+
+function toggleAiChatFloating(): void {
+  setAiChatFloating(!aiChatIsFloating());
+}
+
 function setRightPanelTab(tab: string): void {
+  if (tab === 'ai' && aiChatIsFloating()) {
+    const floatPanel = document.getElementById('ai-chat-panel');
+    if (floatPanel) floatPanel.classList.add('show');
+    return;
+  }
   const mode = tab === 'ai' ? 'ai' : 'props';
   const panel = document.getElementById('right-panel');
   const title = document.getElementById('rpanel-head-title');
@@ -99,6 +200,7 @@ function setRightPanelTab(tab: string): void {
 function toggleAiChatPanel(show?: boolean): void {
   const panel = document.getElementById('ai-chat-panel');
   if (!panel) return;
+  if (show === false && aiChatIsFloating()) setAiChatFloating(false);
   panel.classList.toggle('show', show !== false);
   setRightPanelTab(show === false ? 'props' : 'ai');
   if (show !== false && !AI_CHAT_STATE.messages.length) {

@@ -199,10 +199,10 @@
                 <button class="rpanel-strip-btn" onclick="toggleRPanel()" title="Open properties">&#9664;</button>
                 <div class="rpanel-strip-label">PROPERTIES</div>
             </div>
-            <div class="rpanel-content">
+            <div class="rpanel-content" id="right-panel-content">
                 <div class="rpanel-head">
                     <span class="rpanel-head-title" id="rpanel-head-title">PROPERTIES</span>
-                    <button class="pin-btn" id="pin-rpanel" onclick="toggleRPanel()" title="Pin / Collapse">&#128204;</button>
+                    <button class="pin-btn" id="pin-rpanel" onclick="toggleRPanel()" title="Pin / Collapse"></button>
                 </div>
                 <div class="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
                     <button class="right-panel-tab active" id="right-tab-props" onclick="setRightPanelTab('props')" role="tab" aria-selected="true">Properties</button>
@@ -416,6 +416,7 @@
                 <section class="ai-chat-panel" id="ai-chat-panel" aria-label="AI proposal preview">
                     <div class="ai-chat-head">
                         <span class="ai-chat-title">AI PREVIEW</span>
+                        <button class="pin-btn" id="ai-chat-float-btn" onclick="toggleAiChatFloating()" title="Pop out">&#10138;</button>
                         <button class="pin-btn" onclick="toggleAiChatPanel(false)" title="Back to Properties">&#10005;</button>
                     </div>
                     <div class="ai-chat-body" id="ai-chat-body"></div>

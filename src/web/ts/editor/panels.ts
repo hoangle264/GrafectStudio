@@ -23,6 +23,7 @@ interface PanelState {
 }
 
 const PANEL_KEY = 'gf2-panels';
+const PIN_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
 const panelState: PanelState = { sidebar: true, rpanel: true, proj: true, tools: true };
 
 function loadPanelState(): void {
@@ -49,7 +50,7 @@ function applyPanelState(): void {
     if (sp) sp.classList.toggle('sub-closed', !panelState[id]);
     if (pb) {
       pb.classList.toggle('pinned', panelState[id]);
-      pb.textContent = panelState[id] ? '📌' : '📍';
+      pb.innerHTML = PIN_ICON_SVG;
       pb.title = panelState[id] ? 'Collapse section' : 'Expand section';
     }
   });
@@ -60,7 +61,7 @@ function applyPanelState(): void {
   rp?.classList.toggle('panel-closed', !panelState.rpanel);
   if (rpb) {
     rpb.classList.toggle('pinned', panelState.rpanel);
-    rpb.textContent = panelState.rpanel ? '📌' : '📍';
+    rpb.innerHTML = PIN_ICON_SVG;
     rpb.title = panelState.rpanel ? 'Collapse' : 'Expand';
   }
   drawGrid();
