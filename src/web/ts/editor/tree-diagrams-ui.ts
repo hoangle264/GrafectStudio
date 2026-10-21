@@ -166,13 +166,13 @@ function openDiagPropsPanel(id: string): void {
 
   // Show panel, hide element props
   document.getElementById('dp-panel')!.classList.add('show');
-  (document.getElementById('props-area') as HTMLElement).style.display='none';
+  document.getElementById('right-panel')?.classList.add('dp-open');
 }
 
 function closeDiagPropsPanel(): void {
   diagPropsId = null;
   document.getElementById('dp-panel')!.classList.remove('show');
-  (document.getElementById('props-area') as HTMLElement).style.display='block';
+  document.getElementById('right-panel')?.classList.remove('dp-open');
 }
 
 function dpSetMode(mode: string): void {

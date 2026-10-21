@@ -132,6 +132,7 @@ function selectEl(id, type, e) {
   // Close diagram props panel if open
   if(diagPropsId) closeDiagPropsPanel();
   render(); updateProps();
+  revealPropsForSelection(selIds.size>0);
 }
 function updateProps() {
   const ids=[...selIds];

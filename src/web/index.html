@@ -27,6 +27,12 @@
                     <button id="menu-redo" onclick="historyRedo()">Redo<span class="menu-kbd">Ctrl+Y</span></button>
                 </div>
             </div>
+            <div class="menu"> <button class="menu-btn">View</button>
+                <div class="menu-pop">
+                    <button id="menu-toggle-sidebar" class="menu-check" onclick="toggleSidebar()">Project Panel<span class="menu-kbd">Ctrl+B</span></button>
+                    <button id="menu-toggle-rpanel" class="menu-check" onclick="toggleRPanel()">Properties Panel<span class="menu-kbd">Ctrl+Alt+B</span></button>
+                </div>
+            </div>
             <div class="menu"> <button class="menu-btn">Project</button>
                 <div class="menu-pop"> 
                     <button onclick="renameProject()">Configure</button> 
@@ -52,12 +58,7 @@
         </nav>
     </header>
     <main class="app"> <!-- Left Sidebar -->
-        <aside class="sidebar" id="sidebar" aria-label="Project and tools panels"> <!-- Collapsed strip -->
-            <div class="sidebar-strip"> 
-                <button class="sidebar-strip-btn" onclick="toggleSidebar()" title="Open sidebar">▶</button> 
-                <button class="sidebar-strip-btn icon-compact" onclick="toggleSidebar()" title="Project">📁</button>
-                <div class="sidebar-strip-label">PANELS</div>
-            </div>
+        <aside class="sidebar" id="sidebar" aria-label="Project and tools panels"> 
             <div class="sidebar-content"> <!-- PROJECT Panel-->
                 <div class="sidebar-panel active" id="sidebar-panel-proj"> <!-- Panel header -->
                     <div class="sub-panel-head"> 
@@ -69,7 +70,7 @@
                     </div>
                 </div>
             </div><!-- /sidebar-content --> 
-                <button class="sidebar-strip-btn sidebar-toggle-floating" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">◀</button>
+            <div class="panel-resizer" id="sidebar-resizer" title="Drag to resize (double-click to reset)"></div>
         </aside><!-- /sidebar --> <!-- Main Area -->
         <section class="main-area" aria-label="Diagram workspace"> <!-- Tabs -->
             <div class="tabs-bar" id="tabs-bar"> 
@@ -197,11 +198,7 @@
             </section>
         </section> <!-- Right Panel -->
         <aside class="right-panel right-panel-tab-props" id="right-panel" aria-label="Properties and AI panel">
-            <!-- Collapsed strip -->
-            <div class="rpanel-strip">
-                <button class="rpanel-strip-btn" onclick="toggleRPanel()" title="Open properties">&#9664;</button>
-                <div class="rpanel-strip-label">PROPERTIES</div>
-            </div>
+            <div class="panel-resizer" id="rpanel-resizer" title="Drag to resize (double-click to reset)"></div>
             <div class="rpanel-content" id="right-panel-content">
                 <div class="rpanel-head">
                     <span class="rpanel-head-title" id="rpanel-head-title">PROPERTIES</span>
