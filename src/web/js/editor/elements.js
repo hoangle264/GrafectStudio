@@ -35,6 +35,87 @@ function addConn(from,fromPort,to,toPort){
   state.connections.push({id:'C'+(nextId++),from,fromPort:fromPort||'bottom',to,toPort:toPort||'top'});
   afterChange(); return true;
 }
+// ═══════════════════════════════════════════════════════════
+//  QUICK ADD — append Transition+Step below a step, or build a
+//  straight (non-branching) flow of N steps in one undo entry.
+// ═══════════════════════════════════════════════════════════
+const QA_GAP = 40; // vertical gap between chained elements
+function _qaPushStep(cx,top,init){
+  const id='S'+(nextId++);
+  state.steps.push({id,x:snap(cx-SW/2),y:snap(top),number:Math.max(1, nextStepNum++),label:'',actions:[],initial:!!init,kind:'normal',macroFlowId:null});
+  return state.steps[state.steps.length-1];
+}
+function _qaPushTrans(cx,top){
+  const id='T'+(nextId++);
+  // x is not grid-snapped: TW isn't a multiple of GRID, snapping would shift it off the step's centre line.
+  state.transitions.push({id,x:cx-TW/2,y:snap(top),condition:'',label:''});
+  return state.transitions[state.transitions.length-1];
+}
+function _qaPushConn(from,to){
+  state.connections.push({id:'C'+(nextId++),from,fromPort:'bottom',to,toPort:'top'});
+}
+function _qaHasOutgoing(id){
+  return state.connections.some(c=>c.from===id&&(c.fromPort||'bottom')==='bottom');
+}
+// Selected step → add Transition + Step below; selected transition → add Step below.
+function quickAppend(srcId){
+  srcId = srcId || (selIds.size===1 ? [...selIds][0] : null);
+  const type = srcId && getElType(srcId);
+  if(type!=='step' && type!=='transition'){ toast('⚠ Select one step or transition to quick-add after'); return null; }
+  if(_qaHasOutgoing(srcId)){ toast('⚠ Element already has an outgoing connection'); return null; }
+  let newStep;
+  if(type==='step'){
+    const s=state.steps.find(x=>x.id===srcId);
+    const cx=s.x+SW/2;
+    const t=_qaPushTrans(cx, s.y+SH+QA_GAP);
+    newStep=_qaPushStep(cx, t.y+TH+QA_GAP, false);
+    _qaPushConn(s.id,t.id); _qaPushConn(t.id,newStep.id);
+  } else {
+    const t=state.transitions.find(x=>x.id===srcId);
+    const cx=t.x+TW/2;
+    newStep=_qaPushStep(cx, t.y+TH+QA_GAP, false);
+    _qaPushConn(t.id,newStep.id);
+  }
+  // Select the new step so repeated quick-adds keep chaining downward.
+  selIds.clear(); selIds.add(newStep.id);
+  afterChange(); updateProps();
+  return newStep.id;
+}
+// Build a straight flow: N steps joined by N-1 transitions, placed below existing content.
+function addLinearFlow(count){
+  count=Math.floor(Number(count));
+  if(!(count>=1&&count<=200)){ toast('⚠ Step count must be between 1 and 200'); return; }
+  const bottoms=[...state.steps.map(s=>s.y+SH),...state.transitions.map(t=>t.y+TH),...state.parallels.map(p=>p.y+PH*2)];
+  const lefts=[...state.steps.map(s=>s.x),...state.transitions.map(t=>t.x),...state.parallels.map(p=>p.x)];
+  const top=bottoms.length ? Math.max(...bottoms)+QA_GAP*2 : 60;
+  const cx=(lefts.length ? Math.min(...lefts) : 100)+SW/2;
+  const hasInit=state.steps.some(s=>s.initial);
+  const created=[];
+  let prev=_qaPushStep(cx, top, !hasInit);
+  created.push(prev.id);
+  for(let i=1;i<count;i++){
+    const t=_qaPushTrans(prev.x+SW/2, prev.y+SH+QA_GAP);
+    const s=_qaPushStep(prev.x+SW/2, t.y+TH+QA_GAP, false);
+    _qaPushConn(prev.id,t.id); _qaPushConn(t.id,s.id);
+    created.push(t.id,s.id);
+    prev=s;
+  }
+  selIds.clear(); created.forEach(id=>selIds.add(id));
+  afterChange(); updateProps(); fitView();
+  toast(`✓ Added flow with ${count} step${count>1?'s':''}`);
+}
+function openLinearFlowModal(){
+  const inp=document.getElementById('modal-flow-count');
+  inp.value=inp.value||'5';
+  document.getElementById('modal-linear-flow').classList.add('show');
+  setTimeout(()=>{inp.focus();inp.select();},0);
+}
+function confirmLinearFlow(){
+  const n=document.getElementById('modal-flow-count').value;
+  closeModal('modal-linear-flow');
+  addLinearFlow(n);
+}
+
 function getElType(id){
   if(state.steps.find(s=>s.id===id)) return 'step';
   if(state.transitions.find(t=>t.id===id)) return 'transition';

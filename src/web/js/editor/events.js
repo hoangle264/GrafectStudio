@@ -601,6 +601,7 @@ const onKey = (e) => {
 
   if (keyToolMap[key] && !mod && !e.altKey) setTool(keyToolMap[key]);
   if (key === 'f' && !mod) fitView();
+  if (key === 'n' && !mod && !e.altKey) quickAppend();
   if (e.key === '+' || e.key === '=') zoomIn();
   if (e.key === '-') zoomOut();
   if (e.key === 'Escape') resetCanvasInteraction();

@@ -290,6 +290,7 @@ function buildTransEl(t) {
 
   g.addEventListener('mousedown',e=>elDown(e,t.id,'transition'));
   g.addEventListener('click',e=>{e.stopPropagation();selectEl(t.id,'transition',e);});
+  g.addEventListener('contextmenu', e => showTransitionContextMenu(e, t));
   return g;
 }
 
