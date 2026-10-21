@@ -51,6 +51,12 @@
     }
 
     items.push({
+      icon: '⤓',
+      label: 'Add Transition + Step below (N)',
+      action: () => quickAppend(step.id)
+    });
+
+    items.push({
       icon: '✏',
       label: 'Properties',
       action: () => {
@@ -77,6 +83,11 @@
   // ── Build menu items for a transition ──
   function _buildTransitionItems(transition) {
     return [
+      {
+        icon: '⤓',
+        label: 'Add Step below (N)',
+        action: () => quickAppend(transition.id)
+      },
       {
         icon: '✏',
         label: 'Properties',
