@@ -44,19 +44,22 @@ public static class TemplateLoader
         return result;
     }
 
+    // Alias lists are in priority order: the first file that exists wins and the rest are ignored.
+    internal static readonly (string[] Filenames, string Id, bool IsPartial)[] StandardMappings =
+    {
+        (new[] { "unitError.hbs", "unit-error.hbs", "error.hbs" }, "uc.unitError", false),
+        (new[] { "unitManual.hbs", "unit-manual.hbs", "manual.hbs" }, "uc.unitManual", false),
+        (new[] { "unitAuto.hbs", "unit-auto.hbs", "auto.hbs" }, "uc.unitAuto", false),
+        (new[] { "unitOrigin.hbs", "unit-origin.hbs", "origin.hbs" }, "uc.unitOrigin", false),
+        (new[] { "unitMainOutput.hbs", "unit-main-output.hbs", "main-output.hbs" }, "uc.unitMainOutput", false),
+        (new[] { "output.hbs" }, "uc.outputLegacy", false),
+        (new[] { "step-body.hbs" }, "uc.stepBody", true),
+        (new[] { "MapIO.hbs" }, "uc.mapIo", false)
+    };
+
     private static void LoadStandardTemplates(string rootPath, TemplateLoadResult result)
     {
-        var mapping = new[]
-        {
-            (Filenames: new[] { "unitError.hbs", "unit-error.hbs", "error.hbs" }, Id: "uc.unitError", IsPartial: false),
-            (Filenames: new[] { "unitManual.hbs", "unit-manual.hbs", "manual.hbs" }, Id: "uc.unitManual", IsPartial: false),
-            (Filenames: new[] { "unitAuto.hbs", "unit-auto.hbs", "auto.hbs" }, Id: "uc.unitAuto", IsPartial: false),
-            (Filenames: new[] { "unitOrigin.hbs", "unit-origin.hbs", "origin.hbs" }, Id: "uc.unitOrigin", IsPartial: false),
-            (Filenames: new[] { "unitMainOutput.hbs", "unit-main-output.hbs", "main-output.hbs" }, Id: "uc.unitMainOutput", IsPartial: false),
-            (Filenames: new[] { "output.hbs" }, Id: "uc.outputLegacy", IsPartial: false),
-            (Filenames: new[] { "step-body.hbs" }, Id: "uc.stepBody", IsPartial: true),
-            (Filenames: new[] { "MapIO.hbs" }, Id: "uc.mapIo", IsPartial: false)
-        };
+        var mapping = StandardMappings;
 
         foreach (var item in mapping)
         {
@@ -81,7 +84,7 @@ public static class TemplateLoader
         }
     }
 
-    private static string GetProfileName(string templateRootPath)
+    internal static string GetProfileName(string templateRootPath)
     {
         try
         {

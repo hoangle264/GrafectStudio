@@ -1,10 +1,11 @@
 namespace GrafcetStudioTemplateEditor {
   type TemplateDiagnosticSeverity = 'error' | 'warning' | 'info';
-  type Preset = { id: string; label: string; path: string };
+  type Preset = { id: string; label: string; path: string; platform?: string; group?: string; description?: string; active?: boolean; note?: string };
+  type CatalogEntry = { path: string; platform: string; group: string; description: string; active: boolean; note: string };
   type Suggestion = { label: string; insert: string; cursorToken?: string };
   type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
-  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string };
-  type PendingRead = { resolve: (content: string) => void; reject: (error: Error) => void };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[] };
+  type PendingRead = { resolve: (payload: TemplateFilePayload) => void; reject: (error: Error) => void };
   type TemplateEditorApi = {
     open(templateId?: string): Promise<void>;
     close(): void;
@@ -13,38 +14,14 @@ namespace GrafcetStudioTemplateEditor {
   };
 
 
-  const PRESETS: Preset[] = [
-    { id: 'unitMainOutput', label: 'unitMainOutput.hbs', path: 'unitMainOutput.hbs' },
-    { id: 'unit-main-output', label: 'unit-main-output.hbs', path: 'unit-main-output.hbs' },
-    { id: 'step-body', label: 'step-body.hbs', path: 'step-body.hbs' },
-    { id: 'step-body-1', label: 'step-body-1.hbs', path: 'step-body-1.hbs' },
-    { id: 'unitError', label: 'unitError.hbs', path: 'unitError.hbs' },
-    { id: 'unit-error', label: 'unit-error.hbs', path: 'unit-error.hbs' },
-    { id: 'unitManual', label: 'unitManual.hbs', path: 'unitManual.hbs' },
-    { id: 'unit-manual', label: 'unit-manual.hbs', path: 'unit-manual.hbs' },
-    { id: 'unitAuto', label: 'unitAuto.hbs', path: 'unitAuto.hbs' },
-    { id: 'unit-auto', label: 'unit-auto.hbs', path: 'unit-auto.hbs' },
-    { id: 'unitOrigin', label: 'unitOrigin.hbs', path: 'unitOrigin.hbs' },
-    { id: 'unit-origin', label: 'unit-origin.hbs', path: 'unit-origin.hbs' },
-    { id: 'output', label: 'output.hbs', path: 'output.hbs' },
-    { id: 'simple-UnitCode', label: 'simple/UnitCode.hbs', path: 'simple/UnitCode.hbs' },
-    { id: 'simple-DeviceManager', label: 'simple/DeviceManager.hbs', path: 'simple/DeviceManager.hbs' },
-    { id: 'simple-SystemControl', label: 'simple/SystemControl.hbs', path: 'simple/SystemControl.hbs' },
-    { id: 'simple-MapIO', label: 'simple/MapIO.hbs', path: 'simple/MapIO.hbs' },
-    { id: 'simple-Error', label: 'simple/Error.hbs', path: 'simple/Error.hbs' },
-    { id: 'packml-UnitCode', label: 'packml/UnitCode.hbs', path: 'packml/UnitCode.hbs' },
-    { id: 'packml-DeviceManager', label: 'packml/DeviceManager.hbs', path: 'packml/DeviceManager.hbs' },
-    { id: 'packml-SystemControl', label: 'packml/SystemControl.hbs', path: 'packml/SystemControl.hbs' },
-    { id: 'packml-MapIO', label: 'packml/MapIO.hbs', path: 'packml/MapIO.hbs' },
-    { id: 'packml-Error', label: 'packml/Error.hbs', path: 'packml/Error.hbs' },
-    { id: 'devices-cylinder', label: 'devices/cylinder.hbs', path: 'devices/cylinder.hbs' },
-    { id: 'devices-servo', label: 'devices/servo.hbs', path: 'devices/servo.hbs' },
-    { id: 'devices-motor', label: 'devices/motor.hbs', path: 'devices/motor.hbs' },
-    { id: 'devices-generic', label: 'devices/generic.hbs', path: 'devices/generic.hbs' },
-    { id: 'devices-robot', label: 'devices/robot.hbs', path: 'devices/robot.hbs' },
-    { id: 'devices-device_robot', label: 'devices/device_robot.hbs', path: 'devices/device_robot.hbs' },
-    { id: 'devices-device_starter', label: 'devices/device_starter.hbs', path: 'devices/device_starter.hbs' }
-  ];
+  // Fallback used only when the host cannot list the Template Root; canonical names only.
+  const FALLBACK_PRESETS: Preset[] = [
+    'unitMainOutput.hbs', 'step-body.hbs', 'unitError.hbs', 'unitManual.hbs', 'unitAuto.hbs', 'unitOrigin.hbs', 'output.hbs', 'MapIO.hbs',
+    'simple/UnitCode.hbs', 'simple/DeviceManager.hbs', 'simple/SystemControl.hbs', 'simple/MapIO.hbs', 'simple/Error.hbs',
+    'packml/UnitCode.hbs', 'packml/DeviceManager.hbs', 'packml/SystemControl.hbs', 'packml/MapIO.hbs', 'packml/Error.hbs',
+    'devices/cylinder.hbs', 'devices/servo.hbs', 'devices/motor.hbs', 'devices/generic.hbs'
+  ].map(path => ({ id: path, label: path, path }));
+  let PRESETS: Preset[] = FALLBACK_PRESETS;
 
   const SUGGESTIONS: Suggestion[] = [
     { label: '{{#each }}', insert: '{{#each items}}\n  \n{{/each}}', cursorToken: 'items' },
@@ -210,7 +187,20 @@ namespace GrafcetStudioTemplateEditor {
   function setPresetOptions(): void {
     const select = el<HTMLSelectElement>('template-editor-select');
     if (!select) return;
-    select.innerHTML = PRESETS.map(preset => `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.label)}</option>`).join('');
+    const option = (preset: Preset): string => {
+      const suffix = preset.active === false ? ' (not used)' : '';
+      const title = [preset.description, preset.note].filter(Boolean).join(' - ');
+      return `<option value="${escapeHtml(preset.id)}" title="${escapeHtml(title)}">${escapeHtml(preset.label + suffix)}</option>`;
+    };
+    const groups: string[] = [];
+    PRESETS.forEach(preset => {
+      const name = preset.platform ? `${preset.platform} / ${preset.group}` : '';
+      if (!groups.includes(name)) groups.push(name);
+    });
+    select.innerHTML = groups.map(name => {
+      const items = PRESETS.filter(preset => (preset.platform ? `${preset.platform} / ${preset.group}` : '') === name).map(option).join('');
+      return name ? `<optgroup label="${escapeHtml(name)}">${items}</optgroup>` : items;
+    }).join('');
     select.value = activeId;
     const title = el<HTMLElement>('template-editor-title');
     if (title) title.textContent = presetById(activeId).label;
@@ -226,7 +216,7 @@ namespace GrafcetStudioTemplateEditor {
     return typeof candidate.chrome?.webview?.postMessage === 'function';
   }
 
-  function templateHostRequest(type: string, rootPath: string, relativePath: string, content?: string): Promise<string> {
+  function templateHostRequest(type: string, rootPath: string, relativePath: string, content?: string): Promise<TemplateFilePayload> {
     const bridge = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome?.webview;
     const postMessage = bridge?.postMessage;
     if (!postMessage) return Promise.reject(new Error('Host bridge is unavailable.'));
@@ -238,10 +228,10 @@ namespace GrafcetStudioTemplateEditor {
         reject(new Error('Timed out waiting for host.'));
       }, 5000);
       pendingTemplateReads[requestId] = {
-        resolve: content => {
+        resolve: result => {
           window.clearTimeout(timeout);
           delete pendingTemplateReads[requestId];
-          resolve(content);
+          resolve(result);
         },
         reject: error => {
           window.clearTimeout(timeout);
@@ -256,12 +246,30 @@ namespace GrafcetStudioTemplateEditor {
     });
   }
 
-  function readTemplateViaHost(rootPath: string, relativePath: string): Promise<string> {
-    return templateHostRequest('READ_TEMPLATE_FILE', rootPath, relativePath);
+  async function readTemplateViaHost(rootPath: string, relativePath: string): Promise<string> {
+    return (await templateHostRequest('READ_TEMPLATE_FILE', rootPath, relativePath)).content || '';
   }
 
-  function writeTemplateViaHost(rootPath: string, relativePath: string, content: string): Promise<string> {
-    return templateHostRequest('WRITE_TEMPLATE_FILE', rootPath, relativePath, content);
+  async function writeTemplateViaHost(rootPath: string, relativePath: string, content: string): Promise<void> {
+    await templateHostRequest('WRITE_TEMPLATE_FILE', rootPath, relativePath, content);
+  }
+
+  async function refreshPresets(): Promise<void> {
+    const rootPath = templateRootPath();
+    PRESETS = FALLBACK_PRESETS;
+    if (rootPath && canUseHostBridge()) {
+      try {
+        const result = await templateHostRequest('LIST_TEMPLATE_FILES', rootPath, '');
+        const listed = (result.files || []).map<Preset>(file => ({
+          id: file.path, label: file.path, path: file.path, platform: file.platform, group: file.group,
+          description: file.description, active: file.active, note: file.note
+        }));
+        if (listed.length) PRESETS = listed;
+      } catch (error) {
+        updateStatus(`Cannot list templates: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (!PRESETS.some(preset => preset.id === activeId)) activeId = PRESETS[0].id;
   }
 
   async function loadDefaultText(id: string): Promise<string> {
@@ -414,6 +422,7 @@ namespace GrafcetStudioTemplateEditor {
   async function openTemplateEditor(id?: string): Promise<void> {
     const modal = ensureModal();
     activeId = id || activeId || PRESETS[0].id;
+    await refreshPresets();
     setPresetOptions();
     showCompletions(false);
     modal.classList.add('show');
@@ -536,7 +545,7 @@ namespace GrafcetStudioTemplateEditor {
     const pending = pendingTemplateReads[requestId];
     if (!pending) return;
     if (payload?.error) pending.reject(new Error(payload.error));
-    else pending.resolve(payload?.content || '');
+    else pending.resolve(payload || {});
   }
 
   (window as unknown as Window & {
