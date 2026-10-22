@@ -197,7 +197,10 @@ namespace GrafcetStudioTemplateEditor {
         <div class="template-editor-toolbar">
           <div class="template-editor-field">
             <div class="template-editor-label">Template file</div>
-            <select id="template-editor-select" class="modal-select" onchange="switchTemplateEditorPreset(this.value)"></select>
+            <div class="template-editor-pickers">
+              <select id="template-editor-platform" class="modal-select" title="Platform" onchange="switchTemplateEditorPlatform(this.value)"></select>
+              <select id="template-editor-select" class="modal-select" onchange="switchTemplateEditorPreset(this.value)"></select>
+            </div>
           </div>
           <div class="template-editor-field">
             <div class="template-editor-label">Template Root (shared setting)</div>
@@ -243,13 +246,26 @@ namespace GrafcetStudioTemplateEditor {
       const title = [preset.description, preset.note].filter(Boolean).join(' - ');
       return `<option value="${escapeHtml(preset.id)}" title="${escapeHtml(title)}">${escapeHtml(preset.label + suffix)}</option>`;
     };
-    const groups: string[] = [];
+    const platforms: string[] = [];
     PRESETS.forEach(preset => {
-      const name = preset.platform ? `${preset.platform} / ${preset.group}` : '';
+      if (preset.platform && !platforms.includes(preset.platform)) platforms.push(preset.platform);
+    });
+    const platformSelect = el<HTMLSelectElement>('template-editor-platform');
+    const activePlatform = presetById(activeId).platform || '';
+    if (platformSelect) {
+      platformSelect.innerHTML = platforms.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      platformSelect.value = activePlatform;
+      platformSelect.style.display = platforms.length > 1 ? '' : 'none';
+    }
+
+    const visible = platforms.length > 1 ? PRESETS.filter(preset => (preset.platform || '') === activePlatform) : PRESETS;
+    const groups: string[] = [];
+    visible.forEach(preset => {
+      const name = preset.group || '';
       if (!groups.includes(name)) groups.push(name);
     });
     select.innerHTML = groups.map(name => {
-      const items = PRESETS.filter(preset => (preset.platform ? `${preset.platform} / ${preset.group}` : '') === name).map(option).join('');
+      const items = visible.filter(preset => (preset.group || '') === name).map(option).join('');
       return name ? `<optgroup label="${escapeHtml(name)}">${items}</optgroup>` : items;
     }).join('');
     select.value = activeId;
@@ -820,6 +836,16 @@ namespace GrafcetStudioTemplateEditor {
     updateStatus('Downloaded template file');
   }
 
+  async function switchTemplateEditorPlatform(platform: string): Promise<void> {
+    const inPlatform = PRESETS.filter(preset => preset.platform === platform);
+    const first = inPlatform.find(preset => preset.active !== false) || inPlatform[0];
+    if (!first) {
+      setPresetOptions();
+      return;
+    }
+    await switchTemplateEditorPreset(first.id);
+  }
+
   async function switchTemplateEditorPreset(id: string): Promise<void> {
     if (!confirmDiscard()) {
       setPresetOptions();
@@ -925,6 +951,7 @@ namespace GrafcetStudioTemplateEditor {
     syncTemplateEditorScroll?: typeof syncTemplateEditorScroll;
     pickTemplateEditorSuggestion?: typeof pickTemplateEditorSuggestion;
   }).GrafcetTemplateEditor = api;
+  (window as Window & any).switchTemplateEditorPlatform = switchTemplateEditorPlatform;
   (window as Window & any).toggleTemplateEditorPreview = toggleTemplateEditorPreview;
   (window as Window & any).refreshTemplateEditorPreviewData = refreshTemplateEditorPreviewData;
   (window as Window & any).selectTemplateEditorPreviewFile = selectTemplateEditorPreviewFile;

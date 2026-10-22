@@ -881,6 +881,7 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 /* Template Editor */
 .template-editor-modal{min-height:620px;}
 .template-editor-toolbar{display:grid;grid-template-columns:minmax(200px,300px) minmax(240px,1fr) minmax(150px,auto) minmax(180px,300px);gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--s1);align-items:end;}
+.template-editor-pickers{display:flex;gap:6px;}.template-editor-pickers #template-editor-platform{flex:0 0 auto;width:auto;max-width:42%;}.template-editor-pickers #template-editor-select{flex:1;min-width:0;}
 .template-editor-root{display:flex;gap:6px;}.template-editor-root .cg-input{flex:1;min-width:0;}
 .template-editor-field{min-width:0;}
 .template-editor-label{font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;font-family:var(--font-display);}
