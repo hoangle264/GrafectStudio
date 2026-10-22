@@ -18,6 +18,7 @@ public interface IWebViewBridgeService
     Task SendTemplateFileAsync(string requestId, string relativePath, string content);
     Task SendTemplateListAsync(string requestId, object files);
     Task SendTemplateValidationAsync(string requestId, string? syntaxError);
+    Task SendTemplatePreviewAsync(string requestId, object preview);
     Task SendTemplateFileErrorAsync(string requestId, string relativePath, string error);
     Task SendSiemensTiaPushResultAsync(object result);
 }

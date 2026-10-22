@@ -30,6 +30,10 @@ public class ReadTemplateFileRequestedEvent : PubSubEvent<ReadTemplateFilePayloa
 {
 }
 
+public class PreviewTemplateRequestedEvent : PubSubEvent<PreviewTemplatePayload>
+{
+}
+
 public class SetTemplateRootRequestedEvent : PubSubEvent<SetTemplateRootPayload>
 {
 }

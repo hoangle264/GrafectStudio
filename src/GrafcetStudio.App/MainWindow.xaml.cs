@@ -182,6 +182,20 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
                     break;
                 }
+            case "PREVIEW_TEMPLATE":
+                {
+                    var message = new PreviewTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        Content = payload.TryGetProperty("content", out var previewContent) && previewContent.ValueKind == JsonValueKind.String ? previewContent.GetString() ?? string.Empty : string.Empty,
+                        RawJson = payload.TryGetProperty("codegenPayload", out var previewPayload) && previewPayload.ValueKind == JsonValueKind.Object ? previewPayload.GetRawText() : string.Empty
+                    };
+                    _eventAggregator.GetEvent<PreviewTemplateRequestedEvent>().Publish(message);
+                    break;
+                }
+
             case "SET_TEMPLATE_ROOT":
                 {
                     var message = new SetTemplateRootPayload { Path = GetOptionalString(payload, "path") };

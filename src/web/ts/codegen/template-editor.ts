@@ -4,7 +4,8 @@ namespace GrafcetStudioTemplateEditor {
   type CatalogEntry = { path: string; platform: string; group: string; description: string; active: boolean; note: string };
   type Suggestion = { label: string; insert: string; cursorToken?: string };
   type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
-  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[]; syntaxError?: string | null };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[]; syntaxError?: string | null; preview?: PreviewResult };
+  type PreviewResult = { files: { path: string; content: string }[]; warnings: string[] };
   type PendingRead = { resolve: (payload: TemplateFilePayload) => void; reject: (error: Error) => void };
   type TemplateEditorApi = {
     open(templateId?: string): Promise<void>;
@@ -44,6 +45,13 @@ namespace GrafcetStudioTemplateEditor {
   let hostSyntaxError = '';
   let validateTimer = 0;
   let validateToken = 0;
+  let previewOn = false;
+  let previewTimer = 0;
+  let previewToken = 0;
+  let previewPayload: unknown = null;
+  let previewPayloadError = '';
+  let previewFiles: { path: string; content: string }[] = [];
+  let previewSelected = '';
   const pendingTemplateReads: Record<string, PendingRead> = {};
 
   function el<T extends HTMLElement = HTMLElement>(id: string): T | null {
@@ -175,6 +183,7 @@ namespace GrafcetStudioTemplateEditor {
           <span class="modal-title-accent">&#8862; TEMPLATE EDITOR</span>
           <span id="template-editor-title" class="modal-subtitle"></span>
           <div class="modal-actions">
+            <button id="template-editor-preview-toggle" class="btn" onclick="toggleTemplateEditorPreview()">Preview</button>
             <button class="btn" onclick="openTemplateEditorReset()">Reset to default</button>
             <button class="btn" onclick="closeTemplateEditor()">Cancel</button>
             <button id="template-editor-save" class="btn a" onclick="saveTemplateEditor()">Save Template</button>
@@ -207,6 +216,14 @@ namespace GrafcetStudioTemplateEditor {
             <textarea id="template-editor-textarea" class="template-editor-textarea" spellcheck="false" oninput="onTemplateEditorInput()" onscroll="syncTemplateEditorScroll()" onkeydown="onTemplateEditorKeydown(event)"></textarea>
           </div>
           <div id="template-editor-completions" class="template-editor-completions is-hidden" role="listbox"></div>
+          <div id="template-editor-preview" class="template-editor-preview is-hidden">
+            <div class="template-editor-preview-bar">
+              <select id="template-editor-preview-file" class="modal-select" onchange="selectTemplateEditorPreviewFile(this.value)"></select>
+              <button class="btn" title="Re-read the current project data" onclick="refreshTemplateEditorPreviewData()">Refresh data</button>
+            </div>
+            <div id="template-editor-preview-note" class="template-editor-preview-note is-hidden"></div>
+            <pre id="template-editor-preview-out" class="template-editor-preview-out"></pre>
+          </div>
         </div>
       </section>`;
     document.body.appendChild(root);
@@ -245,7 +262,7 @@ namespace GrafcetStudioTemplateEditor {
     return typeof candidate.chrome?.webview?.postMessage === 'function';
   }
 
-  function templateHostRequest(type: string, rootPath: string, relativePath: string, content?: string): Promise<TemplateFilePayload> {
+  function templateHostRequest(type: string, rootPath: string, relativePath: string, content?: string, extra?: Record<string, unknown>, timeoutMs = 5000): Promise<TemplateFilePayload> {
     const bridge = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome?.webview;
     const postMessage = bridge?.postMessage;
     if (!postMessage) return Promise.reject(new Error('Host bridge is unavailable.'));
@@ -255,7 +272,7 @@ namespace GrafcetStudioTemplateEditor {
       const timeout = window.setTimeout(() => {
         delete pendingTemplateReads[requestId];
         reject(new Error('Timed out waiting for host.'));
-      }, 5000);
+      }, timeoutMs);
       pendingTemplateReads[requestId] = {
         resolve: result => {
           window.clearTimeout(timeout);
@@ -270,7 +287,7 @@ namespace GrafcetStudioTemplateEditor {
       };
       postMessage.call(bridge, {
         type,
-        payload: content === undefined ? { requestId, rootPath, relativePath } : { requestId, rootPath, relativePath, content }
+        payload: { requestId, rootPath, relativePath, ...(content === undefined ? {} : { content }), ...(extra || {}) }
       });
     });
   }
@@ -342,6 +359,102 @@ namespace GrafcetStudioTemplateEditor {
     syncFromTextarea();
   }
 
+  function buildPreviewPayload(): void {
+    previewPayload = null;
+    previewPayloadError = '';
+    const build = (window as Window & { cgBuildCSharpPayload?: (platform: string) => unknown }).cgBuildCSharpPayload;
+    if (!build) {
+      previewPayloadError = 'Project data is not available.';
+      return;
+    }
+    try {
+      previewPayload = build('Keyence');
+    } catch (error) {
+      previewPayloadError = 'Cannot build project data: ' + (error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function defaultPreviewFile(files: { path: string }[]): string {
+    const path = presetById(activeId).path.toLowerCase();
+    const wanted = path.includes('error') && !path.startsWith('unit') ? 'error.mnm'
+      : path.includes('systemcontrol') || path.includes('system') ? 'system.mnm'
+      : path.includes('devicemanager') ? 'devicemanager.mnm'
+      : path.includes('mapio') ? 'iomapping.mnm'
+      : 'units/';
+    const hit = files.find(file => file.path.toLowerCase().includes(wanted));
+    return (hit || files[0] || { path: '' }).path;
+  }
+
+  function showPreviewNote(text: string, isError: boolean): void {
+    const note = el<HTMLElement>('template-editor-preview-note');
+    if (!note) return;
+    note.textContent = text;
+    note.classList.toggle('is-hidden', !text);
+    note.classList.toggle('has-error', isError);
+  }
+
+  function renderPreviewFile(): void {
+    const out = el<HTMLElement>('template-editor-preview-out');
+    const select = el<HTMLSelectElement>('template-editor-preview-file');
+    if (!out || !select) return;
+    select.innerHTML = previewFiles.map(file => `<option value="${escapeHtml(file.path)}">${escapeHtml(file.path)}</option>`).join('');
+    if (!previewFiles.some(file => file.path === previewSelected)) previewSelected = defaultPreviewFile(previewFiles);
+    select.value = previewSelected;
+    const file = previewFiles.find(item => item.path === previewSelected);
+    out.textContent = file ? file.content : '';
+  }
+
+  function schedulePreview(): void {
+    window.clearTimeout(previewTimer);
+    if (!previewOn || loadError) return;
+    const token = ++previewToken;
+    previewTimer = window.setTimeout(async () => {
+      if (presetById(activeId).platform === 'Siemens LAD') {
+        showPreviewNote('Preview is not available for Siemens LAD templates yet.', false);
+        return;
+      }
+      if (!canUseHostBridge()) {
+        showPreviewNote('Preview needs the desktop host.', true);
+        return;
+      }
+      if (!previewPayload) {
+        showPreviewNote(previewPayloadError || 'Project data is not available.', true);
+        return;
+      }
+      try {
+        const result = await templateHostRequest('PREVIEW_TEMPLATE', templateRootPath(), presetById(activeId).path, currentText, { codegenPayload: previewPayload }, 30000);
+        if (token !== previewToken) return;
+        previewFiles = result.preview?.files || [];
+        showPreviewNote((result.preview?.warnings || []).join(' '), false);
+        renderPreviewFile();
+      } catch (error) {
+        if (token !== previewToken) return;
+        showPreviewNote('Render failed: ' + (error instanceof Error ? error.message : String(error)), true);
+      }
+    }, 500);
+  }
+
+  function toggleTemplateEditorPreview(): void {
+    previewOn = !previewOn;
+    el('template-editor-preview')?.classList.toggle('is-hidden', !previewOn);
+    el('template-editor-modal')?.querySelector('.template-editor-body')?.classList.toggle('has-preview', previewOn);
+    el('template-editor-preview-toggle')?.classList.toggle('a', previewOn);
+    if (previewOn) {
+      buildPreviewPayload();
+      schedulePreview();
+    }
+  }
+
+  function refreshTemplateEditorPreviewData(): void {
+    buildPreviewPayload();
+    schedulePreview();
+  }
+
+  function selectTemplateEditorPreviewFile(path: string): void {
+    previewSelected = path;
+    renderPreviewFile();
+  }
+
   function scheduleHostValidation(): void {
     window.clearTimeout(validateTimer);
     if (loadError || !canUseHostBridge()) return;
@@ -399,6 +512,7 @@ namespace GrafcetStudioTemplateEditor {
     updateStatus();
     updateCompletions();
     scheduleHostValidation();
+    schedulePreview();
   }
 
   function syncTemplateEditorScroll(): void {
@@ -552,6 +666,7 @@ namespace GrafcetStudioTemplateEditor {
       return;
     }
     activeId = id;
+    previewSelected = '';
     setPresetOptions();
     showCompletions(false);
     await loadTemplate(id);
@@ -649,6 +764,9 @@ namespace GrafcetStudioTemplateEditor {
     syncTemplateEditorScroll?: typeof syncTemplateEditorScroll;
     pickTemplateEditorSuggestion?: typeof pickTemplateEditorSuggestion;
   }).GrafcetTemplateEditor = api;
+  (window as Window & any).toggleTemplateEditorPreview = toggleTemplateEditorPreview;
+  (window as Window & any).refreshTemplateEditorPreviewData = refreshTemplateEditorPreviewData;
+  (window as Window & any).selectTemplateEditorPreviewFile = selectTemplateEditorPreviewFile;
   (window as Window & any).changeTemplateEditorRoot = changeTemplateEditorRoot;
   (window as Window & any).browseTemplateEditorRoot = browseTemplateEditorRoot;
   (window as Window & any).onTemplateRootChanged = onTemplateRootChanged;

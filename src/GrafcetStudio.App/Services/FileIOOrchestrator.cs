@@ -6,6 +6,12 @@ namespace GrafcetStudio.App.Services;
 
 public class FileIOOrchestrator
 {
+    private static readonly System.Text.Json.JsonSerializerOptions PreviewJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
     private readonly IEventAggregator _events;
     private readonly IFileService _files;
     private readonly IWebViewBridgeService _bridge;
@@ -26,6 +32,7 @@ public class FileIOOrchestrator
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
+        _events.GetEvent<PreviewTemplateRequestedEvent>().Subscribe(OnPreviewTemplateRequested);
         _events.GetEvent<SetTemplateRootRequestedEvent>().Subscribe(OnSetTemplateRootRequested);
         _events.GetEvent<ListTemplateFilesRequestedEvent>().Subscribe(OnListTemplateFilesRequested);
         _events.GetEvent<ValidateTemplateRequestedEvent>().Subscribe(OnValidateTemplateRequested);
@@ -102,6 +109,23 @@ public class FileIOOrchestrator
         {
             var content = await _files.ReadTemplateFileAsync(payload.RootPath, payload.RelativePath);
             await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, content);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnPreviewTemplateRequested(PreviewTemplatePayload payload)
+    {
+        try
+        {
+            var codegen = System.Text.Json.JsonSerializer.Deserialize<GrafcetStudio.Domain.Models.CodegenPayload>(payload.RawJson, PreviewJsonOptions)
+                          ?? throw new InvalidOperationException("Invalid codegen payload.");
+            var editedPath = FileService.ResolveTemplatePath(payload.RootPath, payload.RelativePath);
+            var preview = await System.Threading.Tasks.Task.Run(() =>
+                GrafcetStudio.CodeGen.Template.TemplatePreviewService.Render(payload.RootPath.Trim(), editedPath, payload.Content, codegen));
+            await _bridge.SendTemplatePreviewAsync(payload.RequestId, preview);
         }
         catch (Exception ex)
         {

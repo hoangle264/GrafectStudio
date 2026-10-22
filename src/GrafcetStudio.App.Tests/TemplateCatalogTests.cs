@@ -71,3 +71,53 @@ public class TemplateSyntaxCheckerTests
     [InlineData("{{foo")]
     public void Check_ReturnsMessageForBrokenTemplates(string source) => Assert.False(string.IsNullOrEmpty(TemplateSyntaxChecker.Check(source)));
 }
+
+public class TemplatePreviewServiceTests
+{
+    [Fact]
+    public void Render_UsesUnsavedTextForTheEditedFileOnly()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "tplprev-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "unitMainOutput.hbs");
+        File.WriteAllText(file, "ON-DISK");
+        try
+        {
+            var payload = new GrafcetStudio.Domain.Models.CodegenPayload
+            {
+                Project = new GrafcetStudio.Domain.Models.ProjectInfo { Name = "Demo" },
+                Unit = new GrafcetStudio.Domain.Models.UnitInfo { Name = "Main" }
+            };
+
+            var result = TemplatePreviewService.Render(root, Path.GetFullPath(file), "UNSAVED {{unit.name}}", payload);
+
+            var unit = Assert.Single(result.Files, f => f.Path.StartsWith("Units/"));
+            Assert.Contains("UNSAVED", unit.Content);
+            Assert.DoesNotContain("ON-DISK", unit.Content);
+            Assert.Empty(result.Warnings);
+            Assert.Equal("ON-DISK", File.ReadAllText(file));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Render_WarnsWhenEditedFileIsNotLoadedByTheGenerator()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "tplprev-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "unitError.hbs"), "A");
+        File.WriteAllText(Path.Combine(root, "unit-error.hbs"), "B");
+        try
+        {
+            var payload = new GrafcetStudio.Domain.Models.CodegenPayload
+            {
+                Unit = new GrafcetStudio.Domain.Models.UnitInfo { Name = "Main" }
+            };
+
+            var result = TemplatePreviewService.Render(root, Path.GetFullPath(Path.Combine(root, "unit-error.hbs")), "X", payload);
+
+            Assert.Single(result.Warnings);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+}

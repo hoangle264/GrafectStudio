@@ -98,7 +98,7 @@ public class FileService : IFileService
     }
 
 
-    private static string ResolveTemplatePath(string rootPath, string relativePath)
+    internal static string ResolveTemplatePath(string rootPath, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
         {
