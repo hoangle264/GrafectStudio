@@ -24,6 +24,7 @@ public class FileIOOrchestrator
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
+        _events.GetEvent<WriteTemplateFileRequestedEvent>().Subscribe(OnWriteTemplateFileRequested);
     }
 
     private async void OnSaveRequested(string projectJson)
@@ -96,6 +97,19 @@ public class FileIOOrchestrator
         {
             var content = await _files.ReadTemplateFileAsync(payload.RootPath, payload.RelativePath);
             await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, content);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnWriteTemplateFileRequested(WriteTemplateFilePayload payload)
+    {
+        try
+        {
+            await _files.WriteTemplateFileAsync(payload.RootPath, payload.RelativePath, payload.Content);
+            await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, payload.Content);
         }
         catch (Exception ex)
         {

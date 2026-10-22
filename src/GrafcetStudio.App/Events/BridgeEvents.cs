@@ -30,6 +30,10 @@ public class ReadTemplateFileRequestedEvent : PubSubEvent<ReadTemplateFilePayloa
 {
 }
 
+public class WriteTemplateFileRequestedEvent : PubSubEvent<WriteTemplateFilePayload>
+{
+}
+
 public class PushSiemensLadRequestedEvent : PubSubEvent<PushSiemensLadPayload>
 {
 }

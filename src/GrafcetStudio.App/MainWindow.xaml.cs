@@ -182,6 +182,18 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
                     break;
                 }
+            case "WRITE_TEMPLATE_FILE":
+                {
+                    var message = new WriteTemplateFilePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        Content = payload.TryGetProperty("content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String ? contentProp.GetString() ?? string.Empty : string.Empty
+                    };
+                    _eventAggregator.GetEvent<WriteTemplateFileRequestedEvent>().Publish(message);
+                    break;
+                }
             case "PUSH_SIEMENS_LAD":
                 {
                     var message = new PushSiemensLadPayload

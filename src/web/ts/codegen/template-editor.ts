@@ -226,7 +226,7 @@ namespace GrafcetStudioTemplateEditor {
     return typeof candidate.chrome?.webview?.postMessage === 'function';
   }
 
-  function readTemplateViaHost(rootPath: string, relativePath: string): Promise<string> {
+  function templateHostRequest(type: string, rootPath: string, relativePath: string, content?: string): Promise<string> {
     const bridge = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome?.webview;
     const postMessage = bridge?.postMessage;
     if (!postMessage) return Promise.reject(new Error('Host bridge is unavailable.'));
@@ -235,7 +235,7 @@ namespace GrafcetStudioTemplateEditor {
     return new Promise((resolve, reject) => {
       const timeout = window.setTimeout(() => {
         delete pendingTemplateReads[requestId];
-        reject(new Error('Timed out reading template from host.'));
+        reject(new Error('Timed out waiting for host.'));
       }, 5000);
       pendingTemplateReads[requestId] = {
         resolve: content => {
@@ -250,10 +250,18 @@ namespace GrafcetStudioTemplateEditor {
         }
       };
       postMessage.call(bridge, {
-        type: 'READ_TEMPLATE_FILE',
-        payload: { requestId, rootPath, relativePath }
+        type,
+        payload: content === undefined ? { requestId, rootPath, relativePath } : { requestId, rootPath, relativePath, content }
       });
     });
+  }
+
+  function readTemplateViaHost(rootPath: string, relativePath: string): Promise<string> {
+    return templateHostRequest('READ_TEMPLATE_FILE', rootPath, relativePath);
+  }
+
+  function writeTemplateViaHost(rootPath: string, relativePath: string, content: string): Promise<string> {
+    return templateHostRequest('WRITE_TEMPLATE_FILE', rootPath, relativePath, content);
   }
 
   async function loadDefaultText(id: string): Promise<string> {
@@ -421,6 +429,18 @@ namespace GrafcetStudioTemplateEditor {
   async function saveTemplateEditor(): Promise<void> {
     if (loadError) return;
     const preset = presetById(activeId);
+    const rootPath = templateRootPath();
+    if (rootPath && canUseHostBridge()) {
+      try {
+        await writeTemplateViaHost(rootPath, preset.path, currentText || '');
+        loadedText = currentText;
+        updateStatus(`Saved ${preset.path} (previous version kept as ${preset.path}.bak)`);
+      } catch (error) {
+        updateStatus(`Save failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+
     const filename = preset.path.replace(/[\\/]/g, '__');
     const blob = new Blob([currentText || ''], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
