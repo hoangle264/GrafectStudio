@@ -123,8 +123,27 @@ public class FileIOOrchestrator
             var codegen = System.Text.Json.JsonSerializer.Deserialize<GrafcetStudio.Domain.Models.CodegenPayload>(payload.RawJson, PreviewJsonOptions)
                           ?? throw new InvalidOperationException("Invalid codegen payload.");
             var editedPath = FileService.ResolveTemplatePath(payload.RootPath, payload.RelativePath);
-            var preview = await System.Threading.Tasks.Task.Run(() =>
-                GrafcetStudio.CodeGen.Template.TemplatePreviewService.Render(payload.RootPath.Trim(), editedPath, payload.Content, codegen));
+            // Errors are caught inside the lambda: half-typed templates are expected while editing and
+            // must not surface as unhandled exceptions on the worker thread.
+            var (preview, error) = await System.Threading.Tasks.Task.Run<(GrafcetStudio.CodeGen.Template.TemplatePreviewResult? Preview, string? Error)>(() =>
+            {
+                var syntaxError = GrafcetStudio.CodeGen.Template.TemplateSyntaxChecker.Check(payload.Content);
+                if (syntaxError is not null) return (null, "Handlebars: " + syntaxError);
+                try
+                {
+                    return (GrafcetStudio.CodeGen.Template.TemplatePreviewService.Render(payload.RootPath.Trim(), editedPath, payload.Content, codegen), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
+            if (preview is null)
+            {
+                await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, error ?? "Preview failed.");
+                return;
+            }
+
             await _bridge.SendTemplatePreviewAsync(payload.RequestId, preview);
         }
         catch (Exception ex)
