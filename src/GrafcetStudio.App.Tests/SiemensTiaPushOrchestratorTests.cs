@@ -158,6 +158,7 @@ public class SiemensTiaPushOrchestratorTests
         public Task SendTemplateListAsync(string requestId, object files) => Task.CompletedTask;
         public Task SendTemplateValidationAsync(string requestId, string? syntaxError) => Task.CompletedTask;
         public Task SendTemplatePreviewAsync(string requestId, object preview) => Task.CompletedTask;
+        public Task SendTemplateVariablesAsync(string requestId, object variables) => Task.CompletedTask;
         public Task SendTemplateFileErrorAsync(string requestId, string relativePath, string error) => Task.CompletedTask;
 
         public Task SendSiemensTiaPushResultAsync(object result)

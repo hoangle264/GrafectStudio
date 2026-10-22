@@ -91,6 +91,12 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveTemplateFile({payload});");
     }
 
+    public async Task SendTemplateVariablesAsync(string requestId, object variables)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, variables }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
     public async Task SendTemplateFileErrorAsync(string requestId, string relativePath, string error)
     {
         var payload = JsonSerializer.Serialize(new { requestId, relativePath, error });

@@ -121,3 +121,44 @@ public class TemplatePreviewServiceTests
         finally { Directory.Delete(root, true); }
     }
 }
+
+public class TemplateVariableCatalogTests
+{
+    private static GrafcetStudio.Domain.Models.CodegenPayload Payload() => new()
+    {
+        Project = new GrafcetStudio.Domain.Models.ProjectInfo { Name = "Demo" },
+        Unit = new GrafcetStudio.Domain.Models.UnitInfo { Name = "Main" },
+        Variables = new List<GrafcetStudio.Domain.Models.DeviceVariable>
+        {
+            new() { Label = "UnitMain", Format = "Motor", Address = "@M1" }
+        },
+        DeviceTypes = new List<GrafcetStudio.Domain.Models.DeviceType>
+        {
+            new() { Name = "Motor", Signals = new List<GrafcetStudio.Domain.Models.DeviceSignal> { new() { Id = "run", Name = "Run" } } }
+        }
+    };
+
+    [Fact]
+    public void Build_UnitTemplate_ExposesGeneratorContext()
+    {
+        var root = TemplateVariableCatalog.Build("unitAuto.hbs", Payload());
+        Assert.Contains(root.Children, c => c.Name == "devices" && c.Kind == "list");
+        var devices = root.Children.Single(c => c.Name == "devices");
+        Assert.Contains(devices.Children, c => c.Name == "label" && c.Sample == "UnitMain");
+        Assert.Contains(devices.Children.Single(c => c.Name == "signals").Children, c => c.Name == "name");
+    }
+
+    [Fact]
+    public void Build_DevicePartial_StartsAtTheDeviceElement()
+    {
+        var root = TemplateVariableCatalog.Build("devices/cylinder.hbs", Payload());
+        Assert.Contains(root.Children, c => c.Name == "partialName");
+    }
+
+    [Fact]
+    public void Build_ErrorTemplate_UsesTheErrorGeneratorModel()
+    {
+        var root = TemplateVariableCatalog.Build("simple/Error.hbs", Payload());
+        Assert.DoesNotContain(root.Children, c => c.Name == "devices");
+    }
+}

@@ -2,9 +2,10 @@ namespace GrafcetStudioTemplateEditor {
   type TemplateDiagnosticSeverity = 'error' | 'warning' | 'info';
   type Preset = { id: string; label: string; path: string; platform?: string; group?: string; description?: string; active?: boolean; note?: string };
   type CatalogEntry = { path: string; platform: string; group: string; description: string; active: boolean; note: string };
-  type Suggestion = { label: string; insert: string; cursorToken?: string };
+  type Suggestion = { label: string; insert: string; cursorToken?: string; detail?: string; range?: { start: number; end: number } };
+  type VarNode = { name: string; kind: string; sample?: string | null; children: VarNode[] };
   type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
-  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[]; syntaxError?: string | null; preview?: PreviewResult };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[]; syntaxError?: string | null; preview?: PreviewResult; variables?: VarNode };
   type PreviewResult = { files: { path: string; content: string }[]; warnings: string[] };
   type PendingRead = { resolve: (payload: TemplateFilePayload) => void; reject: (error: Error) => void };
   type TemplateEditorApi = {
@@ -23,6 +24,8 @@ namespace GrafcetStudioTemplateEditor {
     'devices/cylinder.hbs', 'devices/servo.hbs', 'devices/motor.hbs', 'devices/generic.hbs'
   ].map(path => ({ id: path, label: path, path }));
   let PRESETS: Preset[] = FALLBACK_PRESETS;
+
+  const HELPERS: Suggestion[] = ['pad', 'padStart2', 'eq', 'renderDevice'].map(name => ({ label: name, insert: name + ' ', detail: 'helper' }));
 
   const SUGGESTIONS: Suggestion[] = [
     { label: '{{#each }}', insert: '{{#each items}}\n  \n{{/each}}', cursorToken: 'items' },
@@ -52,6 +55,8 @@ namespace GrafcetStudioTemplateEditor {
   let previewPayloadError = '';
   let previewFiles: { path: string; content: string }[] = [];
   let previewSelected = '';
+  let variableRoot: VarNode | null = null;
+  let variablesToken = 0;
   const pendingTemplateReads: Record<string, PendingRead> = {};
 
   function el<T extends HTMLElement = HTMLElement>(id: string): T | null {
@@ -445,9 +450,22 @@ namespace GrafcetStudioTemplateEditor {
     }
   }
 
+  async function loadVariables(): Promise<void> {
+    variableRoot = null;
+    if (!previewPayload || !canUseHostBridge()) return;
+    const token = ++variablesToken;
+    try {
+      const result = await templateHostRequest('LIST_TEMPLATE_VARIABLES', '', presetById(activeId).path, undefined, { codegenPayload: previewPayload }, 30000);
+      if (token === variablesToken) variableRoot = result.variables || null;
+    } catch {
+      if (token === variablesToken) variableRoot = null;
+    }
+  }
+
   function refreshTemplateEditorPreviewData(): void {
     buildPreviewPayload();
     schedulePreview();
+    void loadVariables();
   }
 
   function selectTemplateEditorPreviewFile(path: string): void {
@@ -545,23 +563,162 @@ namespace GrafcetStudioTemplateEditor {
     };
   }
 
+  function findChild(node: VarNode, name: string): VarNode | null {
+    const lower = name.toLowerCase();
+    return node.children.find(child => child.name.toLowerCase() === lower) || null;
+  }
+
+  function descend(base: VarNode | null, parts: string[]): VarNode | null {
+    let node = base;
+    for (const part of parts) {
+      if (!node) return null;
+      if (!part || part === 'this') continue;
+      node = findChild(node, part);
+    }
+    return node;
+  }
+
+  // Resolves a Handlebars path (this., ../, @root.) against the scope stack; innermost scope is last.
+  function resolveVarPath(path: string, scopes: VarNode[]): VarNode | null {
+    let rest = path;
+    let up = 0;
+    while (rest.startsWith('../')) {
+      up++;
+      rest = rest.slice(3);
+    }
+    let base: VarNode | undefined = scopes[scopes.length - 1 - up];
+    if (rest === '@root' || rest.startsWith('@root.')) {
+      base = scopes[0];
+      rest = rest.slice(6);
+    }
+    if (!base) return null;
+    return descend(base, rest.split('.').filter(Boolean));
+  }
+
+  // Scopes opened by #each/#with blocks that are still open at the end of `text`.
+  function scopesAt(text: string): { scopes: VarNode[]; inEach: boolean } | null {
+    if (!variableRoot) return null;
+    const scopes: VarNode[] = [variableRoot];
+    const blocks: { name: string; scoped: boolean }[] = [];
+    const pattern = /\{\{~?([\s\S]*?)~?\}\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const inner = match[1].trim();
+      const open = inner.match(/^#(each|with|if|unless)\s*(.*)$/);
+      const close = inner.match(/^\/(each|with|if|unless)$/);
+      if (open) {
+        const scoped = open[1] === 'each' || open[1] === 'with';
+        if (scoped) {
+          const target = resolveVarPath(open[2].trim().split(/\s+/)[0] || '', scopes);
+          scopes.push(target || { name: '', kind: 'null', children: [] });
+        }
+        blocks.push({ name: open[1], scoped });
+      } else if (close) {
+        const block = blocks.pop();
+        if (block && block.scoped && scopes.length > 1) scopes.pop();
+      }
+    }
+    return { scopes, inEach: blocks.some(block => block.name === 'each') };
+  }
+
+  function kindDetail(node: VarNode): string {
+    if (node.kind === 'list') return 'list';
+    if (node.kind === 'object') return 'object';
+    return node.sample ? `${node.kind}: ${node.sample}` : node.kind;
+  }
+
+  // Variable suggestions for the identifier being typed inside an unclosed {{ ... }}.
+  function variableSuggestions(input: HTMLTextAreaElement): Suggestion[] {
+    if (!variableRoot) return [];
+    const cursor = input.selectionStart || 0;
+    const before = input.value.slice(0, cursor);
+    const markerIndex = before.lastIndexOf('{{');
+    if (markerIndex < 0 || markerIndex < before.lastIndexOf('}}')) return [];
+
+    let expression = before.slice(markerIndex + 2).replace(/^[~{&^]+/, '');
+    if (/^[/!>]/.test(expression)) return [];
+    const isBlock = expression.startsWith('#');
+    expression = expression.replace(/^#/, '');
+    const words = expression.split(/[\s(]+/);
+    const token = words[words.length - 1];
+    const isFirstWord = words.length === 1;
+    if (isBlock && isFirstWord) return [];
+
+    const scope = scopesAt(before.slice(0, markerIndex));
+    if (!scope) return [];
+
+    let afterUp = token;
+    let up = 0;
+    while (afterUp.startsWith('../')) {
+      up++;
+      afterUp = afterUp.slice(3);
+    }
+    const dot = afterUp.lastIndexOf('.');
+    const prefix = afterUp.slice(dot + 1);
+    const parentPath = dot >= 0 ? afterUp.slice(0, dot) : '';
+    const base: VarNode | null = parentPath
+      ? resolveVarPath('../'.repeat(up) + parentPath, scope.scopes)
+      : scope.scopes[scope.scopes.length - 1 - up] || null;
+    if (!base) return [];
+
+    const lowerPrefix = prefix.toLowerCase();
+    const matches = (name: string): number => {
+      const lower = name.toLowerCase();
+      return !lowerPrefix || lower.startsWith(lowerPrefix) ? 0 : lower.includes(lowerPrefix) ? 1 : -1;
+    };
+    const range = { start: cursor - prefix.length, end: cursor };
+    const trailing = /^[\w$]*/.exec(input.value.slice(cursor));
+    if (trailing) range.end += trailing[0].length;
+
+    const found: { rank: number; suggestion: Suggestion }[] = [];
+    for (const child of base.children) {
+      const rank = matches(child.name);
+      if (rank < 0) continue;
+      found.push({ rank, suggestion: { label: child.name, insert: child.name + (child.kind === 'object' ? '.' : ''), detail: kindDetail(child), range } });
+    }
+    if (!parentPath && up === 0) {
+      const specials = ['this'];
+      if (scope.scopes.length > 1) specials.push('../');
+      specials.push('@root');
+      if (scope.inEach) specials.push('@index', '@first', '@last', '@key');
+      for (const name of specials) {
+        const rank = matches(name);
+        if (rank >= 0) found.push({ rank, suggestion: { label: name, insert: name, detail: 'scope', range } });
+      }
+      if (isFirstWord && !isBlock) {
+        for (const helper of HELPERS) {
+          const rank = matches(helper.label);
+          if (rank >= 0) found.push({ rank, suggestion: { ...helper, range } });
+        }
+      }
+    }
+    return found.sort((a, b) => a.rank - b.rank).slice(0, 80).map(item => item.suggestion);
+  }
+
   function updateCompletions(force = false): void {
     const box = el<HTMLElement>('template-editor-completions');
-    if (!box) return;
+    const input = el<HTMLTextAreaElement>('template-editor-textarea');
+    if (!box || !input) return;
     const context = completionContext(force);
-    if (!context.shouldShow) {
+    const variables = variableSuggestions(input);
+    if (!context.shouldShow && !variables.length) {
       showCompletions(false);
       return;
     }
 
-    visibleSuggestions = SUGGESTIONS.filter(item => !context.typed || item.label.toLowerCase().includes(context.typed) || item.insert.toLowerCase().includes(context.typed));
+    // Snippets only make sense for the first word of an expression; later words are arguments.
+    const expressionStart = input.value.lastIndexOf('{{', input.selectionStart || 0);
+    const inArgument = variables.length > 0 && expressionStart >= 0 && /\s/.test(input.value.slice(expressionStart + 2, input.selectionStart || 0).trimStart());
+    const snippets = inArgument ? [] : SUGGESTIONS.filter(item => !context.typed || item.label.toLowerCase().includes(context.typed) || item.insert.toLowerCase().includes(context.typed));
+    visibleSuggestions = context.shouldShow ? [...variables, ...snippets] : variables;
     if (!visibleSuggestions.length) {
       showCompletions(false);
       return;
     }
     suggestionIndex = Math.max(0, Math.min(suggestionIndex, visibleSuggestions.length - 1));
-    box.innerHTML = visibleSuggestions.map((item, index) => `<button class="template-editor-completion ${index === suggestionIndex ? 'active' : ''}" data-index="${index}" onclick="pickTemplateEditorSuggestion(${index})"><span>${escapeHtml(item.label)}</span></button>`).join('');
+    box.innerHTML = visibleSuggestions.map((item, index) => `<button class="template-editor-completion ${index === suggestionIndex ? 'active' : ''}" data-index="${index}" onclick="pickTemplateEditorSuggestion(${index})"><span>${escapeHtml(item.label)}</span>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ''}</button>`).join('');
     showCompletions(true);
+    box.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
   }
 
   function replaceRangeForSuggestion(input: HTMLTextAreaElement): { start: number; end: number } {
@@ -577,7 +734,7 @@ namespace GrafcetStudioTemplateEditor {
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
     if (!input) return;
     const item = visibleSuggestions[index] || visibleSuggestions[0] || SUGGESTIONS[0];
-    const range = replaceRangeForSuggestion(input);
+    const range = item.range || replaceRangeForSuggestion(input);
     replaceTextRange(input, range.start, range.end, item.insert);
     const tokenIndex = item.cursorToken ? item.insert.indexOf(item.cursorToken) : -1;
     const nextPos = range.start + (tokenIndex >= 0 ? tokenIndex : item.insert.length);
@@ -585,6 +742,7 @@ namespace GrafcetStudioTemplateEditor {
     input.setSelectionRange(nextPos, nextPos + (tokenIndex >= 0 && item.cursorToken ? item.cursorToken.length : 0));
     showCompletions(false);
     syncFromTextarea();
+    if (item.range && item.insert.endsWith('.')) updateCompletions(true);
   }
 
   function syncRootInput(): void {
@@ -622,6 +780,8 @@ namespace GrafcetStudioTemplateEditor {
     activeId = id || activeId || PRESETS[0].id;
     await refreshPresets();
     setPresetOptions();
+    buildPreviewPayload();
+    void loadVariables();
     showCompletions(false);
     modal.classList.add('show');
     await loadTemplate(activeId);
@@ -669,6 +829,7 @@ namespace GrafcetStudioTemplateEditor {
     previewSelected = '';
     setPresetOptions();
     showCompletions(false);
+    void loadVariables();
     await loadTemplate(id);
   }
 

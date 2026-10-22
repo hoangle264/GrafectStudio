@@ -32,6 +32,7 @@ public class FileIOOrchestrator
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
+        _events.GetEvent<ListTemplateVariablesRequestedEvent>().Subscribe(OnListTemplateVariablesRequested);
         _events.GetEvent<PreviewTemplateRequestedEvent>().Subscribe(OnPreviewTemplateRequested);
         _events.GetEvent<SetTemplateRootRequestedEvent>().Subscribe(OnSetTemplateRootRequested);
         _events.GetEvent<ListTemplateFilesRequestedEvent>().Subscribe(OnListTemplateFilesRequested);
@@ -109,6 +110,37 @@ public class FileIOOrchestrator
         {
             var content = await _files.ReadTemplateFileAsync(payload.RootPath, payload.RelativePath);
             await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, content);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnListTemplateVariablesRequested(PreviewTemplatePayload payload)
+    {
+        try
+        {
+            var codegen = System.Text.Json.JsonSerializer.Deserialize<GrafcetStudio.Domain.Models.CodegenPayload>(payload.RawJson, PreviewJsonOptions)
+                          ?? throw new InvalidOperationException("Invalid codegen payload.");
+            var (tree, error) = await System.Threading.Tasks.Task.Run<(GrafcetStudio.CodeGen.Template.TemplateVariableNode? Tree, string? Error)>(() =>
+            {
+                try
+                {
+                    return (GrafcetStudio.CodeGen.Template.TemplateVariableCatalog.Build(payload.RelativePath, codegen), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
+            if (tree is null)
+            {
+                await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, error ?? "Cannot list variables.");
+                return;
+            }
+
+            await _bridge.SendTemplateVariablesAsync(payload.RequestId, tree);
         }
         catch (Exception ex)
         {

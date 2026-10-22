@@ -182,6 +182,18 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
                     break;
                 }
+            case "LIST_TEMPLATE_VARIABLES":
+                {
+                    var message = new PreviewTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        RawJson = payload.TryGetProperty("codegenPayload", out var variablesPayload) && variablesPayload.ValueKind == JsonValueKind.Object ? variablesPayload.GetRawText() : string.Empty
+                    };
+                    _eventAggregator.GetEvent<ListTemplateVariablesRequestedEvent>().Publish(message);
+                    break;
+                }
+
             case "PREVIEW_TEMPLATE":
                 {
                     var message = new PreviewTemplatePayload
