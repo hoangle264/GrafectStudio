@@ -65,6 +65,14 @@ public class ConfigService
         await SaveAsync(config);
     }
 
+    public async Task SaveTemplateRootAsync(string? templatePath)
+    {
+        var config = await LoadAsync();
+        config.TemplatePath = templatePath?.Trim() ?? string.Empty;
+
+        await SaveAsync(config);
+    }
+
     public async Task SaveSiemensTiaConfigAsync(string? projectPath, string? deviceName, string? plcName, string? targetFolderPath, string? overwriteMode)
     {
         var config = await LoadAsync();

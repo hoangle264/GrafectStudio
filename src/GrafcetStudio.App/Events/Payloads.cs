@@ -39,6 +39,11 @@ public class ReadTemplateFilePayload
     public string RelativePath { get; set; } = string.Empty;
 }
 
+public class SetTemplateRootPayload
+{
+    public string Path { get; set; } = string.Empty;
+}
+
 public class ListTemplateFilesPayload
 {
     public string RequestId { get; set; } = string.Empty;

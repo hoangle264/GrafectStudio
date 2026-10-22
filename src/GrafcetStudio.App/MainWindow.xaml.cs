@@ -182,6 +182,13 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
                     break;
                 }
+            case "SET_TEMPLATE_ROOT":
+                {
+                    var message = new SetTemplateRootPayload { Path = GetOptionalString(payload, "path") };
+                    _eventAggregator.GetEvent<SetTemplateRootRequestedEvent>().Publish(message);
+                    break;
+                }
+
             case "LIST_TEMPLATE_FILES":
                 {
                     var message = new ListTemplateFilesPayload

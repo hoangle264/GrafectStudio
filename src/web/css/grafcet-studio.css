@@ -880,7 +880,8 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 
 /* Template Editor */
 .template-editor-modal{min-height:620px;}
-.template-editor-toolbar{display:grid;grid-template-columns:minmax(220px,320px) 1fr minmax(220px,360px);gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--s1);align-items:end;}
+.template-editor-toolbar{display:grid;grid-template-columns:minmax(200px,300px) minmax(240px,1fr) minmax(150px,auto) minmax(180px,300px);gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--s1);align-items:end;}
+.template-editor-root{display:flex;gap:6px;}.template-editor-root .cg-input{flex:1;min-width:0;}
 .template-editor-field{min-width:0;}
 .template-editor-label{font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;font-family:var(--font-display);}
 .template-editor-help{font-size:var(--fs-xs);color:var(--text2);line-height:1.4;}

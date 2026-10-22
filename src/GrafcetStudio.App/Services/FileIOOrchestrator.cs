@@ -9,12 +9,14 @@ public class FileIOOrchestrator
     private readonly IEventAggregator _events;
     private readonly IFileService _files;
     private readonly IWebViewBridgeService _bridge;
+    private readonly ConfigService _config;
 
-    public FileIOOrchestrator(IEventAggregator events, IFileService files, IWebViewBridgeService bridge)
+    public FileIOOrchestrator(IEventAggregator events, IFileService files, IWebViewBridgeService bridge, ConfigService config)
     {
         _events = events;
         _files = files;
         _bridge = bridge;
+        _config = config;
     }
 
     public void Init()
@@ -24,6 +26,7 @@ public class FileIOOrchestrator
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
+        _events.GetEvent<SetTemplateRootRequestedEvent>().Subscribe(OnSetTemplateRootRequested);
         _events.GetEvent<ListTemplateFilesRequestedEvent>().Subscribe(OnListTemplateFilesRequested);
         _events.GetEvent<ValidateTemplateRequestedEvent>().Subscribe(OnValidateTemplateRequested);
         _events.GetEvent<WriteTemplateFileRequestedEvent>().Subscribe(OnWriteTemplateFileRequested);
@@ -103,6 +106,18 @@ public class FileIOOrchestrator
         catch (Exception ex)
         {
             await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnSetTemplateRootRequested(SetTemplateRootPayload payload)
+    {
+        try
+        {
+            await _config.SaveTemplateRootAsync(payload.Path);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendErrorAsync("fileIO", ex.Message);
         }
     }
 
