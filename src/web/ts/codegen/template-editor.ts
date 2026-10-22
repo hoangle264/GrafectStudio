@@ -4,7 +4,7 @@ namespace GrafcetStudioTemplateEditor {
   type CatalogEntry = { path: string; platform: string; group: string; description: string; active: boolean; note: string };
   type Suggestion = { label: string; insert: string; cursorToken?: string };
   type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
-  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[] };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string; files?: CatalogEntry[]; syntaxError?: string | null };
   type PendingRead = { resolve: (payload: TemplateFilePayload) => void; reject: (error: Error) => void };
   type TemplateEditorApi = {
     open(templateId?: string): Promise<void>;
@@ -41,12 +41,32 @@ namespace GrafcetStudioTemplateEditor {
   let suggestionVisible = false;
   let suggestionIndex = 0;
   let loadError = '';
+  let hostSyntaxError = '';
+  let validateTimer = 0;
+  let validateToken = 0;
   const pendingTemplateReads: Record<string, PendingRead> = {};
 
   function el<T extends HTMLElement = HTMLElement>(id: string): T | null {
     return document.getElementById(id) as T | null;
   }
 
+
+  function isDirty(): boolean {
+    return !loadError && currentText !== loadedText;
+  }
+
+  function confirmDiscard(): boolean {
+    return !isDirty() || window.confirm('You have unsaved changes to this template. Discard them?');
+  }
+
+  // execCommand keeps the edit on the browser undo stack (assigning .value would clear Ctrl+Z).
+  function replaceTextRange(input: HTMLTextAreaElement, start: number, end: number, text: string): void {
+    input.focus();
+    input.setSelectionRange(start, end);
+    if (!document.execCommand('insertText', false, text)) {
+      input.setRangeText(text, start, end, 'end');
+    }
+  }
 
   function presetById(id: string): Preset {
     return PRESETS.find(preset => preset.id === id) || PRESETS[0];
@@ -118,9 +138,11 @@ namespace GrafcetStudioTemplateEditor {
       }
 
       const inner = match[1].trim();
-      const open = inner.match(/^#(each|if)\b/);
-      const close = inner.match(/^\/(each|if)$/);
-      if (open) {
+      const open = inner.match(/^#(each|if|unless|with)\b/);
+      const close = inner.match(/^\/(each|if|unless|with)$/);
+      if (inner === 'else' || /^else\s/.test(inner)) {
+        if (!blockStack.length) diagnostics.push({ ...location, message: '{{else}} is outside any block', severity: 'error' });
+      } else if (open) {
         blockStack.push({ name: open[1], ...location });
       } else if (close) {
         const expected = blockStack.pop();
@@ -301,6 +323,7 @@ namespace GrafcetStudioTemplateEditor {
       defaultText = '';
       setLoadError(`Cannot read ${presetById(id).path}: ${error instanceof Error ? error.message : String(error)}`);
     }
+    hostSyntaxError = '';
     currentText = defaultText;
     loadedText = currentText;
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
@@ -310,6 +333,24 @@ namespace GrafcetStudioTemplateEditor {
       input.setSelectionRange(0, 0);
     }
     syncFromTextarea();
+  }
+
+  function scheduleHostValidation(): void {
+    window.clearTimeout(validateTimer);
+    if (loadError || !canUseHostBridge()) return;
+    const token = ++validateToken;
+    validateTimer = window.setTimeout(async () => {
+      let error = '';
+      try {
+        const result = await templateHostRequest('VALIDATE_TEMPLATE', '', '', currentText);
+        error = result.syntaxError || '';
+      } catch {
+        error = '';
+      }
+      if (token !== validateToken || error === hostSyntaxError) return;
+      hostSyntaxError = error;
+      updateStatus();
+    }, 400);
   }
 
   function updateStatus(message?: string): void {
@@ -333,6 +374,11 @@ namespace GrafcetStudioTemplateEditor {
       status.textContent = `Line ${firstError.line}: ${firstError.message}`;
       return;
     }
+    if (hostSyntaxError) {
+      status.className = 'template-editor-status has-error';
+      status.textContent = `Handlebars: ${hostSyntaxError}`;
+      return;
+    }
     status.textContent = currentText === loadedText ? 'No changes' : 'Edited';
   }
 
@@ -345,6 +391,7 @@ namespace GrafcetStudioTemplateEditor {
     syncTemplateEditorScroll();
     updateStatus();
     updateCompletions();
+    scheduleHostValidation();
   }
 
   function syncTemplateEditorScroll(): void {
@@ -410,7 +457,7 @@ namespace GrafcetStudioTemplateEditor {
     if (!input) return;
     const item = visibleSuggestions[index] || visibleSuggestions[0] || SUGGESTIONS[0];
     const range = replaceRangeForSuggestion(input);
-    input.value = input.value.slice(0, range.start) + item.insert + input.value.slice(range.end);
+    replaceTextRange(input, range.start, range.end, item.insert);
     const tokenIndex = item.cursorToken ? item.insert.indexOf(item.cursorToken) : -1;
     const nextPos = range.start + (tokenIndex >= 0 ? tokenIndex : item.insert.length);
     input.focus();
@@ -429,7 +476,8 @@ namespace GrafcetStudioTemplateEditor {
     await loadTemplate(activeId);
   }
 
-  function closeTemplateEditor(): void {
+  function closeTemplateEditor(force = false): void {
+    if (!force && !confirmDiscard()) return;
     const modal = el('template-editor-modal');
     if (modal) modal.classList.remove('show');
     showCompletions(false);
@@ -462,6 +510,10 @@ namespace GrafcetStudioTemplateEditor {
   }
 
   async function switchTemplateEditorPreset(id: string): Promise<void> {
+    if (!confirmDiscard()) {
+      setPresetOptions();
+      return;
+    }
     activeId = id;
     setPresetOptions();
     showCompletions(false);
@@ -496,8 +548,7 @@ namespace GrafcetStudioTemplateEditor {
       event.preventDefault();
       const start = input.selectionStart || 0;
       const end = input.selectionEnd || start;
-      input.value = input.value.slice(0, start) + '  ' + input.value.slice(end);
-      input.setSelectionRange(start + 2, start + 2);
+      replaceTextRange(input, start, end, '  ');
       syncFromTextarea();
       return;
     }

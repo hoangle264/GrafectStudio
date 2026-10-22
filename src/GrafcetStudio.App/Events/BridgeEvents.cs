@@ -34,6 +34,10 @@ public class ListTemplateFilesRequestedEvent : PubSubEvent<ListTemplateFilesPayl
 {
 }
 
+public class ValidateTemplateRequestedEvent : PubSubEvent<ValidateTemplatePayload>
+{
+}
+
 public class WriteTemplateFileRequestedEvent : PubSubEvent<WriteTemplateFilePayload>
 {
 }

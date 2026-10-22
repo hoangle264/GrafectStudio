@@ -45,6 +45,12 @@ public class ListTemplateFilesPayload
     public string RootPath { get; set; } = string.Empty;
 }
 
+public class ValidateTemplatePayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+}
+
 public class WriteTemplateFilePayload
 {
     public string RequestId { get; set; } = string.Empty;

@@ -56,3 +56,18 @@ public class TemplateCatalogTests
         finally { Directory.Delete(root, true); }
     }
 }
+
+public class TemplateSyntaxCheckerTests
+{
+    [Theory]
+    [InlineData("{{#each a}}{{name}}{{/each}}")]
+    [InlineData("{{#unless a}}x{{else}}y{{/unless}}")]
+    public void Check_ReturnsNullForValidTemplates(string source) => Assert.Null(TemplateSyntaxChecker.Check(source));
+
+    [Theory]
+    [InlineData("{{#unless a}}x")]
+    [InlineData("{{#with a}}{{#each b}}{{/with}}{{/each}}")]
+    [InlineData("{{#if a}}x{{/each}}")]
+    [InlineData("{{foo")]
+    public void Check_ReturnsMessageForBrokenTemplates(string source) => Assert.False(string.IsNullOrEmpty(TemplateSyntaxChecker.Check(source)));
+}

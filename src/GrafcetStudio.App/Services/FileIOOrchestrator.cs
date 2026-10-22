@@ -25,6 +25,7 @@ public class FileIOOrchestrator
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
         _events.GetEvent<ListTemplateFilesRequestedEvent>().Subscribe(OnListTemplateFilesRequested);
+        _events.GetEvent<ValidateTemplateRequestedEvent>().Subscribe(OnValidateTemplateRequested);
         _events.GetEvent<WriteTemplateFileRequestedEvent>().Subscribe(OnWriteTemplateFileRequested);
     }
 
@@ -111,6 +112,19 @@ public class FileIOOrchestrator
         {
             var files = GrafcetStudio.CodeGen.Template.TemplateCatalog.List(payload.RootPath);
             await _bridge.SendTemplateListAsync(payload.RequestId, files);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, string.Empty, ex.Message);
+        }
+    }
+
+    private async void OnValidateTemplateRequested(ValidateTemplatePayload payload)
+    {
+        try
+        {
+            var error = GrafcetStudio.CodeGen.Template.TemplateSyntaxChecker.Check(payload.Content);
+            await _bridge.SendTemplateValidationAsync(payload.RequestId, error);
         }
         catch (Exception ex)
         {

@@ -193,6 +193,17 @@ public partial class MainWindow : Window
                     break;
                 }
 
+            case "VALIDATE_TEMPLATE":
+                {
+                    var message = new ValidateTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        Content = payload.TryGetProperty("content", out var validateContent) && validateContent.ValueKind == JsonValueKind.String ? validateContent.GetString() ?? string.Empty : string.Empty
+                    };
+                    _eventAggregator.GetEvent<ValidateTemplateRequestedEvent>().Publish(message);
+                    break;
+                }
+
             case "WRITE_TEMPLATE_FILE":
                 {
                     var message = new WriteTemplateFilePayload
