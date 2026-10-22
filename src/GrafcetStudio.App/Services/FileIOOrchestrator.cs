@@ -6,15 +6,23 @@ namespace GrafcetStudio.App.Services;
 
 public class FileIOOrchestrator
 {
+    private static readonly System.Text.Json.JsonSerializerOptions PreviewJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
     private readonly IEventAggregator _events;
     private readonly IFileService _files;
     private readonly IWebViewBridgeService _bridge;
+    private readonly ConfigService _config;
 
-    public FileIOOrchestrator(IEventAggregator events, IFileService files, IWebViewBridgeService bridge)
+    public FileIOOrchestrator(IEventAggregator events, IFileService files, IWebViewBridgeService bridge, ConfigService config)
     {
         _events = events;
         _files = files;
         _bridge = bridge;
+        _config = config;
     }
 
     public void Init()
@@ -24,6 +32,12 @@ public class FileIOOrchestrator
         _events.GetEvent<ExportCodeRequestedEvent>().Subscribe(OnExportRequested);
         _events.GetEvent<BrowseCodegenPathRequestedEvent>().Subscribe(OnBrowseCodegenPathRequested);
         _events.GetEvent<ReadTemplateFileRequestedEvent>().Subscribe(OnReadTemplateFileRequested);
+        _events.GetEvent<ListTemplateVariablesRequestedEvent>().Subscribe(OnListTemplateVariablesRequested);
+        _events.GetEvent<PreviewTemplateRequestedEvent>().Subscribe(OnPreviewTemplateRequested);
+        _events.GetEvent<SetTemplateRootRequestedEvent>().Subscribe(OnSetTemplateRootRequested);
+        _events.GetEvent<ListTemplateFilesRequestedEvent>().Subscribe(OnListTemplateFilesRequested);
+        _events.GetEvent<ValidateTemplateRequestedEvent>().Subscribe(OnValidateTemplateRequested);
+        _events.GetEvent<WriteTemplateFileRequestedEvent>().Subscribe(OnWriteTemplateFileRequested);
     }
 
     private async void OnSaveRequested(string projectJson)
@@ -99,7 +113,125 @@ public class FileIOOrchestrator
         }
         catch (Exception ex)
         {
-            await _bridge.SendErrorAsync("template-editor", ex.Message);
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnListTemplateVariablesRequested(PreviewTemplatePayload payload)
+    {
+        try
+        {
+            var codegen = System.Text.Json.JsonSerializer.Deserialize<GrafcetStudio.Domain.Models.CodegenPayload>(payload.RawJson, PreviewJsonOptions)
+                          ?? throw new InvalidOperationException("Invalid codegen payload.");
+            var (tree, error) = await System.Threading.Tasks.Task.Run<(GrafcetStudio.CodeGen.Template.TemplateVariableNode? Tree, string? Error)>(() =>
+            {
+                try
+                {
+                    return (GrafcetStudio.CodeGen.Template.TemplateVariableCatalog.Build(payload.RelativePath, codegen), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
+            if (tree is null)
+            {
+                await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, error ?? "Cannot list variables.");
+                return;
+            }
+
+            await _bridge.SendTemplateVariablesAsync(payload.RequestId, tree);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnPreviewTemplateRequested(PreviewTemplatePayload payload)
+    {
+        try
+        {
+            var codegen = System.Text.Json.JsonSerializer.Deserialize<GrafcetStudio.Domain.Models.CodegenPayload>(payload.RawJson, PreviewJsonOptions)
+                          ?? throw new InvalidOperationException("Invalid codegen payload.");
+            var editedPath = FileService.ResolveTemplatePath(payload.RootPath, payload.RelativePath);
+            // Errors are caught inside the lambda: half-typed templates are expected while editing and
+            // must not surface as unhandled exceptions on the worker thread.
+            var (preview, error) = await System.Threading.Tasks.Task.Run<(GrafcetStudio.CodeGen.Template.TemplatePreviewResult? Preview, string? Error)>(() =>
+            {
+                var syntaxError = GrafcetStudio.CodeGen.Template.TemplateSyntaxChecker.Check(payload.Content);
+                if (syntaxError is not null) return (null, "Handlebars: " + syntaxError);
+                try
+                {
+                    return (GrafcetStudio.CodeGen.Template.TemplatePreviewService.Render(payload.RootPath.Trim(), editedPath, payload.Content, codegen), null);
+                }
+                catch (Exception ex)
+                {
+                    return (null, ex.Message);
+                }
+            });
+            if (preview is null)
+            {
+                await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, error ?? "Preview failed.");
+                return;
+            }
+
+            await _bridge.SendTemplatePreviewAsync(payload.RequestId, preview);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
+        }
+    }
+
+    private async void OnSetTemplateRootRequested(SetTemplateRootPayload payload)
+    {
+        try
+        {
+            await _config.SaveTemplateRootAsync(payload.Path);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendErrorAsync("fileIO", ex.Message);
+        }
+    }
+
+    private async void OnListTemplateFilesRequested(ListTemplateFilesPayload payload)
+    {
+        try
+        {
+            var files = GrafcetStudio.CodeGen.Template.TemplateCatalog.List(payload.RootPath);
+            await _bridge.SendTemplateListAsync(payload.RequestId, files);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, string.Empty, ex.Message);
+        }
+    }
+
+    private async void OnValidateTemplateRequested(ValidateTemplatePayload payload)
+    {
+        try
+        {
+            var error = GrafcetStudio.CodeGen.Template.TemplateSyntaxChecker.Check(payload.Content);
+            await _bridge.SendTemplateValidationAsync(payload.RequestId, error);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, string.Empty, ex.Message);
+        }
+    }
+
+    private async void OnWriteTemplateFileRequested(WriteTemplateFilePayload payload)
+    {
+        try
+        {
+            await _files.WriteTemplateFileAsync(payload.RootPath, payload.RelativePath, payload.Content);
+            await _bridge.SendTemplateFileAsync(payload.RequestId, payload.RelativePath, payload.Content);
+        }
+        catch (Exception ex)
+        {
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
         }
     }
 }

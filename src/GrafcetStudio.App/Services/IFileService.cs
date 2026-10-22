@@ -13,4 +13,5 @@ public interface IFileService
     Task<string?> BrowseTemplateRootPathAsync();
     Task<string?> BrowseOutputRootPathAsync();
     Task<string> ReadTemplateFileAsync(string rootPath, string relativePath);
+    Task WriteTemplateFileAsync(string rootPath, string relativePath, string content);
 }

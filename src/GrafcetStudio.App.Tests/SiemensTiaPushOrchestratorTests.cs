@@ -155,6 +155,11 @@ public class SiemensTiaPushOrchestratorTests
         public Task SendCodegenPathAsync(string target, string path) => Task.CompletedTask;
         public Task SendSavedPathsAsync(string deviceLibraryPath, string templatePath, string outputPath) => Task.CompletedTask;
         public Task SendTemplateFileAsync(string requestId, string relativePath, string content) => Task.CompletedTask;
+        public Task SendTemplateListAsync(string requestId, object files) => Task.CompletedTask;
+        public Task SendTemplateValidationAsync(string requestId, string? syntaxError) => Task.CompletedTask;
+        public Task SendTemplatePreviewAsync(string requestId, object preview) => Task.CompletedTask;
+        public Task SendTemplateVariablesAsync(string requestId, object variables) => Task.CompletedTask;
+        public Task SendTemplateFileErrorAsync(string requestId, string relativePath, string error) => Task.CompletedTask;
 
         public Task SendSiemensTiaPushResultAsync(object result)
         {

@@ -39,6 +39,40 @@ public class ReadTemplateFilePayload
     public string RelativePath { get; set; } = string.Empty;
 }
 
+public class PreviewTemplatePayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string RootPath { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string RawJson { get; set; } = string.Empty;
+}
+
+public class SetTemplateRootPayload
+{
+    public string Path { get; set; } = string.Empty;
+}
+
+public class ListTemplateFilesPayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string RootPath { get; set; } = string.Empty;
+}
+
+public class ValidateTemplatePayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+}
+
+public class WriteTemplateFilePayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string RootPath { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+}
+
 public class PushSiemensLadPayload
 {
     public string DevPath { get; set; } = string.Empty;

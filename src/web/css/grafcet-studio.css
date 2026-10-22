@@ -880,7 +880,8 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 
 /* Template Editor */
 .template-editor-modal{min-height:620px;}
-.template-editor-toolbar{display:grid;grid-template-columns:minmax(220px,320px) 1fr minmax(220px,360px);gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--s1);align-items:end;}
+.template-editor-toolbar{display:grid;grid-template-columns:minmax(220px,360px) 1fr minmax(220px,360px);gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--s1);align-items:end;}
+.template-editor-pickers{display:flex;gap:6px;}.template-editor-pickers #template-editor-platform{flex:0 0 auto;width:auto;max-width:42%;}.template-editor-pickers #template-editor-select{flex:1;min-width:0;}
 .template-editor-field{min-width:0;}
 .template-editor-label{font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;font-family:var(--font-display);}
 .template-editor-help{font-size:var(--fs-xs);color:var(--text2);line-height:1.4;}
@@ -888,13 +889,21 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .template-editor-status{font-size:var(--fs-xs);color:var(--green);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .template-editor-status.has-error{color:var(--red);}
 .template-editor-body{position:relative;flex:1;min-height:0;background:var(--bg);padding:14px 18px 18px;}
+.template-editor-body.has-preview{display:flex;gap:12px;}
+.template-editor-body.has-preview .template-editor-code-wrap{flex:1 1 50%;width:auto;min-width:0;}
+.template-editor-preview{flex:1 1 50%;min-width:0;display:flex;flex-direction:column;gap:8px;}
+.template-editor-preview.is-hidden{display:none;}
+.template-editor-preview-bar{display:flex;gap:8px;}.template-editor-preview-bar .modal-select{flex:1;min-width:0;}
+.template-editor-preview-note{font-size:var(--fs-xs);color:var(--amber);font-family:var(--font-mono);}.template-editor-preview-note.has-error{color:var(--red);}.template-editor-preview-note.is-hidden{display:none;}
+.template-editor-preview-out{flex:1;min-height:0;margin:0;padding:14px 16px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);background:#0b1220;color:var(--text);font-family:var(--font-mono);font-size:var(--fs-sm);line-height:1.55;white-space:pre;tab-size:2;}
 .template-editor-code-wrap{position:relative;width:100%;height:100%;border:1px solid var(--border);background:#111827;overflow:hidden;border-radius:var(--radius);}
 .template-editor-highlight,.template-editor-textarea{position:absolute;inset:0;margin:0;padding:14px 16px;border:0;background:transparent;font-family:var(--font-mono);font-size:var(--fs-sm);line-height:1.55;tab-size:2;white-space:pre;overflow:auto;}
 .template-editor-highlight{pointer-events:none;color:var(--text);}
 .template-editor-textarea{resize:none;outline:none;color:transparent;caret-color:var(--text);z-index:1;}
 .template-editor-textarea::selection{background:rgba(79,163,227,.35);color:transparent;}
-.template-editor-completions{position:absolute;left:34px;top:64px;z-index:3;width:220px;max-height:260px;overflow:auto;background:var(--s2);border:1px solid var(--border2);box-shadow:var(--shadow-md);border-radius:var(--radius);padding:4px;}
+.template-editor-completions{position:absolute;left:34px;top:64px;z-index:3;width:340px;max-height:260px;overflow:auto;background:var(--s2);border:1px solid var(--border2);box-shadow:var(--shadow-md);border-radius:var(--radius);padding:4px;}
 .template-editor-completion{display:flex;width:100%;padding:6px 8px;background:transparent;border:0;color:var(--text2);font-family:var(--font-mono);font-size:var(--fs-xs);cursor:pointer;text-align:left;border-radius:var(--radius);}
+.template-editor-completion small{margin-left:auto;padding-left:12px;color:var(--text3);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .template-editor-completion:hover,.template-editor-completion.active{background:rgba(34,211,238,.1);color:var(--cyan);}
 .hbs-delim{color:#c084fc;}
 .hbs-block{color:#60a5fa;font-weight:600;}

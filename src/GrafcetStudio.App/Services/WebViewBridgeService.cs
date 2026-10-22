@@ -73,6 +73,36 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveTemplateFile({payload});");
     }
 
+    public async Task SendTemplateListAsync(string requestId, object files)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, files }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
+    public async Task SendTemplateValidationAsync(string requestId, string? syntaxError)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, syntaxError });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
+    public async Task SendTemplatePreviewAsync(string requestId, object preview)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, preview }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
+    public async Task SendTemplateVariablesAsync(string requestId, object variables)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, variables }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
+    public async Task SendTemplateFileErrorAsync(string requestId, string relativePath, string error)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, relativePath, error });
+        await ExecuteAsync($"receiveTemplateFile({payload});");
+    }
+
     public async Task SendSiemensTiaPushResultAsync(object result)
     {
         var payload = JsonSerializer.Serialize(result);

@@ -182,6 +182,73 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<ReadTemplateFileRequestedEvent>().Publish(message);
                     break;
                 }
+            case "LIST_TEMPLATE_VARIABLES":
+                {
+                    var message = new PreviewTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        RawJson = payload.TryGetProperty("codegenPayload", out var variablesPayload) && variablesPayload.ValueKind == JsonValueKind.Object ? variablesPayload.GetRawText() : string.Empty
+                    };
+                    _eventAggregator.GetEvent<ListTemplateVariablesRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "PREVIEW_TEMPLATE":
+                {
+                    var message = new PreviewTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        Content = payload.TryGetProperty("content", out var previewContent) && previewContent.ValueKind == JsonValueKind.String ? previewContent.GetString() ?? string.Empty : string.Empty,
+                        RawJson = payload.TryGetProperty("codegenPayload", out var previewPayload) && previewPayload.ValueKind == JsonValueKind.Object ? previewPayload.GetRawText() : string.Empty
+                    };
+                    _eventAggregator.GetEvent<PreviewTemplateRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "SET_TEMPLATE_ROOT":
+                {
+                    var message = new SetTemplateRootPayload { Path = GetOptionalString(payload, "path") };
+                    _eventAggregator.GetEvent<SetTemplateRootRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "LIST_TEMPLATE_FILES":
+                {
+                    var message = new ListTemplateFilesPayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath")
+                    };
+                    _eventAggregator.GetEvent<ListTemplateFilesRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "VALIDATE_TEMPLATE":
+                {
+                    var message = new ValidateTemplatePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        Content = payload.TryGetProperty("content", out var validateContent) && validateContent.ValueKind == JsonValueKind.String ? validateContent.GetString() ?? string.Empty : string.Empty
+                    };
+                    _eventAggregator.GetEvent<ValidateTemplateRequestedEvent>().Publish(message);
+                    break;
+                }
+
+            case "WRITE_TEMPLATE_FILE":
+                {
+                    var message = new WriteTemplateFilePayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        RootPath = GetOptionalString(payload, "rootPath"),
+                        RelativePath = GetOptionalString(payload, "relativePath"),
+                        Content = payload.TryGetProperty("content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String ? contentProp.GetString() ?? string.Empty : string.Empty
+                    };
+                    _eventAggregator.GetEvent<WriteTemplateFileRequestedEvent>().Publish(message);
+                    break;
+                }
             case "PUSH_SIEMENS_LAD":
                 {
                     var message = new PushSiemensLadPayload

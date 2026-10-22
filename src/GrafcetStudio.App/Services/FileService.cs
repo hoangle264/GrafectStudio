@@ -98,7 +98,7 @@ public class FileService : IFileService
     }
 
 
-    public async Task<string> ReadTemplateFileAsync(string rootPath, string relativePath)
+    internal static string ResolveTemplatePath(string rootPath, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
         {
@@ -120,12 +120,41 @@ public class FileService : IFileService
             throw new InvalidOperationException("Template file path is outside the selected template root.");
         }
 
+        return fileFullPath;
+    }
+
+    public async Task<string> ReadTemplateFileAsync(string rootPath, string relativePath)
+    {
+        var fileFullPath = ResolveTemplatePath(rootPath, relativePath);
         if (!File.Exists(fileFullPath))
         {
             throw new FileNotFoundException("Template file not found.", fileFullPath);
         }
 
         return await File.ReadAllTextAsync(fileFullPath, Utf8NoBom);
+    }
+
+    public async Task WriteTemplateFileAsync(string rootPath, string relativePath, string content)
+    {
+        var fileFullPath = ResolveTemplatePath(rootPath, relativePath);
+        if (!string.Equals(Path.GetExtension(fileFullPath), ".hbs", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only .hbs template files can be written.");
+        }
+
+        var directory = Path.GetDirectoryName(fileFullPath)!;
+        Directory.CreateDirectory(directory);
+
+        var tempPath = fileFullPath + ".tmp";
+        await File.WriteAllTextAsync(tempPath, content, Utf8NoBom);
+        if (File.Exists(fileFullPath))
+        {
+            File.Replace(tempPath, fileFullPath, fileFullPath + ".bak");
+        }
+        else
+        {
+            File.Move(tempPath, fileFullPath);
+        }
     }
 
     private static Task<string?> BrowseFolderAsync(string description)

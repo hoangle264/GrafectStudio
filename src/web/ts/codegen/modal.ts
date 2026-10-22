@@ -91,7 +91,7 @@ function showGenerateCodeModal(): void {
           <div id="asset-paths-body" class="cg-advanced-body">
             <div class="cg-paths-grid">
               <label>Device Library</label><input id="cg-device-library-path" class="cg-input" value="config/Devices.json" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('deviceLibrary')">Browse...</button>
-              <label>Template Root</label><input id="cg-template-root-path" class="cg-input" value="templates" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('templateRoot')">Browse...</button>
+              <label>Template Root</label><input id="cg-template-root-path" class="cg-input" value="templates" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()" onchange="cgSetTemplateRoot(this.value)"><button class="btn" onclick="cgBrowseCodegenPath('templateRoot')">Browse...</button>
               <label>Output Folder</label><input id="cg-output-root-path" class="cg-input" value="" oninput="cgUpdateAssetPathStatus(); cgUpdatePreview()"><button class="btn" onclick="cgBrowseCodegenPath('outputRoot')">Browse...</button>
             </div>
             <div id="asset-paths-status" class="cg-paths-status"></div>
@@ -345,9 +345,28 @@ function cgExportViaHost(code: MdCodegenFile[], platform: string): boolean {
 // JSON Files panel toggle
 
 // --- Codegen asset paths ----------------------------------------------------
+// Template Root is app-wide: the modal input mirrors it, but it is readable (and persisted) without the modal.
+function cgGetTemplateRoot(): string {
+  const input = document.getElementById('cg-template-root-path') as HTMLInputElement | null;
+  if (input) return input.value.trim();
+  return (cgSavedPaths.templatePath || '').trim() || 'templates';
+}
+
+function cgSetTemplateRoot(path: string): void {
+  const value = (path || '').trim();
+  const input = document.getElementById('cg-template-root-path') as HTMLInputElement | null;
+  if (input) input.value = value;
+  cgSavedPaths.templatePath = value;
+  cgUpdateAssetPathStatus();
+  cgUpdatePreview();
+  const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
+  if (host?.webview?.postMessage) host.webview.postMessage({ type: 'SET_TEMPLATE_ROOT', payload: { path: value } });
+  (window as Window & { onTemplateRootChanged?: () => void }).onTemplateRootChanged?.();
+}
+
 function cgGetCodegenAssets(): { deviceLibraryPath: string; templateRootPath: string; outputPath: string } {
   const devPath = (document.getElementById('cg-device-library-path') as HTMLInputElement | null)?.value || 'config/Devices.json';
-  const tplRoot = (document.getElementById('cg-template-root-path') as HTMLInputElement | null)?.value || 'templates';
+  const tplRoot = cgGetTemplateRoot() || 'templates';
   const outRoot = (document.getElementById('cg-output-root-path') as HTMLInputElement | null)?.value || '';
   return {
     deviceLibraryPath: devPath.trim(),
@@ -390,6 +409,10 @@ function cgBrowseCodegenPath(target: string): boolean {
 
 function receiveCodegenPath(payload: string | { target?: string; path?: string } | null): void {
   const data = typeof payload === 'string' ? { target: 'templateRoot', path: payload } : (payload || {});
+  if ((!data.target || data.target === 'templateRoot') && data.path) {
+    cgSetTemplateRoot(data.path);
+    return;
+  }
   const inputId = data.target === 'deviceLibrary'
     ? 'cg-device-library-path'
     : data.target === 'outputRoot'
