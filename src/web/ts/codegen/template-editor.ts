@@ -202,13 +202,6 @@ namespace GrafcetStudioTemplateEditor {
               <select id="template-editor-select" class="modal-select" onchange="switchTemplateEditorPreset(this.value)"></select>
             </div>
           </div>
-          <div class="template-editor-field">
-            <div class="template-editor-label">Template Root (shared setting)</div>
-            <div class="template-editor-root">
-              <input id="template-editor-root" class="cg-input" spellcheck="false" onchange="changeTemplateEditorRoot(this.value)">
-              <button class="btn" onclick="browseTemplateEditorRoot()">Browse...</button>
-            </div>
-          </div>
           <div class="template-editor-field template-editor-help">
             <div class="template-editor-label">Shortcuts</div>
             <div>Type <b>{{</b> or press <b>Ctrl+Space</b> for Handlebars snippets</div>
@@ -270,7 +263,8 @@ namespace GrafcetStudioTemplateEditor {
     }).join('');
     select.value = activeId;
     const title = el<HTMLElement>('template-editor-title');
-    if (title) title.textContent = presetById(activeId).label;
+    if (title) title.textContent = presetById(activeId).label + '  —  ' + templateRootPath();
+    showTemplateRoot();
   }
 
   function templateRootPath(): string {
@@ -761,30 +755,14 @@ namespace GrafcetStudioTemplateEditor {
     if (item.range && item.insert.endsWith('.')) updateCompletions(true);
   }
 
-  function syncRootInput(): void {
-    const input = el<HTMLInputElement>('template-editor-root');
-    if (input) input.value = templateRootPath();
-  }
-
-  function changeTemplateEditorRoot(path: string): void {
-    if (!confirmDiscard()) {
-      syncRootInput();
-      return;
-    }
-    loadedText = currentText;
-    const setRoot = (window as Window & { cgSetTemplateRoot?: (path: string) => void }).cgSetTemplateRoot;
-    if (setRoot) setRoot(path);
-  }
-
-  function browseTemplateEditorRoot(): void {
-    const bridge = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome?.webview;
-    if (bridge?.postMessage) bridge.postMessage({ type: 'BROWSE_CODEGEN_PATH', payload: { target: 'templateRoot' } });
+  function showTemplateRoot(): void {
+    const title = el<HTMLElement>('template-editor-title');
+    if (title) title.title = 'Template Root: ' + templateRootPath();
   }
 
   async function onTemplateRootChanged(): Promise<void> {
     const modal = el('template-editor-modal');
     if (!modal || !modal.classList.contains('show')) return;
-    syncRootInput();
     await refreshPresets();
     setPresetOptions();
     await loadTemplate(activeId);
@@ -792,7 +770,6 @@ namespace GrafcetStudioTemplateEditor {
 
   async function openTemplateEditor(id?: string): Promise<void> {
     const modal = ensureModal();
-    syncRootInput();
     activeId = id || activeId || PRESETS[0].id;
     await refreshPresets();
     setPresetOptions();
@@ -955,8 +932,6 @@ namespace GrafcetStudioTemplateEditor {
   (window as Window & any).toggleTemplateEditorPreview = toggleTemplateEditorPreview;
   (window as Window & any).refreshTemplateEditorPreviewData = refreshTemplateEditorPreviewData;
   (window as Window & any).selectTemplateEditorPreviewFile = selectTemplateEditorPreviewFile;
-  (window as Window & any).changeTemplateEditorRoot = changeTemplateEditorRoot;
-  (window as Window & any).browseTemplateEditorRoot = browseTemplateEditorRoot;
   (window as Window & any).onTemplateRootChanged = onTemplateRootChanged;
   (window as Window & any).receiveTemplateFile = receiveTemplateFile;
   (window as Window & any).openTemplateEditor = openTemplateEditor;
