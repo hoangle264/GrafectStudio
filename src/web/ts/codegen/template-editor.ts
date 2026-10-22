@@ -3,7 +3,8 @@ namespace GrafcetStudioTemplateEditor {
   type Preset = { id: string; label: string; path: string };
   type Suggestion = { label: string; insert: string; cursorToken?: string };
   type TemplateDiagnostic = { line: number; column: number; message: string; severity: TemplateDiagnosticSeverity };
-  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string };
+  type TemplateFilePayload = { requestId?: string; relativePath?: string; content?: string; error?: string };
+  type PendingRead = { resolve: (content: string) => void; reject: (error: Error) => void };
   type TemplateEditorApi = {
     open(templateId?: string): Promise<void>;
     close(): void;
@@ -62,7 +63,8 @@ namespace GrafcetStudioTemplateEditor {
   let visibleSuggestions: Suggestion[] = SUGGESTIONS;
   let suggestionVisible = false;
   let suggestionIndex = 0;
-  const pendingTemplateReads: Record<string, (content: string) => void> = {};
+  let loadError = '';
+  const pendingTemplateReads: Record<string, PendingRead> = {};
 
   function el<T extends HTMLElement = HTMLElement>(id: string): T | null {
     return document.getElementById(id) as T | null;
@@ -176,7 +178,7 @@ namespace GrafcetStudioTemplateEditor {
           <div class="modal-actions">
             <button class="btn" onclick="openTemplateEditorReset()">Reset to default</button>
             <button class="btn" onclick="closeTemplateEditor()">Cancel</button>
-            <button class="btn a" onclick="saveTemplateEditor()">Save Template</button>
+            <button id="template-editor-save" class="btn a" onclick="saveTemplateEditor()">Save Template</button>
           </div>
         </header>
         <div class="template-editor-toolbar">
@@ -235,10 +237,17 @@ namespace GrafcetStudioTemplateEditor {
         delete pendingTemplateReads[requestId];
         reject(new Error('Timed out reading template from host.'));
       }, 5000);
-      pendingTemplateReads[requestId] = content => {
-        window.clearTimeout(timeout);
-        delete pendingTemplateReads[requestId];
-        resolve(content);
+      pendingTemplateReads[requestId] = {
+        resolve: content => {
+          window.clearTimeout(timeout);
+          delete pendingTemplateReads[requestId];
+          resolve(content);
+        },
+        reject: error => {
+          window.clearTimeout(timeout);
+          delete pendingTemplateReads[requestId];
+          reject(error);
+        }
       };
       postMessage.call(bridge, {
         type: 'READ_TEMPLATE_FILE',
@@ -251,24 +260,31 @@ namespace GrafcetStudioTemplateEditor {
     const preset = presetById(id);
     const rootPath = templateRootPath();
     if (rootPath && canUseHostBridge()) {
-      try {
-        return await readTemplateViaHost(rootPath, preset.path);
-      } catch {
-      }
+      return await readTemplateViaHost(rootPath, preset.path);
     }
 
     const url = `https://templates.grafcet.local/${preset.path}`;
-    try {
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return await response.text();
-    } catch {
-      return '{{! Template file unavailable }}\n';
-    }
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    return await response.text();
+  }
+
+  function setLoadError(message: string): void {
+    loadError = message;
+    const input = el<HTMLTextAreaElement>('template-editor-textarea');
+    if (input) input.readOnly = !!message;
+    const save = el<HTMLButtonElement>('template-editor-save');
+    if (save) save.disabled = !!message;
   }
 
   async function loadTemplate(id: string): Promise<void> {
-    defaultText = await loadDefaultText(id);
+    try {
+      defaultText = await loadDefaultText(id);
+      setLoadError('');
+    } catch (error) {
+      defaultText = '';
+      setLoadError(`Cannot read ${presetById(id).path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
     currentText = defaultText;
     loadedText = currentText;
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
@@ -283,6 +299,11 @@ namespace GrafcetStudioTemplateEditor {
   function updateStatus(message?: string): void {
     const status = el<HTMLElement>('template-editor-status');
     if (!status) return;
+    if (loadError) {
+      status.textContent = loadError;
+      status.className = 'template-editor-status has-error';
+      return;
+    }
     if (message) {
       status.textContent = message;
       status.className = 'template-editor-status';
@@ -398,6 +419,7 @@ namespace GrafcetStudioTemplateEditor {
   }
 
   async function saveTemplateEditor(): Promise<void> {
+    if (loadError) return;
     const preset = presetById(activeId);
     const filename = preset.path.replace(/[\\/]/g, '__');
     const blob = new Blob([currentText || ''], { type: 'text/plain;charset=utf-8' });
@@ -418,7 +440,8 @@ namespace GrafcetStudioTemplateEditor {
   }
 
   async function openTemplateEditorReset(): Promise<void> {
-    currentText = defaultText || await loadDefaultText(activeId);
+    if (loadError) return;
+    currentText = defaultText;
     loadedText = currentText;
     const input = el<HTMLTextAreaElement>('template-editor-textarea');
     if (input) input.value = currentText;
@@ -490,8 +513,10 @@ namespace GrafcetStudioTemplateEditor {
 
   function receiveTemplateFile(payload: TemplateFilePayload): void {
     const requestId = payload?.requestId || '';
-    const resolve = pendingTemplateReads[requestId];
-    if (resolve) resolve(payload?.content || '');
+    const pending = pendingTemplateReads[requestId];
+    if (!pending) return;
+    if (payload?.error) pending.reject(new Error(payload.error));
+    else pending.resolve(payload?.content || '');
   }
 
   (window as unknown as Window & {

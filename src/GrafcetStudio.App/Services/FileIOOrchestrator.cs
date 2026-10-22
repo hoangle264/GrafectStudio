@@ -99,7 +99,7 @@ public class FileIOOrchestrator
         }
         catch (Exception ex)
         {
-            await _bridge.SendErrorAsync("template-editor", ex.Message);
+            await _bridge.SendTemplateFileErrorAsync(payload.RequestId, payload.RelativePath, ex.Message);
         }
     }
 }
