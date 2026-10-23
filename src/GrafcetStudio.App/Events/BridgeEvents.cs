@@ -10,6 +10,10 @@ public class AiRequestedEvent : PubSubEvent<AiRequestPayload>
 {
 }
 
+public class AiSettingsRequestedEvent : PubSubEvent<AiSettingsPayload>
+{
+}
+
 public class SaveFileRequestedEvent : PubSubEvent<string>
 {
 }

@@ -38,6 +38,18 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveAiStreamEvent({payload});");
     }
 
+    public async Task SendAiSettingsAsync(bool configured, string source, string model, string? error = null)
+    {
+        var payload = JsonSerializer.Serialize(new { configured, source, model, error = error ?? string.Empty });
+        await ExecuteAsync($"receiveAiSettings({payload});");
+    }
+
+    public async Task SendAiModelsAsync(bool ok, IReadOnlyList<string> models, string suggested, string? error = null)
+    {
+        var payload = JsonSerializer.Serialize(new { ok, models, suggested, error = error ?? string.Empty });
+        await ExecuteAsync($"receiveAiModels({payload});");
+    }
+
     public async Task SendErrorAsync(string source, string message)
     {
         var payload = JsonSerializer.Serialize(new { source, message });

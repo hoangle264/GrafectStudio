@@ -21,6 +21,14 @@ public class AiRequestPayload
     public bool Stream { get; set; }
 }
 
+public class AiSettingsPayload
+{
+    /// <summary>"get", "save" or "clear".</summary>
+    public string Action { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
+}
+
 public class ExportCodePayload
 {
     public List<CodegenFile> Files { get; set; } = new();

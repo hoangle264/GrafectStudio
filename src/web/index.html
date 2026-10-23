@@ -416,8 +416,21 @@
                 <section class="ai-chat-panel" id="ai-chat-panel" aria-label="AI proposal preview">
                     <div class="ai-chat-head">
                         <span class="ai-chat-title">AI PREVIEW</span>
+                        <button class="pin-btn" onclick="aiSettingsToggle()" title="AI settings (API key)">&#9881;</button>
                         <button class="pin-btn" id="ai-chat-float-btn" onclick="toggleAiChatFloating()" title="Pop out">&#10138;</button>
                         <button class="pin-btn" onclick="toggleAiChatPanel(false)" title="Back to Properties">&#10005;</button>
+                    </div>
+                    <div class="ai-settings" id="ai-settings">
+                        <div class="ai-settings-status" id="ai-settings-status">Checking AI settings...</div>
+                        <div class="ai-settings-form" id="ai-settings-form" hidden>
+                            <input type="password" id="ai-settings-key" class="ai-chat-input" autocomplete="off" spellcheck="false" placeholder="Gemini API key (leave empty to keep current)">
+                            <select id="ai-settings-model" class="ai-chat-intent" title="Gemini model"></select>
+                            <div class="ai-chat-actions">
+                                <button class="btn a" onclick="aiSettingsSave()">Save</button>
+                                <button class="btn" onclick="aiSettingsLoadModels()">Load models</button>
+                                <button class="btn r" onclick="aiSettingsClear()">Remove key</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="ai-chat-body" id="ai-chat-body"></div>
                     <div class="ai-chat-compose">

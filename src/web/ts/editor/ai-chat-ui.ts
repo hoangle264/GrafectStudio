@@ -203,6 +203,7 @@ function toggleAiChatPanel(show?: boolean): void {
   if (show === false && aiChatIsFloating()) setAiChatFloating(false);
   panel.classList.toggle('show', show !== false);
   setRightPanelTab(show === false ? 'props' : 'ai');
+  if (show !== false) aiSettingsPost('get');
   if (show !== false && !AI_CHAT_STATE.messages.length) {
     aiChatAddMessage('assistant', 'Create or receive an AI proposal here. Preview and validation are required before Apply is enabled.');
   }
@@ -608,6 +609,84 @@ function receiveAiStreamEvent(event: { kind?: string; text?: unknown } | null): 
   }
   aiChatAppendStreamDelta(text);
 }
+interface AiSettingsState { configured: boolean; source: string; model: string; error?: string; }
+
+function aiSettingsPost(action: string, extra?: Record<string, string>): boolean {
+  const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
+  if (!host || !host.webview || typeof host.webview.postMessage !== 'function') return false;
+  host.webview.postMessage({ type: 'AI_SETTINGS', payload: Object.assign({ action }, extra || {}) });
+  return true;
+}
+
+function aiSettingsToggle(): void {
+  const form = document.getElementById('ai-settings-form');
+  if (!form) return;
+  form.hidden = !form.hidden;
+  if (!form.hidden) aiSettingsPost('get');
+}
+
+function aiSettingsSave(): void {
+  const key = document.getElementById('ai-settings-key') as HTMLInputElement | null;
+  const model = document.getElementById('ai-settings-model') as HTMLSelectElement | null;
+  const posted = aiSettingsPost('save', { apiKey: key ? key.value.trim() : '', model: model ? model.value.trim() : '' });
+  if (!posted) receiveAiSettings({ configured: false, source: 'none', model: '', error: 'API key can only be saved inside the desktop app.' });
+  if (key) key.value = '';
+}
+
+function aiSettingsLoadModels(): void {
+  const key = document.getElementById('ai-settings-key') as HTMLInputElement | null;
+  const status = document.getElementById('ai-settings-status');
+  if (status) status.textContent = 'Loading models from Gemini...';
+  if (!aiSettingsPost('list', { apiKey: key ? key.value.trim() : '' })) receiveAiModels({ ok: false, models: [], suggested: '', error: 'Model list is only available inside the desktop app.' });
+}
+
+function aiSettingsFillModels(models: string[], selected: string): void {
+  const select = document.getElementById('ai-settings-model') as HTMLSelectElement | null;
+  if (!select) return;
+  const names = models.slice();
+  if (selected && names.indexOf(selected) < 0) names.unshift(selected);
+  select.innerHTML = names.map(function(name) {
+    return '<option value="' + aiChatEscape(name) + '">' + aiChatEscape(name) + '</option>';
+  }).join('');
+  if (selected) select.value = selected;
+}
+
+function receiveAiModels(result: { ok: boolean; models: string[]; suggested: string; error?: string }): void {
+  const status = document.getElementById('ai-settings-status');
+  const select = document.getElementById('ai-settings-model') as HTMLSelectElement | null;
+  if (!result.ok) {
+    if (status) {
+      status.textContent = result.error || 'Could not load models.';
+      status.classList.add('warn');
+    }
+    return;
+  }
+  const current = select ? select.value : '';
+  const keep = current && result.models.indexOf(current) >= 0 ? current : result.suggested;
+  aiSettingsFillModels(result.models, keep);
+  if (status) {
+    status.textContent = result.models.length + ' models available. Pick one and Save.';
+    status.classList.remove('warn');
+  }
+}
+
+function aiSettingsClear(): void {
+  aiSettingsPost('clear');
+}
+
+function receiveAiSettings(settings: AiSettingsState): void {
+  const status = document.getElementById('ai-settings-status');
+  const model = document.getElementById('ai-settings-model') as HTMLSelectElement | null;
+  if (model && settings.model && document.activeElement !== model) aiSettingsFillModels(Array.from(model.options).map(function(o) { return o.value; }), settings.model);
+  if (!status) return;
+  let text: string;
+  if (settings.configured) text = 'Gemini connected (' + (settings.source === 'env' ? 'environment key' : 'saved key') + ') - ' + settings.model;
+  else text = 'No API key - using offline mock responses. Click the gear to add a key.';
+  if (settings.error) text = settings.error + ' | ' + text;
+  status.textContent = text;
+  status.classList.toggle('warn', !settings.configured || !!settings.error);
+  if (settings.configured && model && model.options.length <= 1 && !settings.error) aiSettingsLoadModels();
+}
 function runAiChatUiValidation(): { ok: boolean; errors: string[] } {
   const bridge = aiChatBridge();
   if (!bridge) return { ok: false, errors: ['AI bridge is not available.'] };
@@ -714,6 +793,12 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { aiChatEditProposal: typeof aiChatEditProposal }).aiChatEditProposal = aiChatEditProposal;
 (window as unknown as { aiChatCancelEdit: typeof aiChatCancelEdit }).aiChatCancelEdit = aiChatCancelEdit;
 (window as unknown as { aiChatSaveEdit: typeof aiChatSaveEdit }).aiChatSaveEdit = aiChatSaveEdit;
+(window as unknown as { aiSettingsToggle: typeof aiSettingsToggle }).aiSettingsToggle = aiSettingsToggle;
+(window as unknown as { aiSettingsSave: typeof aiSettingsSave }).aiSettingsSave = aiSettingsSave;
+(window as unknown as { aiSettingsClear: typeof aiSettingsClear }).aiSettingsClear = aiSettingsClear;
+(window as unknown as { aiSettingsLoadModels: typeof aiSettingsLoadModels }).aiSettingsLoadModels = aiSettingsLoadModels;
+(window as unknown as { receiveAiModels: typeof receiveAiModels }).receiveAiModels = receiveAiModels;
+(window as unknown as { receiveAiSettings: typeof receiveAiSettings }).receiveAiSettings = receiveAiSettings;
 (window as unknown as { receiveAiChunk: typeof receiveAiChunk }).receiveAiChunk = receiveAiChunk;
 (window as unknown as { runAiChatUiValidation: typeof runAiChatUiValidation }).runAiChatUiValidation = runAiChatUiValidation;
 (window as unknown as { runAiChatStreamingValidation: typeof runAiChatStreamingValidation }).runAiChatStreamingValidation = runAiChatStreamingValidation;

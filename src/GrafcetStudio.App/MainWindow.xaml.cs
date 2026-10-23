@@ -151,6 +151,17 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
                     break;
                 }
+            case "AI_SETTINGS":
+                {
+                    var message = new AiSettingsPayload
+                    {
+                        Action = GetOptionalString(payload, "action"),
+                        ApiKey = GetOptionalString(payload, "apiKey"),
+                        Model = GetOptionalString(payload, "model")
+                    };
+                    _eventAggregator.GetEvent<AiSettingsRequestedEvent>().Publish(message);
+                    break;
+                }
             case "SAVE_FILE":
                 {
                     var projectJson = payload.GetProperty("projectJson").GetString() ?? string.Empty;

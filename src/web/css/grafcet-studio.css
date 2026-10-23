@@ -871,6 +871,11 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .ai-message-list.ai-warnings{color:var(--amber);}
 .ai-proposal-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .ai-proposal-actions .btn[disabled]{opacity:.45;cursor:not-allowed;filter:grayscale(.4);}
+.ai-settings{border-bottom:1px solid var(--border);padding:6px 8px;background:var(--s2);font-size:var(--fs-xs);}
+.ai-settings-status{color:var(--text);font-family:var(--font-mono);}
+.ai-settings-status.warn{color:var(--amber);}
+.ai-settings-form{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+.ai-settings-form[hidden]{display:none;}
 .ai-chat-compose{border-top:1px solid var(--border);padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--s2);}
 .ai-chat-intent,.ai-chat-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-xs);border-radius:var(--radius);outline:none;}
 .ai-chat-intent{padding:5px 6px;}

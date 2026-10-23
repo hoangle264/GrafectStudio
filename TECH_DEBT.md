@@ -5,66 +5,6 @@ Mỗi mục ghi rõ **vấn đề**, **rủi ro**, **phương án đề xuất**
 
 ---
 
-## [TD-001] Bảo mật API Key nhập từ UI
-
-| Trường | Nội dung |
-|---|---|
-| **Ngày ghi nhận** | 2026-08-04 |
-| **Mức độ** | 🟠 Trung bình — chỉ ảnh hưởng khi người dùng chọn lưu key |
-| **Module liên quan** | `ConfigService.cs`, `App.xaml.cs`, `DynamicAiCompletionService` (chưa tạo) |
-
-### Vấn đề
-
-Khi implement tính năng cho phép người dùng nhập Gemini API Key trực tiếp trên UI (thay vì set biến môi trường OS), key có nguy cơ bị lưu dưới dạng **plaintext** vào `config.json`:
-
-```
-C:\Users\<user>\AppData\Roaming\GrafcetStudio\config.json
-```
-
-[`ConfigService.cs:L88`](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/src/GrafcetStudio.App/Services/ConfigService.cs#L88) dùng `JsonSerializer.Serialize()` — không có bước mã hóa nào.
-
-### Rủi ro cụ thể
-
-- Bất kỳ phần mềm nào chạy cùng user đều đọc được file JSON → lấy được key
-- Nếu `AppData` được sync lên OneDrive / cloud backup → key lộ ra ngoài máy
-- Người dùng vô tình chia sẻ thư mục config → key bị lộ
-
-> **Lưu ý:** `debug.log` đã an toàn — `ScrubEndpoint()` trong
-> [`GeminiAiCompletionService.cs:L287`](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/src/GrafcetStudio.App/Services/Ai/GeminiAiCompletionService.cs#L287)
-> đã che `key=<redacted>` trước khi ghi log.
-
-### Phương án đề xuất khi xử lý
-
-Dùng **Windows DPAPI** (`System.Security.Cryptography.ProtectedData`) — chuẩn bảo mật cho desktop app Windows:
-
-```csharp
-// Lưu key (mã hóa bằng danh tính Windows user hiện tại):
-var encrypted = ProtectedData.Protect(
-    Encoding.UTF8.GetBytes(apiKey),
-    null,
-    DataProtectionScope.CurrentUser
-);
-File.WriteAllBytes(
-    Path.Combine(appData, "GrafcetStudio", "ai_key.bin"),
-    encrypted
-);
-
-// Đọc key (chỉ giải mã được bằng cùng user Windows):
-var raw = File.ReadAllBytes(keyPath);
-var apiKey = Encoding.UTF8.GetString(
-    ProtectedData.Unprotect(raw, null, DataProtectionScope.CurrentUser)
-);
-```
-
-File `ai_key.bin` sẽ là bytes ngẫu nhiên — không đọc được bằng text editor.
-
-### Điều kiện để ưu tiên xử lý
-
-- Khi triển khai tính năng "Lưu API Key qua UI" (không còn yêu cầu set env var thủ công)
-- Khi chuẩn bị phát hành cho người dùng cuối (production release)
-
----
-
 ## [TD-002] `GenerateFallbackJson` không đọc Actions/Transitions thực từ Grafcet
 
 | Trường | Nội dung |
@@ -134,6 +74,28 @@ Thiết kế gencode orchestrator thật (từ `OrchestratorConfig.Elements`), t
 *File này được duy trì thủ công. Khi một mục được xử lý xong, chuyển nó sang mục `## Đã Xử Lý` bên dưới và ghi ngày hoàn thành.*
 
 ## Đã Xử Lý
+
+### ✅ [TD-001] Bảo mật API Key nhập từ UI
+
+| Trường | Nội dung |
+|---|---|
+| **Ngày ghi nhận** | 2026-08-04 |
+| **Ngày hoàn thành** | 2026-10-23 |
+| **Mức độ** | ~~🟠 Trung bình~~ → ✅ Đã xử lý |
+| **Module liên quan** | [`AiKeyStore.cs`](src/GrafcetStudio.App/Services/Ai/AiKeyStore.cs), [`DynamicAiCompletionService.cs`](src/GrafcetStudio.App/Services/Ai/DynamicAiCompletionService.cs), [`AiSettingsOrchestrator.cs`](src/GrafcetStudio.App/Services/AiSettingsOrchestrator.cs), `ai-chat-ui.ts` |
+
+**Đã sửa:**
+- Người dùng nhập/xóa Gemini API key và model ngay trong panel AI (nút ⚙), không cần set biến môi trường.
+- Key mã hóa bằng Windows DPAPI (`DataProtectionScope.CurrentUser`), lưu ở `%AppData%/GrafcetStudio/ai_key.bin`; model lưu riêng ở `ai_settings.json`. Không ghi key vào `config.json`.
+- WebView chỉ nhận trạng thái (đã cấu hình, nguồn, model), không bao giờ nhận lại key.
+- Thứ tự ưu tiên: key lưu từ UI → `GEMINI_API_KEY` → `GRAFCETSTUDIO_GEMINI_API_KEY`. `GRAFCETSTUDIO_AI_MODE=mock` ép dùng mock.
+- `DynamicAiCompletionService` chọn Gemini/mock theo từng request nên key mới có hiệu lực ngay, không cần khởi động lại.
+
+**Đã sửa thêm:**
+- Chọn model qua dropdown lấy từ Gemini API (`GeminiModelLister`, nút "Load models"); lần gọi này cũng kiểm tra key đúng/sai nên thay cho nút Test connection.
+
+**Còn lại (chưa làm, mức thấp):**
+- Chuyển key từ query string `?key=` sang header `x-goog-api-key`.
 
 ### ✅ [TD-003] ABB RAPID Prompt — Rule 3 thiếu logic phân biệt `WaitDI`/`WaitDO` vs `WaitUntil`
 

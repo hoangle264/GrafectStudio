@@ -68,11 +68,13 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<SiemensTiaPushOrchestrator>();
         RegisterAiServices(containerRegistry);
         containerRegistry.RegisterSingleton<AiRequestOrchestrator>();
+        containerRegistry.RegisterSingleton<AiSettingsOrchestrator>();
 
         Container.Resolve<CodeGenerationOrchestrator>().Init();
         Container.Resolve<FileIOOrchestrator>().Init();
         Container.Resolve<SiemensTiaPushOrchestrator>().Init();
         Container.Resolve<AiRequestOrchestrator>();
+        Container.Resolve<AiSettingsOrchestrator>();
     }
 
     private static async Task RunAiMockValidationAsync()
@@ -166,17 +168,7 @@ public partial class App : PrismApplication
     }
     private static void RegisterAiServices(IContainerRegistry containerRegistry)
     {
-        var mode = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_AI_MODE")?.Trim();
-        var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY")?.Trim()
-            ?? Environment.GetEnvironmentVariable("GRAFCETSTUDIO_GEMINI_API_KEY")?.Trim();
-        var model = Environment.GetEnvironmentVariable("GRAFCETSTUDIO_GEMINI_MODEL")?.Trim();
-
-        if (string.Equals(mode, "gemini", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(apiKey))
-        {
-            containerRegistry.RegisterInstance<IAiCompletionService>(new GeminiAiCompletionService(new HttpClient(), apiKey, model));
-            return;
-        }
-
-        containerRegistry.RegisterSingleton<IAiCompletionService, MockAiCompletionService>();
+        containerRegistry.RegisterSingleton<AiKeyStore>();
+        containerRegistry.RegisterSingleton<IAiCompletionService, DynamicAiCompletionService>();
     }
 }
