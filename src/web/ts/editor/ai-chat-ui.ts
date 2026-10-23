@@ -824,14 +824,18 @@ function aiChatRoute(message: string): void {
   if (host && AI_PERMISSION_STATE.liveAi !== false) {
     const sessionId = 'agt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     const status = aiChatAddMessage('assistant', 'Assistant is working (only your message is sent until you allow more)...');
-    AI_AGENT_SESSIONS[sessionId] = { message, statusMessageId: status.id };
+    AI_AGENT_SESSIONS[sessionId] = { message, statusMessageId: status.id, startedAt: Date.now() };
     host({ type: 'AI_AGENT_START', payload: { sessionId, message } });
     return;
   }
   aiChatRouteLocally(message, null, '');
 }
 
-const AI_AGENT_SESSIONS: Record<string, { message: string; statusMessageId: string; timer?: number }> = {};
+const AI_AGENT_SESSIONS: Record<string, { message: string; statusMessageId: string; timer?: number; startedAt: number }> = {};
+
+function aiAgentTotalSeconds(session: { startedAt: number }): string {
+  return Math.floor((Date.now() - session.startedAt) / 1000) + 's';
+}
 
 function aiAgentStopTimer(session: { timer?: number }): void {
   if (session.timer !== undefined) {
@@ -880,12 +884,12 @@ function receiveAiAgentEvent(event: { sessionId: string; kind: string; data?: { 
     case 'error':
       aiAgentStopTimer(session);
       delete AI_AGENT_SESSIONS[event.sessionId];
-      if (status) { status.text = data.text || 'Assistant failed.'; status.error = true; aiChatRender(); }
+      if (status) { status.text = (data.text || 'Assistant failed.') + ' (total ' + aiAgentTotalSeconds(session) + ')'; status.error = true; aiChatRender(); }
       return;
     case 'end':
       aiAgentStopTimer(session);
       delete AI_AGENT_SESSIONS[event.sessionId];
-      if (status) { status.text = 'Assistant finished.'; aiChatRender(); }
+      if (status) { status.text = 'Assistant finished (total ' + aiAgentTotalSeconds(session) + ').'; aiChatRender(); }
       return;
   }
 }
@@ -921,7 +925,7 @@ function aiAgentRunTool(sessionId: string, callId: string, name: string, args: R
       return;
     }
     const data = aiAgentReadData(name, args);
-    if (status) { status.text = 'Assistant wants to ' + tool.label + '.'; aiChatRender(); }
+    if (status) { status.text = 'Assistant wants to ' + tool.label + ' (waiting for you, ' + aiAgentTotalSeconds(AI_AGENT_SESSIONS[sessionId] || { startedAt: Date.now() }) + ' so far).'; aiChatRender(); }
     if (!aiPermissionNeeded() || !aiPermissionMissingScopes([tool.scope]).length) {
       aiAgentSendResult(sessionId, callId, { data });
       return;

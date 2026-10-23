@@ -103,7 +103,7 @@ namespace GrafcetStudioFlowReview {
       const name = 'Transition ' + (t.label || t.id);
       if (!from.length) findings.push({ severity: 'error', code: 'transition-no-input', message: name + ' has no input step.', transitionIds: [t.id] });
       if (!to.length) findings.push({ severity: 'error', code: 'transition-no-output', message: name + ' has no output step.', transitionIds: [t.id] });
-      if (!String(t.condition || '').trim()) findings.push({ severity: 'warning', code: 'empty-condition', message: name + ' has an empty condition (always true).', transitionIds: [t.id] });
+      // An empty condition is valid: either "true" or an implicit wait for the previous step to complete.
       from.forEach(function(stepId) {
         outgoingByStep.set(stepId, (outgoingByStep.get(stepId) || []).concat([t]));
         const set = successors.get(stepId) || new Set<string>();

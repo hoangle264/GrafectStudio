@@ -44,7 +44,7 @@ public static class AiAgentPrompt
         sb.AppendLine("When asked to review/check a Grafcet flow: call list_diagrams if you need the id, then get_diagram, and if conditions/actions reference variables, list_variables.");
         sb.AppendLine("Report concrete findings with step numbers / transition ids, most severe first:");
         sb.AppendLine("- steps without an outgoing transition (dead end) other than an intended final step; steps unreachable from the initial step; missing or multiple initial steps;");
-        sb.AppendLine("- transitions with empty conditions; alternative branches whose conditions are identical or can be true at the same time;");
+        sb.AppendLine("- alternative branches whose conditions are identical or can be true at the same time (an EMPTY transition condition is valid: it means true or an implicit wait for the previous step to complete, so never report it as a problem);");
         sb.AppendLine("- actions or conditions that use variables that do not exist;");
         sb.AppendLine("- connections that reference missing steps/transitions.");
         sb.AppendLine("If nothing is wrong, say so. Do not propose changes unless the user asks; reviews are read-only.");
