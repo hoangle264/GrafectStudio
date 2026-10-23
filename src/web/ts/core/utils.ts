@@ -52,3 +52,18 @@ function toast(msg: string, opts: ToastOptions = {}): void {
 
 /** Non-blocking replacement for alert() on failures. */
 function notifyError(msg: string): void { toast(msg, { kind: 'error' }); }
+
+// ── Address helpers ─────────────────────────────────────────
+interface ParsedAddressBase {
+  prefix: string;
+  number: number;
+  width: number;
+}
+
+/** Parse a base address such as "MR100" (empty value => defaultBase). Throws on malformed input. */
+function parseAddressBase(value: unknown, defaultBase: string): ParsedAddressBase {
+  const source = String(value == null || value === '' ? defaultBase : value).trim();
+  const match = source.match(/^([A-Za-z]+)(\d+)$/);
+  if (!match) throw new Error('Invalid base address: ' + value);
+  return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
+}

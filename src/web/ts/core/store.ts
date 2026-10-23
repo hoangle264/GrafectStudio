@@ -94,22 +94,6 @@ namespace GrafcetStudioStoreHelpers {
     return steps.reduce(function(max, step) { return Math.max(max, Number(step && step.number) || 0); }, 0);
   }
 
-  interface ParsedAddressBase {
-    prefix: string;
-    number: number;
-    width: number;
-  }
-
-  function parseAddressBase(value: unknown, fallback: string): ParsedAddressBase {
-    const source = String(value == null || value === '' ? fallback : value).trim();
-    const match = source.match(/^([A-Za-z]+)(\d+)$/);
-    if (!match) {
-      const fallbackMatch = fallback.match(/^([A-Za-z]+)(\d+)$/)!;
-      return { prefix: fallbackMatch[1].toUpperCase(), number: Number(fallbackMatch[2]), width: fallbackMatch[2].length };
-    }
-    return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
-  }
-
   function formatAddressBase(prefix: string, number: number, width: number): string {
     const numberText = width > 1 ? String(number).padStart(width, '0') : String(number);
     return prefix + numberText;
@@ -118,8 +102,12 @@ namespace GrafcetStudioStoreHelpers {
   function getBoolAddressRange(context: StoreContext, flow: DiagramMeta | null | undefined): { start: number; end: number } | null {
     if (!flow || flow.addressMode !== 'bool') return null;
     const maxStepNumber = Math.max(1, getFlowStepMaxNumber(context, flow.id));
-    const start = parseAddressBase(flow.baseMr, 'MR100').number;
-    return { start, end: start + maxStepNumber * 2 - 1 };
+    try {
+      const start = parseAddressBase(flow.baseMr, 'MR100').number;
+      return { start, end: start + maxStepNumber * 2 - 1 };
+    } catch {
+      return null;
+    }
   }
 
   function boolAddressRangesOverlap(a: { start: number; end: number } | null, b: { start: number; end: number } | null): boolean {

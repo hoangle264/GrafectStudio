@@ -110,12 +110,6 @@ namespace GrafcetStudioCodegenPayload {
     return components.map((component, index) => normalizeSiemensSymbolicComponent(component, index)).join('.') + '.%X' + bit;
   }
 
-  interface ParsedAddressBase {
-    prefix: string;
-    number: number;
-    width: number;
-  }
-
   function parseWordAddress(address: string): ParsedWordAddress {
     const match = String(address || '').trim().match(/^([A-Za-z]+)(\d+)$/);
     if (!match) throw new Error('Invalid word address: ' + address);
@@ -127,13 +121,6 @@ namespace GrafcetStudioCodegenPayload {
     const next = parsed.number + offset;
     const numberText = parsed.width > 1 ? String(next).padStart(parsed.width, '0') : String(next);
     return parsed.prefix + numberText;
-  }
-
-  function parseAddressBase(value: unknown, fallback: string): ParsedAddressBase {
-    const source = String(value == null || value === '' ? fallback : value).trim();
-    const match = source.match(/^([A-Za-z]+)(\d+)$/);
-    if (!match) throw new Error('Invalid base address: ' + value);
-    return { prefix: match[1].toUpperCase(), number: Number(match[2]), width: match[2].length };
   }
 
   function formatBaseAddress(base: ParsedAddressBase, number: number): string {
