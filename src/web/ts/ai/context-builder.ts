@@ -14,7 +14,6 @@ namespace GrafcetStudioAIContextBuilder {
     rawProject: unknown;
     selection?: GrafcetStudioAIContracts.AiContextSelection;
     requestId?: string;
-    allowAutoDetect?: boolean;
     budget?: ContextBudgetLimits;
   }
 
@@ -117,17 +116,12 @@ namespace GrafcetStudioAIContextBuilder {
   }
 
   function resolveIntent(input: BuildAiRequestInput, message: string, warnings: string[], errors: string[]): GrafcetStudioAIContracts.AiIntent | null {
-    const detected = detectIntent(message);
     if (GrafcetStudioAIContracts.isAiIntent(input.selectedIntent)) {
       return input.selectedIntent;
     }
     if (input.selectedIntent !== undefined && input.selectedIntent !== null && input.selectedIntent !== '') {
       errors.push('selectedIntent must be one of: create-variable, clone-variable, map-io, create-flow, create-structure.');
       return null;
-    }
-    if (input.allowAutoDetect && detected) {
-      warnings.push('selectedIntent was not provided; optional detectIntent fallback selected "' + detected + '".');
-      return detected;
     }
     errors.push('selectedIntent is required for MVP context building.');
     return null;

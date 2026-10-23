@@ -16,14 +16,8 @@ namespace GrafcetStudioTemplateEditor {
   };
 
 
-  // Fallback used only when the host cannot list the Template Root; canonical names only.
-  const FALLBACK_PRESETS: Preset[] = [
-    'unitMainOutput.hbs', 'step-body.hbs', 'unitError.hbs', 'unitManual.hbs', 'unitAuto.hbs', 'unitOrigin.hbs', 'output.hbs', 'MapIO.hbs',
-    'simple/UnitCode.hbs', 'simple/DeviceManager.hbs', 'simple/SystemControl.hbs', 'simple/MapIO.hbs', 'simple/Error.hbs',
-    'packml/UnitCode.hbs', 'packml/DeviceManager.hbs', 'packml/SystemControl.hbs', 'packml/MapIO.hbs', 'packml/Error.hbs',
-    'devices/cylinder.hbs', 'devices/servo.hbs', 'devices/motor.hbs', 'devices/generic.hbs'
-  ].map(path => ({ id: path, label: path, path }));
-  let PRESETS: Preset[] = FALLBACK_PRESETS;
+  const EMPTY_PRESET: Preset = { id: '', label: '', path: '' };
+  let PRESETS: Preset[] = [];
 
   const HELPERS: Suggestion[] = ['pad', 'padStart2', 'eq', 'renderDevice'].map(name => ({ label: name, insert: name + ' ', detail: 'helper' }));
 
@@ -37,7 +31,7 @@ namespace GrafcetStudioTemplateEditor {
     { label: '{{! comment }}', insert: '{{! comment }}', cursorToken: 'comment' }
   ];
 
-  let activeId = PRESETS[0].id;
+  let activeId = '';
   let currentText = '';
   let loadedText = '';
   let defaultText = '';
@@ -82,7 +76,7 @@ namespace GrafcetStudioTemplateEditor {
   }
 
   function presetById(id: string): Preset {
-    return PRESETS.find(preset => preset.id === id) || PRESETS[0];
+    return PRESETS.find(preset => preset.id === id) || PRESETS[0] || EMPTY_PRESET;
   }
 
   function escapeHtml(text: string): string {
@@ -317,33 +311,26 @@ namespace GrafcetStudioTemplateEditor {
 
   async function refreshPresets(): Promise<void> {
     const rootPath = templateRootPath();
-    PRESETS = FALLBACK_PRESETS;
+    PRESETS = [];
     if (rootPath && canUseHostBridge()) {
       try {
         const result = await templateHostRequest('LIST_TEMPLATE_FILES', rootPath, '');
-        const listed = (result.files || []).map<Preset>(file => ({
+        PRESETS = (result.files || []).map<Preset>(file => ({
           id: file.path, label: file.path, path: file.path, platform: file.platform, group: file.group,
           description: file.description, active: file.active, note: file.note
         }));
-        if (listed.length) PRESETS = listed;
       } catch (error) {
         updateStatus(`Cannot list templates: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    if (!PRESETS.some(preset => preset.id === activeId)) activeId = PRESETS[0].id;
+    if (!PRESETS.some(preset => preset.id === activeId)) activeId = PRESETS[0]?.id || '';
   }
 
   async function loadDefaultText(id: string): Promise<string> {
     const preset = presetById(id);
     const rootPath = templateRootPath();
-    if (rootPath && canUseHostBridge()) {
-      return await readTemplateViaHost(rootPath, preset.path);
-    }
-
-    const url = `https://templates.grafcet.local/${preset.path}`;
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    return await response.text();
+    if (!rootPath || !canUseHostBridge()) throw new Error('Template Root or desktop host is not available');
+    return await readTemplateViaHost(rootPath, preset.path);
   }
 
   function setLoadError(message: string): void {
@@ -770,7 +757,7 @@ namespace GrafcetStudioTemplateEditor {
 
   async function openTemplateEditor(id?: string): Promise<void> {
     const modal = ensureModal();
-    activeId = id || activeId || PRESETS[0].id;
+    activeId = id || activeId;
     await refreshPresets();
     setPresetOptions();
     buildPreviewPayload();
@@ -791,26 +778,17 @@ namespace GrafcetStudioTemplateEditor {
     if (loadError) return;
     const preset = presetById(activeId);
     const rootPath = templateRootPath();
-    if (rootPath && canUseHostBridge()) {
-      try {
-        await writeTemplateViaHost(rootPath, preset.path, currentText || '');
-        loadedText = currentText;
-        updateStatus(`Saved ${preset.path} (previous version kept as ${preset.path}.bak)`);
-      } catch (error) {
-        updateStatus(`Save failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
+    if (!rootPath || !canUseHostBridge()) {
+      updateStatus('Save needs Template Root and the desktop host');
       return;
     }
-
-    const filename = preset.path.replace(/[\\/]/g, '__');
-    const blob = new Blob([currentText || ''], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    loadedText = currentText;
-    updateStatus('Downloaded template file');
+    try {
+      await writeTemplateViaHost(rootPath, preset.path, currentText || '');
+      loadedText = currentText;
+      updateStatus(`Saved ${preset.path} (previous version kept as ${preset.path}.bak)`);
+    } catch (error) {
+      updateStatus(`Save failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async function switchTemplateEditorPlatform(platform: string): Promise<void> {
