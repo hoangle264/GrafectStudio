@@ -10,7 +10,7 @@ namespace GrafcetStudio.App.Services.Ai;
 /// </summary>
 public class AiPermissionStore
 {
-    private static readonly string[] KnownScopes = { "variable", "unit", "diagram", "step", "io", "structure" };
+    private static readonly string[] KnownScopes = { "variable", "unit", "diagram", "step", "io", "structure", "robot" };
     private readonly string _path;
     private readonly object _sync = new();
 

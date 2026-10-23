@@ -19,6 +19,7 @@ declare function cgGetSiemensTiaConfig(): {
 };
 declare function cgSetSiemensLadStatus(message: string, ok: boolean | null): void;
 declare function cgRenderGeneratedFiles(files: GrafcetStudioProject.CodegenFile[]): void;
+declare function aiPermissionRequestRobotCodegen(payload: unknown, send: () => void, containerId: string): void;
 
 interface MhWebViewMessage {
   type: string;
@@ -137,10 +138,14 @@ function cgGenerateViaHost(platform: string, diagId: string): boolean {
       return true;
     }
 
-    chromeHost.webview.postMessage({
-      type: 'GENERATE_CODE',
-      payload: cgBuildCSharpPayload(platform, diagId)
-    });
+    const payload = cgBuildCSharpPayload(platform, diagId);
+    const send = function() { chromeHost.webview!.postMessage!({ type: 'GENERATE_CODE', payload }); };
+    if (platform === 'abb-rapid') {
+      // ABB code is written by the AI from this payload, so it goes through the AI permission gate.
+      aiPermissionRequestRobotCodegen(payload, send, 'cg-files');
+      return true;
+    }
+    send();
     return true;
   } catch (err) {
     const pre = document.getElementById('cg-files');

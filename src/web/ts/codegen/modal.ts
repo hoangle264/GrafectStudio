@@ -19,6 +19,9 @@ let cgStep = 1;
 
 function showGenerateCodeModal(): void {
   if (activeDiagramId && typeof flushState === 'function') flushState();
+  const aiWindow = window as unknown as { aiPermissionRefreshGrants?: () => void; chrome?: { webview?: { postMessage?: (message: unknown) => void } } };
+  if (aiWindow.aiPermissionRefreshGrants) aiWindow.aiPermissionRefreshGrants();
+  if (aiWindow.chrome && aiWindow.chrome.webview && aiWindow.chrome.webview.postMessage) aiWindow.chrome.webview.postMessage({ type: 'AI_SETTINGS', payload: { action: 'get' } });
   let el = document.getElementById('modal-codegen');
   if (el) el.remove();
   el = document.createElement('div');

@@ -85,7 +85,8 @@ const AI_SCOPE_LABELS: Record<string, string> = {
   diagram: 'Diagram info',
   step: 'Steps, transitions and connections',
   io: 'IO mapping',
-  structure: 'Device structures'
+  structure: 'Device structures',
+  robot: 'Robot flows and variables (ABB code generation)'
 };
 
 function aiChatBridge(): GrafcetStudioAIBridge.AiBridgeApi | null {
@@ -682,6 +683,58 @@ function aiPermissionDecide(id: string, choice: AiPermissionChoice): void {
   aiChatDispatch(item.request, item.intent, item.message);
 }
 
+let aiPermissionRobotPending: { send: () => void; containerId: string; json: string } | null = null;
+
+/**
+ * Gate for ABB robot code generation: the host builds the prompt from the codegen payload and sends it to the AI,
+ * so the same permission rules apply. Calls send() immediately when allowed, otherwise renders a card in containerId.
+ */
+function aiPermissionRequestRobotCodegen(payload: unknown, send: () => void, containerId: string): void {
+  if (!aiPermissionNeeded() || !aiPermissionMissingScopes(['robot']).length) {
+    send();
+    return;
+  }
+  const json = JSON.stringify(payload, null, 2);
+  aiPermissionRobotPending = { send, containerId, json };
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const size = json.length >= 1024 ? (json.length / 1024).toFixed(1) + ' KB' : json.length + ' chars';
+  const canProject = !!aiPermissionCurrentProjectId();
+  container.innerHTML = '<div class="ai-bubble ai-bubble-assistant">' +
+    '<div class="ai-proposal-head"><span class="ai-proposal-title">Send robot flows to AI?</span></div>' +
+    '<div class="ai-proposal-summary">ABB code is written by Gemini. The prompt is built from this data (' + aiChatEscape(size) + '): flows, steps, transitions and the variables they use.</div>' +
+    '<details class="ai-perm-details"><summary>View data</summary><pre class="ai-preview-json">' + aiChatEscape(json) + '</pre></details>' +
+    '<div class="ai-proposal-actions">' +
+      '<button class="btn a" onclick="aiPermissionDecideRobot(\'once\')">Allow once</button>' +
+      '<button class="btn" onclick="aiPermissionDecideRobot(\'session\')">Allow this session</button>' +
+      (canProject ? '<button class="btn" onclick="aiPermissionDecideRobot(\'project\')">Allow for this project</button>' : '') +
+      '<button class="btn r" onclick="aiPermissionDecideRobot(\'deny\')">Deny</button>' +
+    '</div></div>';
+}
+
+function aiPermissionDecideRobot(choice: AiPermissionChoice): void {
+  const pending = aiPermissionRobotPending;
+  if (!pending) return;
+  aiPermissionRobotPending = null;
+  const container = document.getElementById(pending.containerId);
+  if (choice === 'deny') {
+    if (container) container.textContent = 'Robot code generation cancelled. Nothing was sent to the AI.';
+    return;
+  }
+  if (choice === 'session' && AI_PERMISSION_STATE.sessionScopes.indexOf('robot') < 0) AI_PERMISSION_STATE.sessionScopes.push('robot');
+  if (choice === 'project') {
+    const projectId = aiPermissionCurrentProjectId();
+    if (AI_PERMISSION_STATE.projectId !== projectId) {
+      AI_PERMISSION_STATE.projectId = projectId;
+      AI_PERMISSION_STATE.projectScopes = [];
+    }
+    if (AI_PERMISSION_STATE.projectScopes.indexOf('robot') < 0) AI_PERMISSION_STATE.projectScopes.push('robot');
+    aiSettingsPost('grant', { projectId, scopes: 'robot' });
+  }
+  if (container) container.textContent = 'Generating ABB RAPID with AI...';
+  pending.send();
+}
+
 function aiPermissionRefreshGrants(): void {
   const projectId = aiPermissionCurrentProjectId();
   if (projectId) aiSettingsPost('grants-get', { projectId });
@@ -958,6 +1011,9 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { receiveAiModels: typeof receiveAiModels }).receiveAiModels = receiveAiModels;
 (window as unknown as { aiPermissionDecide: typeof aiPermissionDecide }).aiPermissionDecide = aiPermissionDecide;
 (window as unknown as { aiPermissionRevoke: typeof aiPermissionRevoke }).aiPermissionRevoke = aiPermissionRevoke;
+(window as unknown as { aiPermissionRequestRobotCodegen: typeof aiPermissionRequestRobotCodegen }).aiPermissionRequestRobotCodegen = aiPermissionRequestRobotCodegen;
+(window as unknown as { aiPermissionDecideRobot: typeof aiPermissionDecideRobot }).aiPermissionDecideRobot = aiPermissionDecideRobot;
+(window as unknown as { aiPermissionRefreshGrants: typeof aiPermissionRefreshGrants }).aiPermissionRefreshGrants = aiPermissionRefreshGrants;
 (window as unknown as { receiveAiGrants: typeof receiveAiGrants }).receiveAiGrants = receiveAiGrants;
 (window as unknown as { receiveAiSettings: typeof receiveAiSettings }).receiveAiSettings = receiveAiSettings;
 (window as unknown as { receiveAiChunk: typeof receiveAiChunk }).receiveAiChunk = receiveAiChunk;

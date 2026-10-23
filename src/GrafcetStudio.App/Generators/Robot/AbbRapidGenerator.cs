@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using GrafcetStudio.App.Generators.Robot.RapidAst;
 using GrafcetStudio.App.Services.Ai;
 using GrafcetStudio.Domain.Models;
 
@@ -13,24 +12,16 @@ public class AbbRapidGenerator : ICodeGenerator
 {
     public string Platform => "abb-rapid";
 
+    private const int MaxRepairAttempts = 2;
+
     private readonly TopologyAnalyzer _topologyAnalyzer;
-    private readonly RobotSnippetPromptBuilder _promptBuilder;
-    private readonly RobotSnippetParser _snippetParser;
-    private readonly RapidAstLinter _astLinter;
-    private readonly RobotSkeletonEngine _skeletonEngine;
-    private readonly TeachListGenerator _teachListGenerator;
-    private readonly RobotRepairLoop _repairLoop;
+    private readonly RobotRapidPromptBuilder _promptBuilder;
     private readonly IAiCompletionService? _aiCompletionService;
 
     public AbbRapidGenerator(IAiCompletionService? aiCompletionService = null)
     {
         _topologyAnalyzer = new TopologyAnalyzer();
-        _promptBuilder = new RobotSnippetPromptBuilder();
-        _snippetParser = new RobotSnippetParser();
-        _astLinter = new RapidAstLinter();
-        _skeletonEngine = new RobotSkeletonEngine();
-        _teachListGenerator = new TeachListGenerator();
-        _repairLoop = new RobotRepairLoop(aiCompletionService);
+        _promptBuilder = new RobotRapidPromptBuilder();
         _aiCompletionService = aiCompletionService;
     }
 
@@ -64,119 +55,97 @@ public class AbbRapidGenerator : ICodeGenerator
         var flowById = flows
             .Where(f => !string.IsNullOrWhiteSpace(f.Id))
             .ToDictionary(f => f.Id!, f => f, StringComparer.OrdinalIgnoreCase);
+        var variables = payload!.Variables ?? new List<DeviceVariable>();
 
         foreach (var flow in flows)
         {
             var rawFlowName = !string.IsNullOrWhiteSpace(flow.Name) ? flow.Name : "main";
             var flowNameClean = SanitizeFilename(rawFlowName);
 
-            // 1. Topology Analysis
-            var topologyContext = _topologyAnalyzer.Analyze(flow, flowById);
-
-            // 2. Build Prompts
-            var (systemPrompt, userPrompt) = _promptBuilder.BuildPrompts(flow, payload.Variables ?? new List<DeviceVariable>(), topologyContext, flowNameClean);
-
-            // Log Prompt Sent
-            var debugTransitions = string.Join("\n", (flow.Transitions ?? new List<Transition>())
-                .Select(t => $"  [{t.Id}] FROM=[{string.Join(",", t.FromStepIds ?? new List<string>())}] TO=[{string.Join(",", t.ToStepIds ?? new List<string>())}] COND=\"{t.Condition}\""));
-            var promptLogContent = FormatPromptLog(flowNameClean, systemPrompt, userPrompt, debugTransitions);
-
-            SavePromptLogToDisk(flowNameClean, promptLogContent);
-
-            // 3. Call AI Service
-            AiCompletionResult result;
+            // 1. Topology analysis decides the control structure; the AI writes the module around it.
+            RobotRapidPrompt prompt;
             try
             {
-                var jsonPayload = System.Text.Json.JsonSerializer.Serialize(new { systemPrompt, userPrompt });
-                var sanitized = new SanitizedAiRequest($"robot-gen-{flowNameClean}", "robot-codegen", userPrompt, jsonPayload);
-                var req = new AiCompletionRequest(sanitized);
-                result = Task.Run(() => _aiCompletionService.CompleteAsync(req)).GetAwaiter().GetResult();
+                var topologyContext = _topologyAnalyzer.Analyze(flow, flowById);
+                prompt = _promptBuilder.BuildPrompts(flow, variables, topologyContext, flowNameClean);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
             {
-                generatedFiles.AddRange(FailureFiles(flowNameClean,
-                    reason: "AI_REQUEST_EXCEPTION",
-                    details: new[]
-                    {
-                        $"An exception occurred while calling the AI service for flow {flowNameClean}: {ex.GetType().Name}",
-                        $"Message: {ex.Message}",
-                        "Check your network connection and API key validity."
-                    }));
+                generatedFiles.AddRange(FailureFiles(flowNameClean, "TOPOLOGY_INVALID", new[] { ex.Message }));
                 continue;
             }
 
-            if (!result.Ok || string.IsNullOrWhiteSpace(result.RawText))
-            {
-                var aiErrors = result.Errors != null && result.Errors.Count > 0
-                ? result.Errors.ToArray()
-                : new[] { "AI service returned an empty or unsuccessful response." };
+            var promptLogContent = FormatPromptLog(flowNameClean, prompt.SystemPrompt, prompt.UserPrompt);
+            SavePromptLogToDisk(flowNameClean, promptLogContent);
 
-                generatedFiles.AddRange(FailureFiles(flowNameClean,
-                    reason: "AI_RESPONSE_FAILED",
-                    details: aiErrors.Prepend("AI call did not succeed:").ToArray()));
+            // 2. Ask the AI for the module, then validate; feed errors back for a bounded number of repairs.
+            var userPrompt = prompt.UserPrompt;
+            string code = string.Empty;
+            IReadOnlyList<string> errors = Array.Empty<string>();
+            string? failureReason = null;
+
+            for (var attempt = 0; attempt <= MaxRepairAttempts; attempt++)
+            {
+                AiCompletionResult result;
+                try
+                {
+                    var jsonPayload = System.Text.Json.JsonSerializer.Serialize(new { systemPrompt = prompt.SystemPrompt, userPrompt });
+                    var request = new SanitizedAiRequest($"robot-gen-{flowNameClean}-{attempt}", "robot-codegen", userPrompt, jsonPayload);
+                    result = Task.Run(() => _aiCompletionService.CompleteAsync(new AiCompletionRequest(request))).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    failureReason = "AI_REQUEST_EXCEPTION";
+                    errors = new[] { $"{ex.GetType().Name}: {ex.Message}", "Check your network connection and API key validity." };
+                    break;
+                }
+
+                if (!result.Ok || string.IsNullOrWhiteSpace(result.RawText))
+                {
+                    failureReason = "AI_RESPONSE_FAILED";
+                    errors = result.Errors is { Count: > 0 } ? result.Errors : new[] { "AI service returned an empty or unsuccessful response." };
+                    break;
+                }
+
+                code = RapidModuleValidator.ExtractModule(result.RawText);
+                errors = RapidModuleValidator.Validate(code, flowNameClean, prompt.AllowedIdentifiers, prompt.RequiredFragments);
+                if (errors.Count == 0)
+                {
+                    failureReason = null;
+                    break;
+                }
+
+                failureReason = "RAPID_VALIDATION_FAILED";
+                userPrompt = BuildRepairPrompt(prompt.UserPrompt, code, errors);
+            }
+
+            if (failureReason != null)
+            {
+                generatedFiles.AddRange(FailureFiles(flowNameClean, failureReason, errors.Prepend("Generated code was rejected:").ToArray()));
+                generatedFiles.Add(new CodegenFile { Path = $"{flowNameClean}_prompt.log", Content = promptLogContent });
                 continue;
             }
 
-            // 4. Parse Snippet Map JSON
-            var parseResult = _snippetParser.Parse(result.RawText);
-            SnippetMapDocument? doc = parseResult.Document;
-
-            if (!parseResult.IsOk || doc == null)
-            {
-                // Try repair loop
-                var repairTask = Task.Run(() => _repairLoop.TryRepairAsync(
-                    doc ?? new SnippetMapDocument { Module = flowNameClean },
-                    parseResult.Errors.Select(e => new LintError(0, "", e)).ToList(),
-                    userPrompt));
-                var repairRes = repairTask.GetAwaiter().GetResult();
-
-                if (repairRes.Success && repairRes.Document != null)
-                {
-                    doc = repairRes.Document;
-                }
-                else
-                {
-                    generatedFiles.AddRange(FailureFiles(flowNameClean,
-                        reason: "AI_RESPONSE_INVALID_SCHEMA",
-                        details: parseResult.Errors
-                            .Prepend($"AI returned JSON that does not conform to schema 'grafectstudio/robot-snippet-map/v1'.")
-                            .ToArray()));
-                    continue;
-                }
-            }
-
-            // 5. AST Linter
-            var lintErrors = _astLinter.Lint(doc, payload.Variables ?? new List<DeviceVariable>(), topologyContext);
-            if (lintErrors.Count > 0)
-            {
-                // Try repair loop
-                var repairTask = Task.Run(() => _repairLoop.TryRepairAsync(doc, lintErrors, userPrompt));
-                var repairRes = repairTask.GetAwaiter().GetResult();
-
-                if (repairRes.Success && repairRes.Document != null)
-                {
-                    doc = repairRes.Document;
-                }
-                else
-                {
-                    var lintErrMsgs = lintErrors.Select(e => $"Step {e.StepNumber}: {e.ErrorMessage}").ToArray();
-                    generatedFiles.AddRange(FailureFiles(flowNameClean,
-                        reason: "AST_LINTER_VALIDATION_FAILED",
-                        details: lintErrMsgs.Prepend("RAPID AST Linter validation failed:").ToArray()));
-                    continue;
-                }
-            }
-
-            // 6. Skeleton Engine Rendering
-            var rapidCode = _skeletonEngine.Render(doc, topologyContext, flow, flowNameClean);
-            var teachList = _teachListGenerator.GenerateTeachList(doc, flowNameClean);
-
-            generatedFiles.Add(new CodegenFile { Path = $"{flowNameClean}.mod", Content = rapidCode });
-            generatedFiles.Add(new CodegenFile { Path = $"{flowNameClean}_teach.txt", Content = teachList });
+            generatedFiles.Add(new CodegenFile { Path = $"{flowNameClean}.mod", Content = code + Environment.NewLine });
             generatedFiles.Add(new CodegenFile { Path = $"{flowNameClean}_prompt.log", Content = promptLogContent });
         }
 
         return generatedFiles;
+    }
+
+    private static string BuildRepairPrompt(string originalUserPrompt, string code, IReadOnlyList<string> errors)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(originalUserPrompt);
+        sb.AppendLine();
+        sb.AppendLine("=== YOUR PREVIOUS MODULE WAS REJECTED ===");
+        sb.AppendLine(code);
+        sb.AppendLine();
+        sb.AppendLine("=== VALIDATION ERRORS ===");
+        foreach (var error in errors) sb.AppendLine("- " + error);
+        sb.AppendLine();
+        sb.AppendLine("Fix every error above and output the complete corrected module. Follow all rules; output only the module.");
+        return sb.ToString();
     }
 
     private static string FormatPromptLog(string flowName, string systemPrompt, string userPrompt, string? debugTransitions = null)
