@@ -15,35 +15,6 @@ public class AiRequestOrchestrator
         _webViewBridgeService = webViewBridgeService;
         _aiCompletionService = aiCompletionService;
         eventAggregator.GetEvent<AiRequestedEvent>().Subscribe(async payload => await HandleAiRequestAsync(payload));
-        eventAggregator.GetEvent<AiClassifyRequestedEvent>().Subscribe(async payload => await HandleClassifyAsync(payload));
-    }
-
-    private async Task HandleClassifyAsync(AiClassifyPayload payload)
-    {
-        // Without a live provider the WebView falls back to its local keyword detection.
-        if (_aiCompletionService is not DynamicAiCompletionService { IsLive: true })
-        {
-            await _webViewBridgeService.SendAiClassificationAsync(payload.RequestId, "unavailable", null, string.Empty, string.Empty);
-            return;
-        }
-
-        try
-        {
-            var request = AiIntentClassifier.BuildRequest("ai-classify-" + payload.RequestId, payload.Message);
-            var result = await _aiCompletionService.CompleteAsync(new AiCompletionRequest(request));
-            if (!result.Ok)
-            {
-                await _webViewBridgeService.SendAiClassificationAsync(payload.RequestId, "error", null, string.Empty, string.Empty, string.Join("; ", result.Errors));
-                return;
-            }
-
-            var choice = AiIntentClassifier.Parse(result.RawText);
-            await _webViewBridgeService.SendAiClassificationAsync(payload.RequestId, "ai", choice.Intent, choice.Reason, choice.Question);
-        }
-        catch (Exception error)
-        {
-            await _webViewBridgeService.SendAiClassificationAsync(payload.RequestId, "error", null, string.Empty, string.Empty, BuildSafeStreamingError(error));
-        }
     }
 
     private async Task HandleAiRequestAsync(AiRequestPayload payload)

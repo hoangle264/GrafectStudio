@@ -10,7 +10,11 @@ public class AiRequestedEvent : PubSubEvent<AiRequestPayload>
 {
 }
 
-public class AiClassifyRequestedEvent : PubSubEvent<AiClassifyPayload>
+public class AiAgentStartRequestedEvent : PubSubEvent<AiAgentStartPayload>
+{
+}
+
+public class AiAgentToolResultEvent : PubSubEvent<AiAgentToolResultPayload>
 {
 }
 

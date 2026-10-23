@@ -69,12 +69,14 @@ public partial class App : PrismApplication
         RegisterAiServices(containerRegistry);
         containerRegistry.RegisterSingleton<AiRequestOrchestrator>();
         containerRegistry.RegisterSingleton<AiSettingsOrchestrator>();
+        containerRegistry.RegisterSingleton<AiAgentOrchestrator>();
 
         Container.Resolve<CodeGenerationOrchestrator>().Init();
         Container.Resolve<FileIOOrchestrator>().Init();
         Container.Resolve<SiemensTiaPushOrchestrator>().Init();
         Container.Resolve<AiRequestOrchestrator>();
         Container.Resolve<AiSettingsOrchestrator>();
+        Container.Resolve<AiAgentOrchestrator>();
     }
 
     private static async Task RunAiMockValidationAsync()

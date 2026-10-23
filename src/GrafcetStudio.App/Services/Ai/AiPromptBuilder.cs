@@ -2,9 +2,8 @@ namespace GrafcetStudio.App.Services.Ai;
 
 public static class AiPromptBuilder
 {
-    public static string BuildSystemPrompt(string intent)
-    {
-        var intentRequirements = intent switch
+    public static string IntentRequirements(string intent)
+        => intent switch
         {
             "clone-variable" => "Return data.source (object with label or id of the template to clone) and data.variables (array of 2 or more variable objects). Each variable needs label, format (same as source), kind, comment, source=\"manual\". Do NOT return data.variable (singular). Minimum 2 variables per proposal to be useful. Address fields are optional for struct-type variables.",
             "map-io" => "Return data.entries only. Each entry must contain physicalIOId, appVariable, status, and optional matchScore.",
@@ -12,6 +11,10 @@ public static class AiPromptBuilder
             "create-structure" => "Return data.name (string) and data.signals (array of objects with name, dataType, varType, comment). dataType must be one of: Bool, Int, Real, Word, DWord, Time. varType must be one of: Input, Output, Var. Do not include id, categoryId, address, deviceId, or internal metadata. Do not propose a structure name already listed in existingStructures.",
             _ => "Return data.bucket and data.variable only. Use bucket \"user\" unless sanitized context clearly requires another safe bucket."
         };
+
+    public static string BuildSystemPrompt(string intent)
+    {
+        var intentRequirements = IntentRequirements(intent);
 
         return string.Join("\n", new[]
         {

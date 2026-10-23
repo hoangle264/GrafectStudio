@@ -72,12 +72,14 @@ type AiPermissionChoice = 'once' | 'session' | 'project' | 'deny';
 
 interface AiPermissionRequest {
   id: string;
-  request: GrafcetStudioAIContracts.AiRequest;
-  intent: string;
-  message: string;
+  title: string;
+  /** Exactly what will be sent if allowed (shown under "View data"). */
+  preview: unknown;
   scopes: string[];
   missing: string[];
   status: 'pending' | AiPermissionChoice;
+  onAllow: () => void;
+  onDeny: () => void;
 }
 
 const AI_PERMISSION_STATE: {
@@ -652,7 +654,6 @@ function aiChatBuildRequest(message: string, intent: string): GrafcetStudioAICon
 
 const AI_ASSISTANT_INTENT = 'assistant';
 const AI_ROUTABLE_INTENTS = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
-const AI_CLASSIFY_PENDING: Record<string, { message: string; statusMessageId: string }> = {};
 
 function aiChatSend(): void {
   toggleAiChatPanel(true);
@@ -667,17 +668,141 @@ function aiChatSend(): void {
   else aiChatRunIntent(message, intent);
 }
 
-/** Assistant mode: ask the host to pick an intent from the message alone; fall back to local keyword detection. */
+/**
+ * Assistant mode: the host runs a tool-use loop with the AI. Each tool runs here, reads only what it names,
+ * and asks for permission before any project data is returned. Without a live AI, keyword routing is used.
+ */
 function aiChatRoute(message: string): void {
-  const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
-  if (host && host.webview && typeof host.webview.postMessage === 'function' && AI_PERMISSION_STATE.liveAi !== false) {
-    const requestId = 'cls-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-    const status = aiChatAddMessage('assistant', 'Assistant is choosing an action (only your message is sent)...');
-    AI_CLASSIFY_PENDING[requestId] = { message, statusMessageId: status.id };
-    host.webview.postMessage({ type: 'AI_CLASSIFY', payload: { requestId, message } });
+  const host = aiAgentHost();
+  if (host && AI_PERMISSION_STATE.liveAi !== false) {
+    const sessionId = 'agt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    const status = aiChatAddMessage('assistant', 'Assistant is working (only your message is sent until you allow more)...');
+    AI_AGENT_SESSIONS[sessionId] = { message, statusMessageId: status.id };
+    host({ type: 'AI_AGENT_START', payload: { sessionId, message } });
     return;
   }
   aiChatRouteLocally(message, null, '');
+}
+
+const AI_AGENT_SESSIONS: Record<string, { message: string; statusMessageId: string }> = {};
+
+function aiAgentHost(): ((message: unknown) => void) | null {
+  const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
+  return host && host.webview && typeof host.webview.postMessage === 'function' ? host.webview.postMessage.bind(host.webview) : null;
+}
+
+function receiveAiAgentEvent(event: { sessionId: string; kind: string; data?: { text?: string; callId?: string; name?: string; args?: Record<string, unknown> } | null }): void {
+  const session = AI_AGENT_SESSIONS[event.sessionId];
+  if (!session) return;
+  const status = aiChatFindMessage(session.statusMessageId);
+  const data = event.data || {};
+  switch (event.kind) {
+    case 'unavailable':
+      delete AI_AGENT_SESSIONS[event.sessionId];
+      aiChatRouteLocally(session.message, status, 'AI is not configured.');
+      return;
+    case 'status':
+      if (status) { status.text = data.text || status.text; aiChatRender(); }
+      return;
+    case 'tool_call':
+      aiAgentRunTool(event.sessionId, String(data.callId || ''), String(data.name || ''), data.args || {}, status);
+      return;
+    case 'error':
+      delete AI_AGENT_SESSIONS[event.sessionId];
+      if (status) { status.text = data.text || 'Assistant failed.'; status.error = true; aiChatRender(); }
+      return;
+    case 'end':
+      delete AI_AGENT_SESSIONS[event.sessionId];
+      if (status) { status.text = 'Assistant finished.'; aiChatRender(); }
+      return;
+  }
+}
+
+function aiAgentSendResult(sessionId: string, callId: string, result: Record<string, unknown>): void {
+  const host = aiAgentHost();
+  if (host) host({ type: 'AI_AGENT_TOOL_RESULT', payload: { sessionId, callId, result } });
+}
+
+const AI_AGENT_READ_TOOLS: Record<string, { scope: string; label: string }> = {
+  list_diagrams: { scope: 'diagram', label: 'list diagrams' },
+  get_diagram: { scope: 'step', label: 'read a diagram' },
+  list_variables: { scope: 'variable', label: 'read variables' },
+  get_io_mapping: { scope: 'io', label: 'read the IO mapping' },
+  list_device_types: { scope: 'structure', label: 'list device types' },
+  list_units: { scope: 'unit', label: 'list units' }
+};
+
+function aiAgentRunTool(sessionId: string, callId: string, name: string, args: Record<string, unknown>, status: AiChatMessage | null): void {
+  try {
+    if (name === 'reply') {
+      aiChatAddMessage('assistant', aiChatText(args.text, '(empty reply)'));
+      aiAgentSendResult(sessionId, callId, { done: true });
+      return;
+    }
+    if (name === 'submit_proposal') {
+      aiAgentSendResult(sessionId, callId, aiAgentSubmitProposal(String(args.proposal_json || '')));
+      return;
+    }
+    const tool = AI_AGENT_READ_TOOLS[name];
+    if (!tool) {
+      aiAgentSendResult(sessionId, callId, { error: 'Unknown tool: ' + name });
+      return;
+    }
+    const data = aiAgentReadData(name, args);
+    if (status) { status.text = 'Assistant wants to ' + tool.label + '.'; aiChatRender(); }
+    if (!aiPermissionNeeded() || !aiPermissionMissingScopes([tool.scope]).length) {
+      aiAgentSendResult(sessionId, callId, { data });
+      return;
+    }
+    aiPermissionAsk('Assistant wants to ' + tool.label, data, [tool.scope], [tool.scope],
+      function() { aiAgentSendResult(sessionId, callId, { data }); },
+      function() { aiAgentSendResult(sessionId, callId, { denied: true, message: 'The user did not allow sharing this data.' }); });
+  } catch (error) {
+    aiAgentSendResult(sessionId, callId, { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/** Sanitized, read-only view of the project for one tool; never returns raw project objects. */
+function aiAgentReadData(name: string, args: Record<string, unknown>): unknown {
+  const sanitizer = GrafcetStudioAISanitizer.api;
+  const read = function(raw: unknown, scope: GrafcetStudioAISanitizer.AiContextScope, maxItems: number) {
+    return sanitizer.sanitizeAiContext(raw, { scopes: [scope], maxItems });
+  };
+  switch (name) {
+    case 'list_diagrams': return read(project, 'diagram', 500).diagrams || [];
+    case 'list_variables': return read(project, 'variable', 1000).variables || [];
+    case 'get_io_mapping': return read(project, 'io', 2000).ioMapping || { physicalIOs: [], entries: [] };
+    case 'list_device_types': return read(project, 'structure', 500).existingStructures || [];
+    case 'list_units': return read(project, 'unit', 500).units || [];
+    case 'get_diagram': {
+      const diagramId = aiChatText(args.diagramId, '');
+      const meta = (project.diagrams || []).find(function(d) { return d.id === diagramId; });
+      if (!meta) return { error: 'No diagram with id ' + diagramId + '. Call list_diagrams first.' };
+      if (activeDiagramId === diagramId && typeof flushState === 'function') flushState();
+      const stored = typeof loadDiagramData === 'function' ? loadDiagramData(diagramId) : null;
+      const content = read(stored || {}, 'step', 2000);
+      return {
+        diagram: sanitizer.sanitizeDiagram(meta),
+        steps: content.steps || [],
+        transitions: content.transitions || [],
+        connections: content.connections || []
+      };
+    }
+  }
+  return null;
+}
+
+/** Runs the same parser, validator and dry-run as any proposal; errors go back to the AI so it can fix them. */
+function aiAgentSubmitProposal(proposalJson: string): Record<string, unknown> {
+  const bridge = aiChatBridge();
+  if (!bridge) return { accepted: false, errors: ['AI bridge is not available.'] };
+  const parsed = bridge.mockService.receiveHostResponse(proposalJson);
+  if (!parsed.ok || !('proposal' in parsed) || !parsed.proposal) return { accepted: false, errors: parsed.errors || ['Proposal JSON is invalid.'] };
+  const normalized = bridge.proposalParser.normalizeAiProposal(aiChatClone(parsed.proposal));
+  const preview = aiChatValidatePreview(normalized);
+  if (!preview.ok) return { accepted: false, errors: preview.errors };
+  aiChatAddProposal(normalized, proposalJson);
+  return { accepted: true, done: true, warnings: preview.warnings };
 }
 
 function aiChatRouteLocally(message: string, statusMessage: AiChatMessage | null, note: string): void {
@@ -701,23 +826,6 @@ function aiChatShowRouteResult(statusMessage: AiChatMessage | null, message: str
   } else {
     aiChatAddMessage('assistant', body, { routedText: message, routedIntent: intent || '' });
   }
-}
-
-function receiveAiClassification(payload: { requestId: string; source: string; intent?: string; reason?: string; question?: string; error?: string }): void {
-  const pending = AI_CLASSIFY_PENDING[payload.requestId];
-  if (!pending) return;
-  delete AI_CLASSIFY_PENDING[payload.requestId];
-  const status = aiChatFindMessage(pending.statusMessageId);
-  if (payload.source !== 'ai') {
-    aiChatRouteLocally(pending.message, status, payload.error ? 'AI routing failed (' + payload.error + ').' : '');
-    return;
-  }
-  if (!payload.intent || AI_ROUTABLE_INTENTS.indexOf(payload.intent) < 0) {
-    aiChatShowRouteResult(status, pending.message, null, payload.question || 'Could not tell which action you want. Rephrase, or pick an action from the list.');
-    return;
-  }
-  aiChatShowRouteResult(status, pending.message, payload.intent, payload.reason || '');
-  aiChatRunIntent(pending.message, payload.intent);
 }
 
 /** Re-run the original request with an intent the user picked instead of the assistant's choice. */
@@ -752,7 +860,10 @@ function aiChatRunIntent(message: string, intent: string): void {
   const scopes = (requestResult.appliedScopes || []).slice();
   const missing = aiPermissionMissingScopes(scopes);
   if (aiPermissionNeeded() && missing.length) {
-    aiPermissionAsk(requestResult.request, intent, message, scopes, missing);
+    const request = requestResult.request;
+    aiPermissionAsk('Send project data to AI?', request.context, scopes, missing,
+      function() { aiChatDispatch(request, intent, message); },
+      function() { /* nothing sent */ });
     return;
   }
   aiChatDispatch(requestResult.request, intent, message);
@@ -790,14 +901,14 @@ function aiPermissionMissingScopes(scopes: string[]): string[] {
   });
 }
 
-function aiPermissionAsk(request: GrafcetStudioAIContracts.AiRequest, intent: string, message: string, scopes: string[], missing: string[]): void {
+function aiPermissionAsk(title: string, preview: unknown, scopes: string[], missing: string[], onAllow: () => void, onDeny: () => void): void {
   const id = 'ai-perm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-  AI_PERMISSION_STATE.requests[id] = { id, request, intent, message, scopes, missing, status: 'pending' };
+  AI_PERMISSION_STATE.requests[id] = { id, title, preview, scopes, missing, status: 'pending', onAllow, onDeny };
   aiChatAddMessage('assistant', 'Permission required.', { permissionId: id });
 }
 
 function aiPermissionRenderCard(item: AiPermissionRequest): string {
-  const json = JSON.stringify(item.request.context, null, 2);
+  const json = JSON.stringify(item.preview, null, 2);
   const size = json.length >= 1024 ? (json.length / 1024).toFixed(1) + ' KB' : json.length + ' chars';
   const scopeList = item.scopes.map(function(scope) {
     const label = AI_SCOPE_LABELS[scope] || scope;
@@ -807,12 +918,12 @@ function aiPermissionRenderCard(item: AiPermissionRequest): string {
   const disabled = pending ? '' : ' disabled';
   const canProject = !!aiPermissionCurrentProjectId();
   const statusText: Record<string, string> = {
-    once: 'Allowed once. Request sent.',
-    session: 'Allowed for this session. Request sent.',
-    project: 'Allowed for this project. Request sent.',
+    once: 'Allowed once. Sent to AI.',
+    session: 'Allowed for this session. Sent to AI.',
+    project: 'Allowed for this project. Sent to AI.',
     deny: 'Denied. Nothing was sent.'
   };
-  return '<div class="ai-proposal-head"><span class="ai-proposal-title">Send project data to AI?</span></div>' +
+  return '<div class="ai-proposal-head"><span class="ai-proposal-title">' + aiChatEscape(item.title) + '</span></div>' +
     '<div class="ai-proposal-summary">This request will send the following to Gemini (' + aiChatEscape(size) + '):</div>' +
     '<ul class="ai-message-list">' + scopeList + '</ul>' +
     '<details class="ai-perm-details"><summary>View data</summary><pre class="ai-preview-json">' + aiChatEscape(json) + '</pre></details>' +
@@ -832,6 +943,7 @@ function aiPermissionDecide(id: string, choice: AiPermissionChoice): void {
   item.status = choice;
   if (choice === 'deny') {
     aiChatRender();
+    item.onDeny();
     return;
   }
   if (choice === 'session') {
@@ -847,7 +959,7 @@ function aiPermissionDecide(id: string, choice: AiPermissionChoice): void {
     aiSettingsPost('grant', { projectId, scopes: item.missing.join(',') });
   }
   aiChatRender();
-  aiChatDispatch(item.request, item.intent, item.message);
+  item.onAllow();
 }
 
 let aiPermissionRobotPending: { send: () => void; containerId: string; json: string } | null = null;
@@ -1167,7 +1279,7 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { toggleAiChatPanel: typeof toggleAiChatPanel }).toggleAiChatPanel = toggleAiChatPanel;
 (window as unknown as { aiChatSend: typeof aiChatSend }).aiChatSend = aiChatSend;
 (window as unknown as { aiChatReroute: typeof aiChatReroute }).aiChatReroute = aiChatReroute;
-(window as unknown as { receiveAiClassification: typeof receiveAiClassification }).receiveAiClassification = receiveAiClassification;
+(window as unknown as { receiveAiAgentEvent: typeof receiveAiAgentEvent }).receiveAiAgentEvent = receiveAiAgentEvent;
 (window as unknown as { aiChatInsertMockProposal: typeof aiChatInsertMockProposal }).aiChatInsertMockProposal = aiChatInsertMockProposal;
 (window as unknown as { aiChatApplyProposal: typeof aiChatApplyProposal }).aiChatApplyProposal = aiChatApplyProposal;
 (window as unknown as { aiChatUndoProposal: typeof aiChatUndoProposal }).aiChatUndoProposal = aiChatUndoProposal;

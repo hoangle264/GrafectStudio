@@ -56,10 +56,10 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveAiGrants({payload});");
     }
 
-    public async Task SendAiClassificationAsync(string requestId, string source, string? intent, string reason, string question, string? error = null)
+    public async Task SendAiAgentEventAsync(string sessionId, string kind, System.Text.Json.Nodes.JsonObject? data)
     {
-        var payload = JsonSerializer.Serialize(new { requestId, source, intent = intent ?? string.Empty, reason, question, error = error ?? string.Empty });
-        await ExecuteAsync($"receiveAiClassification({payload});");
+        var payload = new System.Text.Json.Nodes.JsonObject { ["sessionId"] = sessionId, ["kind"] = kind, ["data"] = data?.DeepClone() };
+        await ExecuteAsync($"receiveAiAgentEvent({payload.ToJsonString()});");
     }
 
     public async Task SendErrorAsync(string source, string message)

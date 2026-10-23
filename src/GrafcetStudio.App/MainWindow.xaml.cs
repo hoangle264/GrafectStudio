@@ -151,14 +151,25 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
                     break;
                 }
-            case "AI_CLASSIFY":
+            case "AI_AGENT_START":
                 {
-                    var message = new AiClassifyPayload
+                    var message = new AiAgentStartPayload
                     {
-                        RequestId = GetOptionalString(payload, "requestId"),
+                        SessionId = GetOptionalString(payload, "sessionId"),
                         Message = GetOptionalString(payload, "message")
                     };
-                    _eventAggregator.GetEvent<AiClassifyRequestedEvent>().Publish(message);
+                    _eventAggregator.GetEvent<AiAgentStartRequestedEvent>().Publish(message);
+                    break;
+                }
+            case "AI_AGENT_TOOL_RESULT":
+                {
+                    var message = new AiAgentToolResultPayload
+                    {
+                        SessionId = GetOptionalString(payload, "sessionId"),
+                        CallId = GetOptionalString(payload, "callId"),
+                        ResultJson = payload.TryGetProperty("result", out var resultElement) ? resultElement.GetRawText() : "{}"
+                    };
+                    _eventAggregator.GetEvent<AiAgentToolResultEvent>().Publish(message);
                     break;
                 }
             case "AI_SETTINGS":
