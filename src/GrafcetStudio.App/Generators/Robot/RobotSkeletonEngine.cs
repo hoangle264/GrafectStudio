@@ -24,9 +24,14 @@ public class RobotSkeletonEngine
         var positionDecls = RenderPositionDeclarations(doc.Positions);
         var toolDecls = RenderToolDeclarations(doc.Tools);
 
-        var initText = IndentText(doc.Init ?? "! Default initialization\nWaitTime 0.1;", 8);
+        if (string.IsNullOrWhiteSpace(doc.Init))
+            throw new InvalidOperationException("Robot snippet map is missing 'init'.");
+        if (string.IsNullOrWhiteSpace(doc.Labels))
+            throw new InvalidOperationException("Robot snippet map is missing 'labels' (error / E-Stop handlers).");
+
+        var initText = IndentText(doc.Init, 8);
         var stepsText = RenderSteps(doc, topologyContext, flow);
-        var labelsText = IndentText(doc.Labels ?? "! Error / E-Stop handlers\nlbl_estop:\n    WaitTime 0.1;", 8);
+        var labelsText = IndentText(doc.Labels, 8);
 
         var result = skeletonText
             .Replace("{MODULE_NAME}", moduleName)

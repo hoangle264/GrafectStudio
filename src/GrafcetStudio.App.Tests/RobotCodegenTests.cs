@@ -168,6 +168,7 @@ public class RobotCodegenTests
             },
             Tools = new List<SnippetTool> { new SnippetTool("tool1", "Gripper tool") },
             Init = "WaitTime 0.1;",
+            Labels = "lbl_estop:\n    WaitTime 0.1;",
             Steps = new Dictionary<int, string>
             {
                 { 1, "SetDO gripper, 1;\nWaitTime 0.5;" }
@@ -313,6 +314,8 @@ public class RobotCodegenTests
             Schema = "grafectstudio/robot-snippet-map/v1",
             Platform = "ABB_RAPID",
             Module = "Drop_Work",
+            Init = "WaitTime 0.1;",
+            Labels = "lbl_estop:\n    WaitTime 0.1;",
             Steps = new Dictionary<int, string>
             {
                 { 1, "MoveJ Pos1, v500, fine, T0;\nWaitDI sig1, 1;" },
