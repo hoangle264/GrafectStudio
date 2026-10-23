@@ -24,6 +24,9 @@ interface AiChatMessage {
   error?: boolean;
   proposalId?: string;
   permissionId?: string;
+  /** Assistant routing result: the original request and the intent it was routed to. */
+  routedText?: string;
+  routedIntent?: string;
   streaming?: boolean;
   streamStatus?: string[];
   streamText?: string;
@@ -479,7 +482,7 @@ function aiChatRender(): void {
     const classes = ['ai-bubble', message.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-assistant'];
     if (message.error) classes.push('ai-bubble-error');
     return '<div class="' + classes.join(' ') + '">' +
-      (record ? aiChatRenderProposal(record) : message.permissionId && AI_PERMISSION_STATE.requests[message.permissionId] ? aiPermissionRenderCard(AI_PERMISSION_STATE.requests[message.permissionId]) : aiChatEscape(message.text)) +
+      (record ? aiChatRenderProposal(record) : message.permissionId && AI_PERMISSION_STATE.requests[message.permissionId] ? aiPermissionRenderCard(AI_PERMISSION_STATE.requests[message.permissionId]) : aiChatEscape(message.text) + (message.routedText ? aiChatRenderRouteActions(message) : '')) +
     '</div>';
   }).join('');
   body.scrollTop = body.scrollHeight;
@@ -566,14 +569,95 @@ function aiChatBuildRequest(message: string, intent: string): GrafcetStudioAICon
   });
 }
 
+const AI_ASSISTANT_INTENT = 'assistant';
+const AI_ROUTABLE_INTENTS = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
+const AI_CLASSIFY_PENDING: Record<string, { message: string; statusMessageId: string }> = {};
+
 function aiChatSend(): void {
   toggleAiChatPanel(true);
   const input = document.getElementById('ai-chat-input') as HTMLInputElement | HTMLTextAreaElement | null;
   const intentInput = document.getElementById('ai-chat-intent') as HTMLInputElement | HTMLSelectElement | null;
-  const message = aiChatText(input && input.value, 'Create a variable proposal.');
-  const intent = aiChatText(intentInput && intentInput.value, 'create-variable');
+  const message = aiChatText(input && input.value, '');
+  if (!message) return;
+  const intent = aiChatText(intentInput && intentInput.value, AI_ASSISTANT_INTENT);
   aiChatAddMessage('user', message);
   if (input) input.value = '';
+  if (intent === AI_ASSISTANT_INTENT) aiChatRoute(message);
+  else aiChatRunIntent(message, intent);
+}
+
+/** Assistant mode: ask the host to pick an intent from the message alone; fall back to local keyword detection. */
+function aiChatRoute(message: string): void {
+  const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
+  if (host && host.webview && typeof host.webview.postMessage === 'function' && AI_PERMISSION_STATE.liveAi !== false) {
+    const requestId = 'cls-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    const status = aiChatAddMessage('assistant', 'Assistant is choosing an action (only your message is sent)...');
+    AI_CLASSIFY_PENDING[requestId] = { message, statusMessageId: status.id };
+    host.webview.postMessage({ type: 'AI_CLASSIFY', payload: { requestId, message } });
+    return;
+  }
+  aiChatRouteLocally(message, null, '');
+}
+
+function aiChatRouteLocally(message: string, statusMessage: AiChatMessage | null, note: string): void {
+  const bridge = aiChatBridge();
+  const detected = bridge ? bridge.contextBuilder.detectIntent(message) : null;
+  if (!detected) {
+    aiChatShowRouteResult(statusMessage, message, null, (note ? note + ' ' : '') + 'Could not tell which action you want. Rephrase, or pick an action from the list.');
+    return;
+  }
+  aiChatShowRouteResult(statusMessage, message, detected, (note ? note + ' ' : '') + 'Matched by keywords.');
+  aiChatRunIntent(message, detected);
+}
+
+function aiChatShowRouteResult(statusMessage: AiChatMessage | null, message: string, intent: string | null, text: string): void {
+  const body = intent ? 'Assistant chose ' + intent + '. ' + text : text;
+  if (statusMessage) {
+    statusMessage.text = body;
+    statusMessage.routedText = message;
+    statusMessage.routedIntent = intent || '';
+    aiChatRender();
+  } else {
+    aiChatAddMessage('assistant', body, { routedText: message, routedIntent: intent || '' });
+  }
+}
+
+function receiveAiClassification(payload: { requestId: string; source: string; intent?: string; reason?: string; question?: string; error?: string }): void {
+  const pending = AI_CLASSIFY_PENDING[payload.requestId];
+  if (!pending) return;
+  delete AI_CLASSIFY_PENDING[payload.requestId];
+  const status = aiChatFindMessage(pending.statusMessageId);
+  if (payload.source !== 'ai') {
+    aiChatRouteLocally(pending.message, status, payload.error ? 'AI routing failed (' + payload.error + ').' : '');
+    return;
+  }
+  if (!payload.intent || AI_ROUTABLE_INTENTS.indexOf(payload.intent) < 0) {
+    aiChatShowRouteResult(status, pending.message, null, payload.question || 'Could not tell which action you want. Rephrase, or pick an action from the list.');
+    return;
+  }
+  aiChatShowRouteResult(status, pending.message, payload.intent, payload.reason || '');
+  aiChatRunIntent(pending.message, payload.intent);
+}
+
+/** Re-run the original request with an intent the user picked instead of the assistant's choice. */
+function aiChatReroute(messageId: string, intent: string): void {
+  const message = aiChatFindMessage(messageId);
+  if (!message || !message.routedText || AI_ROUTABLE_INTENTS.indexOf(intent) < 0) return;
+  message.routedIntent = intent;
+  message.text = 'Switched to ' + intent + '.';
+  aiChatRender();
+  aiChatRunIntent(message.routedText, intent);
+}
+
+function aiChatRenderRouteActions(message: AiChatMessage): string {
+  const others = AI_ROUTABLE_INTENTS.filter(function(intent) { return intent !== message.routedIntent; });
+  return '<div class="ai-proposal-actions"><span class="ai-route-label">' + (message.routedIntent ? 'Use instead:' : 'Run as:') + '</span>' +
+    others.map(function(intent) {
+      return '<button class="btn" onclick="aiChatReroute(\'' + aiChatEscape(message.id) + '\', \'' + intent + '\')">' + aiChatEscape(intent) + '</button>';
+    }).join('') + '</div>';
+}
+
+function aiChatRunIntent(message: string, intent: string): void {
   const bridge = aiChatBridge();
   if (!bridge) {
     aiChatAddMessage('assistant', 'AI bridge is not available.', { error: true });
@@ -770,7 +854,8 @@ function aiChatInsertMockProposal(): void {
   toggleAiChatPanel(true);
   const bridge = aiChatBridge();
   const intentInput = document.getElementById('ai-chat-intent') as HTMLInputElement | HTMLSelectElement | null;
-  const intent = aiChatText(intentInput && intentInput.value, 'create-variable') as GrafcetStudioAIContracts.AiIntent;
+  const selected = aiChatText(intentInput && intentInput.value, 'create-variable');
+  const intent = (selected === AI_ASSISTANT_INTENT ? 'create-variable' : selected) as GrafcetStudioAIContracts.AiIntent;
   if (!bridge) {
     aiChatAddMessage('assistant', 'AI bridge is not available.', { error: true });
     return;
@@ -1000,6 +1085,8 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { setRightPanelTab: typeof setRightPanelTab }).setRightPanelTab = setRightPanelTab;
 (window as unknown as { toggleAiChatPanel: typeof toggleAiChatPanel }).toggleAiChatPanel = toggleAiChatPanel;
 (window as unknown as { aiChatSend: typeof aiChatSend }).aiChatSend = aiChatSend;
+(window as unknown as { aiChatReroute: typeof aiChatReroute }).aiChatReroute = aiChatReroute;
+(window as unknown as { receiveAiClassification: typeof receiveAiClassification }).receiveAiClassification = receiveAiClassification;
 (window as unknown as { aiChatInsertMockProposal: typeof aiChatInsertMockProposal }).aiChatInsertMockProposal = aiChatInsertMockProposal;
 (window as unknown as { aiChatApplyProposal: typeof aiChatApplyProposal }).aiChatApplyProposal = aiChatApplyProposal;
 (window as unknown as { aiChatDiscardProposal: typeof aiChatDiscardProposal }).aiChatDiscardProposal = aiChatDiscardProposal;

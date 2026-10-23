@@ -56,6 +56,12 @@ public class WebViewBridgeService : IWebViewBridgeService
         await ExecuteAsync($"receiveAiGrants({payload});");
     }
 
+    public async Task SendAiClassificationAsync(string requestId, string source, string? intent, string reason, string question, string? error = null)
+    {
+        var payload = JsonSerializer.Serialize(new { requestId, source, intent = intent ?? string.Empty, reason, question, error = error ?? string.Empty });
+        await ExecuteAsync($"receiveAiClassification({payload});");
+    }
+
     public async Task SendErrorAsync(string source, string message)
     {
         var payload = JsonSerializer.Serialize(new { source, message });

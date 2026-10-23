@@ -21,6 +21,12 @@ public class AiRequestPayload
     public bool Stream { get; set; }
 }
 
+public class AiClassifyPayload
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+}
+
 public class AiSettingsPayload
 {
     /// <summary>"get", "save", "clear", "list", "grants-get", "grant" or "revoke".</summary>

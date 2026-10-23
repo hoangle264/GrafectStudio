@@ -439,12 +439,14 @@
                     <div class="ai-chat-body" id="ai-chat-body"></div>
                     <div class="ai-chat-compose">
                         <select class="ai-chat-intent" id="ai-chat-intent" title="AI intent">
+                            <option value="assistant" selected>assistant (auto)</option>
+                            <option value="create-variable">create-variable</option>
                             <option value="create-structure">create-structure</option>
                             <option value="clone-variable">clone-variable</option>
                             <option value="map-io">map-io</option>
                             <option value="create-flow">create-flow</option>
                         </select>
-                        <textarea id="ai-chat-input" class="ai-chat-input" rows="3" placeholder="Describe the proposal to preview..."></textarea>
+                        <textarea id="ai-chat-input" class="ai-chat-input" rows="3" placeholder="Describe what you need; the assistant picks the action..."></textarea>
                         <div class="ai-chat-actions">
                             <button class="btn a" onclick="aiChatSend()">Send</button>
                         </div>

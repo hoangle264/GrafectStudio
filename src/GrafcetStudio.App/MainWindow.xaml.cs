@@ -151,6 +151,16 @@ public partial class MainWindow : Window
                     _eventAggregator.GetEvent<AiRequestedEvent>().Publish(message);
                     break;
                 }
+            case "AI_CLASSIFY":
+                {
+                    var message = new AiClassifyPayload
+                    {
+                        RequestId = GetOptionalString(payload, "requestId"),
+                        Message = GetOptionalString(payload, "message")
+                    };
+                    _eventAggregator.GetEvent<AiClassifyRequestedEvent>().Publish(message);
+                    break;
+                }
             case "AI_SETTINGS":
                 {
                     var message = new AiSettingsPayload
