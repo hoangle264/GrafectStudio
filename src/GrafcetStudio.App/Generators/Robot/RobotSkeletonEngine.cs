@@ -44,42 +44,12 @@ public class RobotSkeletonEngine
     private string LoadSkeleton(string platform)
     {
         var skelFile = Path.Combine(_skeletonBasePath, platform.ToLowerInvariant(), "main.skel");
-        if (File.Exists(skelFile))
+        if (!File.Exists(skelFile))
         {
-            return File.ReadAllText(skelFile);
+            throw new FileNotFoundException($"Robot skeleton not found for platform '{platform}': {skelFile}", skelFile);
         }
 
-        // Fallback for execution from relative project dir
-        var fallbackFile = Path.Combine(Directory.GetCurrentDirectory(), "assets", "skeletons", platform.ToLowerInvariant(), "main.skel");
-        if (File.Exists(fallbackFile))
-        {
-            return File.ReadAllText(fallbackFile);
-        }
-
-        // Hardcoded default skeleton fallback
-        return @"MODULE {MODULE_NAME}
-    ! --- I/O Signal Aliases ---
-{INJECT:signal_decls}
-
-    ! --- Position Targets ---
-{INJECT:position_decls}
-
-    ! --- Tool Data ---
-{INJECT:tool_decls}
-
-    PROC main()
-        ! === INITIALIZATION ===
-{INJECT:init}
-
-        ! === MAIN SEQUENCE LOOP ===
-        WHILE TRUE DO
-{INJECT:steps}
-        ENDWHILE
-
-        ! === ERROR / E-STOP HANDLERS ===
-{INJECT:labels}
-    ENDPROC
-ENDMODULE";
+        return File.ReadAllText(skelFile);
     }
 
     private static string RenderSignalDeclarations(List<SnippetSignal> signals)

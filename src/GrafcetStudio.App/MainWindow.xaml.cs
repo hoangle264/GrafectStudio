@@ -50,7 +50,16 @@ public partial class MainWindow : Window
         }
         webView.CoreWebView2.NavigationCompleted += async (_, _) =>
         {
-            var config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
+            AppConfig config;
+            try
+            {
+                config = await ((App)System.Windows.Application.Current).Container.Resolve<ConfigService>().LoadAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message, "Invalid config", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
             await bridge.SendSavedPathsAsync(config.DeviceLibraryPath, config.TemplatePath, config.OutputPath);
             await bridge.SendSiemensTiaPushResultAsync(new
             {

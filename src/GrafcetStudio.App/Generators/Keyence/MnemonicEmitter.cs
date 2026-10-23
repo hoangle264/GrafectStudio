@@ -22,28 +22,14 @@ public static class MnemonicEmitter
             return SplitMnemonicLines(KeyenceMnemonicInstructionEmitter.Format(keyenceInstruction));
         }
 
-        try
-        {
-            return SplitMnemonicLines(KeyenceMnemonicExpressionEmitter.EmitExpressionAndInstruction(condition, vars.ToList(), keyenceInstruction));
-        }
-        catch
-        {
-            return SplitMnemonicLines(StepContextBuilder.BuildInstructionExpression(condition, instruction, target));
-        }
+        return SplitMnemonicLines(KeyenceMnemonicExpressionEmitter.EmitExpressionAndInstruction(condition, vars.ToList(), keyenceInstruction));
     }
 
     public static IList<string> EmitConditionLines(string condition, IList<DeviceVariable> vars)
     {
         if (string.IsNullOrWhiteSpace(condition)) return new List<string>();
 
-        try
-        {
-            return KeyenceMnemonicExpressionEmitter.EmitCondition(condition, vars.ToList()).ToList();
-        }
-        catch
-        {
-            return new List<string> { condition };
-        }
+        return KeyenceMnemonicExpressionEmitter.EmitCondition(condition, vars.ToList()).ToList();
     }
 
     public static KeyenceInstruction? ToInstruction(string instruction, string target, IList<DeviceVariable> vars)

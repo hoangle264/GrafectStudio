@@ -31,8 +31,19 @@ public static class TemplateLoader
             return result;
         }
 
+        string profile;
+        try
+        {
+            profile = GetProfileName(templateRootPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            result.Errors.Add($"Error reading profile.txt in '{rootPath}': {ex.Message}");
+            return result;
+        }
+
         LoadStandardTemplates(rootPath, result);
-        LoadBaseTemplates(rootPath, result, GetProfileName(templateRootPath));
+        LoadBaseTemplates(rootPath, result, profile);
         LoadDevicePartials(rootPath, result);
         LoadCustomDevicePartials(rootPath, result);
 
@@ -86,17 +97,10 @@ public static class TemplateLoader
 
     internal static string GetProfileName(string templateRootPath)
     {
-        try
-        {
-            var profileFile = Path.Combine(Path.GetFullPath(templateRootPath.Trim()), "profile.txt");
-            if (!File.Exists(profileFile)) return "simple";
-            var profile = File.ReadAllText(profileFile).Trim();
-            return string.IsNullOrWhiteSpace(profile) ? "simple" : profile;
-        }
-        catch
-        {
-            return "simple";
-        }
+        var profileFile = Path.Combine(Path.GetFullPath(templateRootPath.Trim()), "profile.txt");
+        if (!File.Exists(profileFile)) return "simple";
+        var profile = File.ReadAllText(profileFile).Trim();
+        return string.IsNullOrWhiteSpace(profile) ? "simple" : profile;
     }
 
     private static void LoadTemplateSet(string folderPath, string prefix, TemplateLoadResult result)

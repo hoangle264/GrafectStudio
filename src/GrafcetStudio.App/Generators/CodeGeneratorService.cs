@@ -69,9 +69,9 @@ public class CodeGeneratorService : ICodeGeneratorService
             using var doc = System.Text.Json.JsonDocument.Parse(content);
             return ConvertJsonElement(doc.RootElement.Clone());
         }
-        catch
+        catch (System.Text.Json.JsonException ex)
         {
-            return content;
+            throw new InvalidOperationException($"Generated content is not valid JSON for template rendering: {ex.Message}", ex);
         }
     }
 

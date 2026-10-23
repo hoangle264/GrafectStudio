@@ -20,41 +20,34 @@ public class RobotRagLoader
 
         if (!Directory.Exists(platformDir))
         {
-            var fallbackDir = Path.Combine(Directory.GetCurrentDirectory(), "assets", "rag", platform.ToLowerInvariant());
-            if (Directory.Exists(fallbackDir))
-            {
-                platformDir = fallbackDir;
-            }
+            throw new DirectoryNotFoundException($"Robot RAG directory not found for platform '{platform}': {platformDir}");
         }
 
-        if (Directory.Exists(platformDir))
+        var rulesFile = Path.Combine(platformDir, "rules.md");
+        if (File.Exists(rulesFile))
         {
-            var rulesFile = Path.Combine(platformDir, "rules.md");
-            if (File.Exists(rulesFile))
-            {
-                sb.AppendLine("## Supplemental Rules");
-                sb.AppendLine(File.ReadAllText(rulesFile));
-                sb.AppendLine();
-            }
+            sb.AppendLine("## Supplemental Rules");
+            sb.AppendLine(File.ReadAllText(rulesFile));
+            sb.AppendLine();
+        }
 
-            var irPatternsFile = Path.Combine(platformDir, "ir_patterns.md");
-            if (File.Exists(irPatternsFile))
-            {
-                sb.AppendLine("## RAG IR Patterns");
-                sb.AppendLine(File.ReadAllText(irPatternsFile));
-                sb.AppendLine();
-            }
+        var irPatternsFile = Path.Combine(platformDir, "ir_patterns.md");
+        if (File.Exists(irPatternsFile))
+        {
+            sb.AppendLine("## RAG IR Patterns");
+            sb.AppendLine(File.ReadAllText(irPatternsFile));
+            sb.AppendLine();
+        }
 
-            var patternsSubDir = Path.Combine(platformDir, "patterns");
-            if (Directory.Exists(patternsSubDir))
+        var patternsSubDir = Path.Combine(platformDir, "patterns");
+        if (Directory.Exists(patternsSubDir))
+        {
+            var mdFiles = Directory.GetFiles(patternsSubDir, "*.md");
+            foreach (var mdFile in mdFiles)
             {
-                var mdFiles = Directory.GetFiles(patternsSubDir, "*.md");
-                foreach (var mdFile in mdFiles)
-                {
-                    sb.AppendLine($"## Pattern ({Path.GetFileNameWithoutExtension(mdFile)})");
-                    sb.AppendLine(File.ReadAllText(mdFile));
-                    sb.AppendLine();
-                }
+                sb.AppendLine($"## Pattern ({Path.GetFileNameWithoutExtension(mdFile)})");
+                sb.AppendLine(File.ReadAllText(mdFile));
+                sb.AppendLine();
             }
         }
 

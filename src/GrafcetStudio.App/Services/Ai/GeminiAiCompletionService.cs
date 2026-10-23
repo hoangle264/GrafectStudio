@@ -179,13 +179,12 @@ public class GeminiAiCompletionService : IAiCompletionService
     {
         // Cố gắng lấy systemPrompt / userPrompt đã được build sẵn bởi RobotPromptBuilder
         // (được serialize vào field Json của SanitizedAiRequest tại AbbRapidGenerator).
-        // Nếu không parse được thì fallback về AiPromptBuilder chung cho các AI request thông thường.
+        // Request không có systemPrompt/userPrompt thì dùng AiPromptBuilder chung cho các AI request thông thường.
         string systemPrompt;
         string userPrompt;
 
-        try
+        using (var doc = JsonDocument.Parse(request.Request.Json))
         {
-            using var doc = JsonDocument.Parse(request.Request.Json);
             var root = doc.RootElement;
             var hasSys  = root.TryGetProperty("systemPrompt", out var sysProp)  && sysProp.ValueKind == JsonValueKind.String;
             var hasUser = root.TryGetProperty("userPrompt",   out var userProp) && userProp.ValueKind == JsonValueKind.String;
@@ -201,11 +200,6 @@ public class GeminiAiCompletionService : IAiCompletionService
                 systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
                 userPrompt   = AiPromptBuilder.BuildUserPrompt(request.Request);
             }
-        }
-        catch
-        {
-            systemPrompt = AiPromptBuilder.BuildSystemPrompt(request.Request.Intent);
-            userPrompt   = AiPromptBuilder.BuildUserPrompt(request.Request);
         }
 
         // Gemini API hỗ trợ systemInstruction riêng biệt (không merge vào user turn).

@@ -226,8 +226,9 @@ public class AbbRapidGenerator : ICodeGenerator
                 File.WriteAllText(Path.Combine(baseLogsDir, "prompt_sent.log"), content, System.Text.Encoding.UTF8);
             }
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            System.Diagnostics.Trace.WriteLine($"[Robot Codegen] Could not write prompt log for flow '{flowName}': {ex.Message}");
         }
     }
 

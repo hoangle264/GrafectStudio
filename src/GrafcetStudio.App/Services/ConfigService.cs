@@ -49,9 +49,9 @@ public class ConfigService
             config.SiemensTia ??= new SiemensTiaConfig();
             return config;
         }
-        catch
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            return new AppConfig();
+            throw new InvalidOperationException($"Could not read config file '{_configPath}': {ex.Message}", ex);
         }
     }
 
