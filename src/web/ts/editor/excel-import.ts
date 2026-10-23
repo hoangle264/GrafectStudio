@@ -74,12 +74,13 @@ namespace GrafcetStudioExcelImport {
     const firstRow = rows[0] || [];
     const firstRowNorm = firstRow.map(normalizeHeader);
     const hasHeader = firstRowNorm.includes('unitname') || firstRowNorm.includes('unit') || firstRowNorm.includes('label');
-    const headerIndexMap: Record<string, number> = {};
-    if (hasHeader) {
-      firstRowNorm.forEach(function(name, index) {
-        if (name && headerIndexMap[name] == null) headerIndexMap[name] = index;
-      });
+    if (!hasHeader) {
+      return { configs, errors: ['Missing header row. First row must contain a "UnitName" (or "Unit"/"Label") column.'] };
     }
+    const headerIndexMap: Record<string, number> = {};
+    firstRowNorm.forEach(function(name, index) {
+      if (name && headerIndexMap[name] == null) headerIndexMap[name] = index;
+    });
 
     function getByHeader(columns: string[], names: string[]): string {
       for (let index = 0; index < names.length; index++) {
@@ -90,37 +91,27 @@ namespace GrafcetStudioExcelImport {
     }
 
     rows.forEach(function(columns, rowIndex) {
-      if (rowIndex === 0 && hasHeader) return;
-      if (rowIndex === 0 && !hasHeader && isNaN(parseInt(columns[1], 10)) && !looksLikeAddress(columns[1])) return;
+      if (rowIndex === 0) return;
       if (!columns[0] || !columns[0].trim()) return;
 
-      const unitName = (hasHeader ? getByHeader(columns, ['unitname', 'unit', 'label']) : columns[0]).trim();
+      const unitName = getByHeader(columns, ['unitname', 'unit', 'label']).trim();
       if (!unitName) return;
 
-      const unitIndexRaw = hasHeader
-        ? getByHeader(columns, ['unitindex', 'index'])
-        : (looksLikeAddress(columns[1]) ? '' : columns[1] || '');
-      const parsedUnitIndex = parseInt(unitIndexRaw, 10);
+      const parsedUnitIndex = parseInt(getByHeader(columns, ['unitindex', 'index']), 10);
       const unitIndex = Number.isNaN(parsedUnitIndex) ? configs.length : parsedUnitIndex;
 
-      const noIndexLayout = !hasHeader && looksLikeAddress(columns[1]) && looksLikeAddress(columns[2]);
-
-      function column(headerNames: string[], legacyIndex: number): string {
-        return hasHeader ? getByHeader(columns, headerNames) : (columns[legacyIndex] || '');
-      }
-
       const io = {
-        originBaseAddr: column(['originbase', 'originbaseaddr'], noIndexLayout ? 4 : 2),
-        autoBaseAddr: column(['autobase', 'autobaseaddr'], noIndexLayout ? 5 : 3),
-        flagOrigin: column(['originflag', 'flagorigin'], noIndexLayout ? 1 : 2),
-        flagAuto: column(['autoflag', 'flagauto'], noIndexLayout ? 2 : 3),
-        flagManual: column(['manualflag', 'flagmanual'], noIndexLayout ? 3 : 4),
-        flagError: column(['errorflag', 'flagerror'], noIndexLayout ? 6 : 5),
-        btnStart: column(['start', 'btnstart'], noIndexLayout ? 7 : 6),
-        hmiStop: column(['stop', 'hmistop', 'btnstop'], noIndexLayout ? 8 : 7),
-        btnReset: column(['reset', 'btnreset'], noIndexLayout ? 9 : 8),
-        eStop: column(['estop'], noIndexLayout ? 10 : 9),
-        outHomed: column(['homedone', 'outhomed'], noIndexLayout ? 11 : 10)
+        originBaseAddr: getByHeader(columns, ['originbase', 'originbaseaddr']),
+        autoBaseAddr: getByHeader(columns, ['autobase', 'autobaseaddr']),
+        flagOrigin: getByHeader(columns, ['originflag', 'flagorigin']),
+        flagAuto: getByHeader(columns, ['autoflag', 'flagauto']),
+        flagManual: getByHeader(columns, ['manualflag', 'flagmanual']),
+        flagError: getByHeader(columns, ['errorflag', 'flagerror']),
+        btnStart: getByHeader(columns, ['start', 'btnstart']),
+        hmiStop: getByHeader(columns, ['stop', 'hmistop', 'btnstop']),
+        btnReset: getByHeader(columns, ['reset', 'btnreset']),
+        eStop: getByHeader(columns, ['estop']),
+        outHomed: getByHeader(columns, ['homedone', 'outhomed'])
       };
 
       let hasError = false;
