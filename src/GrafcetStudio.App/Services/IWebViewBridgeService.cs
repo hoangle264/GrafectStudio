@@ -12,6 +12,7 @@ public interface IWebViewBridgeService
     Task SendAiStreamEventAsync(string kind, string? text = null, bool done = false);
     Task SendAiSettingsAsync(bool configured, string source, string model, string? error = null);
     Task SendAiModelsAsync(bool ok, IReadOnlyList<string> models, string suggested, string? error = null);
+    Task SendAiGrantsAsync(string projectId, IReadOnlyList<string> scopes, string? error = null);
     Task SendErrorAsync(string source, string message);
     Task LoadProjectDataAsync(string json);
     Task UpdateDiagramStateAsync(string actionsJson);

@@ -169,6 +169,7 @@ public partial class App : PrismApplication
     private static void RegisterAiServices(IContainerRegistry containerRegistry)
     {
         containerRegistry.RegisterSingleton<AiKeyStore>();
+        containerRegistry.RegisterSingleton<AiPermissionStore>();
         containerRegistry.RegisterSingleton<IAiCompletionService, DynamicAiCompletionService>();
     }
 }

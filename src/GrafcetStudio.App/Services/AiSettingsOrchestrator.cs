@@ -9,11 +9,13 @@ public class AiSettingsOrchestrator
     private readonly IWebViewBridgeService _bridge;
     private static readonly System.Net.Http.HttpClient HttpClient = new();
     private readonly AiKeyStore _keyStore;
+    private readonly AiPermissionStore _permissions;
 
-    public AiSettingsOrchestrator(IEventAggregator eventAggregator, IWebViewBridgeService bridge, AiKeyStore keyStore)
+    public AiSettingsOrchestrator(IEventAggregator eventAggregator, IWebViewBridgeService bridge, AiKeyStore keyStore, AiPermissionStore permissions)
     {
         _bridge = bridge;
         _keyStore = keyStore;
+        _permissions = permissions;
         eventAggregator.GetEvent<AiSettingsRequestedEvent>().Subscribe(async payload => await HandleAsync(payload));
     }
 
@@ -22,6 +24,12 @@ public class AiSettingsOrchestrator
         if (payload.Action == "list")
         {
             await HandleListModelsAsync(payload);
+            return;
+        }
+
+        if (payload.Action is "grants-get" or "grant" or "revoke")
+        {
+            await HandleGrantsAsync(payload);
             return;
         }
 
@@ -51,6 +59,33 @@ public class AiSettingsOrchestrator
 
         var snapshot = _keyStore.GetSnapshot();
         await _bridge.SendAiSettingsAsync(snapshot.Configured, snapshot.Source, snapshot.Model, error);
+    }
+
+    private async Task HandleGrantsAsync(AiSettingsPayload payload)
+    {
+        string? error = null;
+        IReadOnlyList<string> scopes = Array.Empty<string>();
+        try
+        {
+            scopes = payload.Action switch
+            {
+                "grant" => _permissions.Grant(payload.ProjectId, payload.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries)),
+                "revoke" => Revoke(payload.ProjectId),
+                _ => _permissions.Get(payload.ProjectId)
+            };
+        }
+        catch (Exception ex)
+        {
+            error = "Could not update AI permissions: " + ex.Message;
+        }
+
+        await _bridge.SendAiGrantsAsync(payload.ProjectId, scopes, error);
+    }
+
+    private IReadOnlyList<string> Revoke(string projectId)
+    {
+        _permissions.Revoke(projectId);
+        return Array.Empty<string>();
     }
 
     private async Task HandleListModelsAsync(AiSettingsPayload payload)

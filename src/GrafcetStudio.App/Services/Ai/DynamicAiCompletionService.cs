@@ -17,19 +17,24 @@ public class DynamicAiCompletionService : IAiCompletionService
     }
 
     public Task<AiCompletionResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken = default)
-        => Resolve().CompleteAsync(request, cancellationToken);
+        => Resolve(request).CompleteAsync(request, cancellationToken);
 
     public IAsyncEnumerable<AiStreamChunk> StreamAsync(AiCompletionRequest request, CancellationToken cancellationToken = default)
-        => Resolve().StreamAsync(request, cancellationToken);
+        => Resolve(request).StreamAsync(request, cancellationToken);
 
-    private IAiCompletionService Resolve()
+    /// <summary>True when requests will reach a real AI provider (not the mock).</summary>
+    public bool IsLive => !IsMockForced() && !string.IsNullOrWhiteSpace(_keyStore.ResolveKey().Key);
+
+    private IAiCompletionService Resolve(AiCompletionRequest request)
     {
         if (IsMockForced()) return _mock;
 
         var (key, _) = _keyStore.ResolveKey();
-        return string.IsNullOrWhiteSpace(key)
-            ? _mock
-            : new GeminiAiCompletionService(SharedHttpClient, key, _keyStore.ResolveModel());
+        if (string.IsNullOrWhiteSpace(key)) return _mock;
+
+        var model = _keyStore.ResolveModel();
+        AiAuditLog.Record(request.Request, "gemini", model);
+        return new GeminiAiCompletionService(SharedHttpClient, key, model);
     }
 
     private static bool IsMockForced()

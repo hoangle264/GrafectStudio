@@ -157,7 +157,9 @@ public partial class MainWindow : Window
                     {
                         Action = GetOptionalString(payload, "action"),
                         ApiKey = GetOptionalString(payload, "apiKey"),
-                        Model = GetOptionalString(payload, "model")
+                        Model = GetOptionalString(payload, "model"),
+                        ProjectId = GetOptionalString(payload, "projectId"),
+                        Scopes = GetOptionalString(payload, "scopes")
                     };
                     _eventAggregator.GetEvent<AiSettingsRequestedEvent>().Publish(message);
                     break;

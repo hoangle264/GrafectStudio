@@ -430,6 +430,10 @@
                                 <button class="btn" onclick="aiSettingsLoadModels()">Load models</button>
                                 <button class="btn r" onclick="aiSettingsClear()">Remove key</button>
                             </div>
+                            <div class="ai-settings-grants-row">
+                                <span id="ai-settings-grants">No data shared with AI yet. You will be asked first.</span>
+                                <button class="btn" onclick="aiPermissionRevoke()">Revoke</button>
+                            </div>
                         </div>
                     </div>
                     <div class="ai-chat-body" id="ai-chat-body"></div>

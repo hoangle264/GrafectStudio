@@ -23,10 +23,13 @@ public class AiRequestPayload
 
 public class AiSettingsPayload
 {
-    /// <summary>"get", "save" or "clear".</summary>
+    /// <summary>"get", "save", "clear", "list", "grants-get", "grant" or "revoke".</summary>
     public string Action { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = string.Empty;
+    /// <summary>Comma separated context scopes, used by "grant".</summary>
+    public string Scopes { get; set; } = string.Empty;
 }
 
 public class ExportCodePayload

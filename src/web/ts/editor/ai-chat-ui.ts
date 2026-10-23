@@ -22,6 +22,7 @@ interface AiChatMessage {
   text: string;
   error?: boolean;
   proposalId?: string;
+  permissionId?: string;
   streaming?: boolean;
   streamStatus?: string[];
   streamText?: string;
@@ -50,6 +51,41 @@ const AI_CHAT_STATE: {
   pendingRequestId: null,
   pendingStreamMessageId: null,
   pendingStreamFinalText: ''
+};
+
+type AiPermissionChoice = 'once' | 'session' | 'project' | 'deny';
+
+interface AiPermissionRequest {
+  id: string;
+  request: GrafcetStudioAIContracts.AiRequest;
+  intent: string;
+  message: string;
+  scopes: string[];
+  missing: string[];
+  status: 'pending' | AiPermissionChoice;
+}
+
+const AI_PERMISSION_STATE: {
+  liveAi: boolean | null;
+  sessionScopes: string[];
+  projectId: string;
+  projectScopes: string[];
+  requests: Record<string, AiPermissionRequest>;
+} = {
+  liveAi: null,
+  sessionScopes: [],
+  projectId: '',
+  projectScopes: [],
+  requests: {}
+};
+
+const AI_SCOPE_LABELS: Record<string, string> = {
+  variable: 'Variables',
+  unit: 'Units',
+  diagram: 'Diagram info',
+  step: 'Steps, transitions and connections',
+  io: 'IO mapping',
+  structure: 'Device structures'
 };
 
 function aiChatBridge(): GrafcetStudioAIBridge.AiBridgeApi | null {
@@ -203,7 +239,10 @@ function toggleAiChatPanel(show?: boolean): void {
   if (show === false && aiChatIsFloating()) setAiChatFloating(false);
   panel.classList.toggle('show', show !== false);
   setRightPanelTab(show === false ? 'props' : 'ai');
-  if (show !== false) aiSettingsPost('get');
+  if (show !== false) {
+    aiSettingsPost('get');
+    aiPermissionRefreshGrants();
+  }
   if (show !== false && !AI_CHAT_STATE.messages.length) {
     aiChatAddMessage('assistant', 'Create or receive an AI proposal here. Preview and validation are required before Apply is enabled.');
   }
@@ -437,7 +476,7 @@ function aiChatRender(): void {
     const classes = ['ai-bubble', message.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-assistant'];
     if (message.error) classes.push('ai-bubble-error');
     return '<div class="' + classes.join(' ') + '">' +
-      (record ? aiChatRenderProposal(record) : aiChatEscape(message.text)) +
+      (record ? aiChatRenderProposal(record) : message.permissionId && AI_PERMISSION_STATE.requests[message.permissionId] ? aiPermissionRenderCard(AI_PERMISSION_STATE.requests[message.permissionId]) : aiChatEscape(message.text)) +
     '</div>';
   }).join('');
   body.scrollTop = body.scrollHeight;
@@ -542,16 +581,134 @@ function aiChatSend(): void {
     aiChatAddMessage('assistant', requestResult.errors.join('; '), { error: true });
     return;
   }
+  const scopes = (requestResult.appliedScopes || []).slice();
+  const missing = aiPermissionMissingScopes(scopes);
+  if (aiPermissionNeeded() && missing.length) {
+    aiPermissionAsk(requestResult.request, intent, message, scopes, missing);
+    return;
+  }
+  aiChatDispatch(requestResult.request, intent, message);
+}
+
+function aiChatDispatch(request: GrafcetStudioAIContracts.AiRequest, intent: string, message: string): void {
+  const bridge = aiChatBridge();
+  if (!bridge) return;
   aiChatResetPendingStream();
-  AI_CHAT_STATE.pendingRequestId = requestResult.request.id;
+  AI_CHAT_STATE.pendingRequestId = request.id;
   const chromeHost = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
   if (chromeHost && chromeHost.webview && typeof chromeHost.webview.postMessage === 'function') {
-    chromeHost.webview.postMessage({ type: 'AI_REQUEST', payload: Object.assign({}, requestResult.request, { prompt: message, mockFixture: intent, stream: true }) });
+    chromeHost.webview.postMessage({ type: 'AI_REQUEST', payload: Object.assign({}, request, { prompt: message, mockFixture: intent, stream: true }) });
   } else {
-    const result = bridge.mockService.generateMockResponse(requestResult.request);
+    const result = bridge.mockService.generateMockResponse(request);
     if (result.ok && result.proposal) aiChatAddProposal(result.proposal, result.rawText);
     else aiChatAddMessage('assistant', (result.errors || ['Mock AI response failed.']).join('; '), { error: true });
   }
+}
+
+function aiPermissionCurrentProjectId(): string {
+  return project && typeof project.id === 'string' ? project.id : '';
+}
+
+/** Data leaves the machine only through the desktop host with a Gemini key; unknown counts as live. */
+function aiPermissionNeeded(): boolean {
+  const host = (window as Window & { chrome?: { webview?: unknown } }).chrome;
+  return !!(host && host.webview) && AI_PERMISSION_STATE.liveAi !== false;
+}
+
+function aiPermissionMissingScopes(scopes: string[]): string[] {
+  const projectScopes = AI_PERMISSION_STATE.projectId === aiPermissionCurrentProjectId() ? AI_PERMISSION_STATE.projectScopes : [];
+  return scopes.filter(function(scope) {
+    return AI_PERMISSION_STATE.sessionScopes.indexOf(scope) < 0 && projectScopes.indexOf(scope) < 0;
+  });
+}
+
+function aiPermissionAsk(request: GrafcetStudioAIContracts.AiRequest, intent: string, message: string, scopes: string[], missing: string[]): void {
+  const id = 'ai-perm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  AI_PERMISSION_STATE.requests[id] = { id, request, intent, message, scopes, missing, status: 'pending' };
+  aiChatAddMessage('assistant', 'Permission required.', { permissionId: id });
+}
+
+function aiPermissionRenderCard(item: AiPermissionRequest): string {
+  const json = JSON.stringify(item.request.context, null, 2);
+  const size = json.length >= 1024 ? (json.length / 1024).toFixed(1) + ' KB' : json.length + ' chars';
+  const scopeList = item.scopes.map(function(scope) {
+    const label = AI_SCOPE_LABELS[scope] || scope;
+    return '<li>' + aiChatEscape(label) + (item.missing.indexOf(scope) >= 0 ? '' : ' <span class="ai-perm-granted">(already allowed)</span>') + '</li>';
+  }).join('');
+  const pending = item.status === 'pending';
+  const disabled = pending ? '' : ' disabled';
+  const canProject = !!aiPermissionCurrentProjectId();
+  const statusText: Record<string, string> = {
+    once: 'Allowed once. Request sent.',
+    session: 'Allowed for this session. Request sent.',
+    project: 'Allowed for this project. Request sent.',
+    deny: 'Denied. Nothing was sent.'
+  };
+  return '<div class="ai-proposal-head"><span class="ai-proposal-title">Send project data to AI?</span></div>' +
+    '<div class="ai-proposal-summary">This request will send the following to Gemini (' + aiChatEscape(size) + '):</div>' +
+    '<ul class="ai-message-list">' + scopeList + '</ul>' +
+    '<details class="ai-perm-details"><summary>View data</summary><pre class="ai-preview-json">' + aiChatEscape(json) + '</pre></details>' +
+    (pending
+      ? '<div class="ai-proposal-actions">' +
+          '<button class="btn a" onclick="aiPermissionDecide(\'' + item.id + '\', \'once\')"' + disabled + '>Allow once</button>' +
+          '<button class="btn" onclick="aiPermissionDecide(\'' + item.id + '\', \'session\')"' + disabled + '>Allow this session</button>' +
+          (canProject ? '<button class="btn" onclick="aiPermissionDecide(\'' + item.id + '\', \'project\')"' + disabled + '>Allow for this project</button>' : '') +
+          '<button class="btn r" onclick="aiPermissionDecide(\'' + item.id + '\', \'deny\')"' + disabled + '>Deny</button>' +
+        '</div>'
+      : '<div class="ai-proposal-summary">' + aiChatEscape(statusText[item.status] || '') + '</div>');
+}
+
+function aiPermissionDecide(id: string, choice: AiPermissionChoice): void {
+  const item = AI_PERMISSION_STATE.requests[id];
+  if (!item || item.status !== 'pending') return;
+  item.status = choice;
+  if (choice === 'deny') {
+    aiChatRender();
+    return;
+  }
+  if (choice === 'session') {
+    item.missing.forEach(function(scope) { if (AI_PERMISSION_STATE.sessionScopes.indexOf(scope) < 0) AI_PERMISSION_STATE.sessionScopes.push(scope); });
+  }
+  if (choice === 'project') {
+    const projectId = aiPermissionCurrentProjectId();
+    if (AI_PERMISSION_STATE.projectId !== projectId) {
+      AI_PERMISSION_STATE.projectId = projectId;
+      AI_PERMISSION_STATE.projectScopes = [];
+    }
+    item.missing.forEach(function(scope) { if (AI_PERMISSION_STATE.projectScopes.indexOf(scope) < 0) AI_PERMISSION_STATE.projectScopes.push(scope); });
+    aiSettingsPost('grant', { projectId, scopes: item.missing.join(',') });
+  }
+  aiChatRender();
+  aiChatDispatch(item.request, item.intent, item.message);
+}
+
+function aiPermissionRefreshGrants(): void {
+  const projectId = aiPermissionCurrentProjectId();
+  if (projectId) aiSettingsPost('grants-get', { projectId });
+  else aiPermissionRenderGrants();
+}
+
+function aiPermissionRevoke(): void {
+  AI_PERMISSION_STATE.sessionScopes = [];
+  const projectId = aiPermissionCurrentProjectId();
+  if (projectId) aiSettingsPost('revoke', { projectId });
+  AI_PERMISSION_STATE.projectScopes = [];
+  aiPermissionRenderGrants();
+}
+
+function receiveAiGrants(payload: { projectId: string; scopes: string[]; error?: string }): void {
+  if (payload.projectId !== aiPermissionCurrentProjectId()) return;
+  AI_PERMISSION_STATE.projectId = payload.projectId;
+  AI_PERMISSION_STATE.projectScopes = Array.isArray(payload.scopes) ? payload.scopes.slice() : [];
+  aiPermissionRenderGrants(payload.error);
+}
+
+function aiPermissionRenderGrants(error?: string): void {
+  const line = document.getElementById('ai-settings-grants');
+  if (!line) return;
+  const all = AI_PERMISSION_STATE.projectScopes.concat(AI_PERMISSION_STATE.sessionScopes.filter(function(s) { return AI_PERMISSION_STATE.projectScopes.indexOf(s) < 0; }));
+  const labels = all.map(function(scope) { return AI_SCOPE_LABELS[scope] || scope; });
+  line.textContent = (error ? error + ' | ' : '') + (labels.length ? 'Shared with AI: ' + labels.join(', ') : 'No data shared with AI yet. You will be asked first.');
 }
 
 function aiChatInsertMockProposal(): void {
@@ -678,6 +835,7 @@ function receiveAiSettings(settings: AiSettingsState): void {
   const status = document.getElementById('ai-settings-status');
   const model = document.getElementById('ai-settings-model') as HTMLSelectElement | null;
   if (model && settings.model && document.activeElement !== model) aiSettingsFillModels(Array.from(model.options).map(function(o) { return o.value; }), settings.model);
+  AI_PERMISSION_STATE.liveAi = !!settings.configured;
   if (!status) return;
   let text: string;
   if (settings.configured) text = 'Gemini connected (' + (settings.source === 'env' ? 'environment key' : 'saved key') + ') - ' + settings.model;
@@ -798,6 +956,9 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { aiSettingsClear: typeof aiSettingsClear }).aiSettingsClear = aiSettingsClear;
 (window as unknown as { aiSettingsLoadModels: typeof aiSettingsLoadModels }).aiSettingsLoadModels = aiSettingsLoadModels;
 (window as unknown as { receiveAiModels: typeof receiveAiModels }).receiveAiModels = receiveAiModels;
+(window as unknown as { aiPermissionDecide: typeof aiPermissionDecide }).aiPermissionDecide = aiPermissionDecide;
+(window as unknown as { aiPermissionRevoke: typeof aiPermissionRevoke }).aiPermissionRevoke = aiPermissionRevoke;
+(window as unknown as { receiveAiGrants: typeof receiveAiGrants }).receiveAiGrants = receiveAiGrants;
 (window as unknown as { receiveAiSettings: typeof receiveAiSettings }).receiveAiSettings = receiveAiSettings;
 (window as unknown as { receiveAiChunk: typeof receiveAiChunk }).receiveAiChunk = receiveAiChunk;
 (window as unknown as { runAiChatUiValidation: typeof runAiChatUiValidation }).runAiChatUiValidation = runAiChatUiValidation;

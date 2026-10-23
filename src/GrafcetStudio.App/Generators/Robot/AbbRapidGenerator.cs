@@ -43,7 +43,7 @@ public class AbbRapidGenerator : ICodeGenerator
         var generatedFiles = new List<CodegenFile>();
 
         // ── Check AI service configuration ──────────────────────────────────
-        if (_aiCompletionService == null || _aiCompletionService is MockAiCompletionService)
+        if (_aiCompletionService == null || _aiCompletionService is MockAiCompletionService || _aiCompletionService is DynamicAiCompletionService { IsLive: false })
         {
             var targetFlow = flows.FirstOrDefault()?.Name ?? "main";
             var flowNameClean = SanitizeFilename(targetFlow);
@@ -53,9 +53,8 @@ public class AbbRapidGenerator : ICodeGenerator
                 details: new[]
                 {
                     "No real AI completion service is registered.",
-                    "Set environment variables before launching the app:",
-                    "  GRAFCETSTUDIO_AI_MODE=gemini",
-                    "  GEMINI_API_KEY=<your-key>",
+                    "Open the AI panel settings (gear icon) and save a Gemini API key,",
+                    "or set GEMINI_API_KEY before launching the app.",
                     "Robot code generation requires a live AI connection and CANNOT use a fallback.",
                     "A fallback would produce incorrect motion sequences that may damage equipment."
                 });

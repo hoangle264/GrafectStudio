@@ -150,6 +150,7 @@ public class SiemensTiaPushOrchestratorTests
         public Task SendAiResponseAsync(string rawText) => Task.CompletedTask;
         public Task SendAiStreamEventAsync(string kind, string? text = null, bool done = false) => Task.CompletedTask;
         public Task SendAiModelsAsync(bool ok, IReadOnlyList<string> models, string suggested, string? error = null) => Task.CompletedTask;
+        public Task SendAiGrantsAsync(string projectId, IReadOnlyList<string> scopes, string? error = null) => Task.CompletedTask;
         public Task SendAiSettingsAsync(bool configured, string source, string model, string? error = null) => Task.CompletedTask;
         public Task SendErrorAsync(string source, string message) => Task.CompletedTask;
         public Task LoadProjectDataAsync(string json) => Task.CompletedTask;
