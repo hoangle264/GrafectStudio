@@ -32,10 +32,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\assets\skeletons\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>assets\skeletons\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </Content>
     <Content Include="..\..\assets\rag\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>assets\rag\%(RecursiveDir)%(Filename)%(Extension)</Link>

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GrafcetStudio.App.Generators.Robot;
-using GrafcetStudio.App.Generators.Robot.RapidAst;
 using GrafcetStudio.Domain.Models;
 using Xunit;
 
@@ -10,104 +9,6 @@ namespace GrafcetStudio.App.Tests;
 
 public class RobotCodegenTests
 {
-    [Fact]
-    public void RobotSnippetParser_ValidJson_ReturnsSuccess()
-    {
-        var parser = new RobotSnippetParser();
-        var json = @"
-{
-  ""schema"": ""grafectstudio/robot-snippet-map/v1"",
-  ""platform"": ""ABB_RAPID"",
-  ""module"": ""MainModule"",
-  ""signals"": [
-    { ""name"": ""gripper_open"", ""type"": ""DO"", ""alias"": ""DO1"" },
-    { ""name"": ""sensor_part"", ""type"": ""DI"", ""alias"": ""DI1"" }
-  ],
-  ""positions"": [
-    { ""name"": ""pHome"", ""motionType"": ""AbsJ"", ""speed"": ""Fast"" },
-    { ""name"": ""pPickup"", ""motionType"": ""Linear"", ""speed"": ""Precise"" }
-  ],
-  ""tools"": [
-    { ""name"": ""tool1"" }
-  ],
-  ""init"": ""WaitTime 0.1;"",
-  ""steps"": {
-    ""1"": ""WaitDI sensor_part, 1;\nMoveL pPickup, v500, fine, tool1;\nSetDO gripper_open, 1;""
-  }
-}";
-
-        var result = parser.Parse(json);
-
-        Assert.True(result.IsOk, string.Join("; ", result.Errors));
-        Assert.NotNull(result.Document);
-        Assert.Equal("ABB_RAPID", result.Document!.Platform);
-        Assert.Single(result.Document.Steps);
-    }
-
-    [Fact]
-    public void RapidAstLinter_DetectsMissingEndIf_AndUnresolvedGoto()
-    {
-        var linter = new RapidAstLinter();
-        var doc = new SnippetMapDocument
-        {
-            Schema = "grafectstudio/robot-snippet-map/v1",
-            Platform = "ABB_RAPID",
-            Module = "TestModule",
-            Steps = new Dictionary<int, string>
-            {
-                { 1, "IF DI_sensor = 1 THEN\n  MoveL pHome, v500, fine, tool0;\n! Missing END_IF" },
-                { 2, "GOTO lbl_ghost;" }
-            }
-        };
-
-        var vars = new List<DeviceVariable>
-        {
-            new DeviceVariable { Label = "DI_sensor" },
-            new DeviceVariable { Label = "pHome" }
-        };
-
-        var topologyContext = new TopologyContext();
-
-        var errors = linter.Lint(doc, vars, topologyContext);
-
-        Assert.NotEmpty(errors);
-        Assert.Contains(errors, e => e.ErrorMessage.Contains("missing closing END_IF"));
-        Assert.Contains(errors, e => e.ErrorMessage.Contains("Target label 'lbl_ghost' does not exist"));
-    }
-
-    [Fact]
-    public void RapidAstLinter_ValidatesWaitInstructions_WithoutErrors()
-    {
-        var linter = new RapidAstLinter();
-        var doc = new SnippetMapDocument
-        {
-            Schema = "grafectstudio/robot-snippet-map/v1",
-            Platform = "ABB_RAPID",
-            Module = "WaitModule",
-            Signals = new List<SnippetSignal>
-            {
-                new SnippetSignal("diClamp", "DI", "DI1"),
-                new SnippetSignal("doReady", "DO", "DO1")
-            },
-            Steps = new Dictionary<int, string>
-            {
-                { 1, "WaitTime 2;\nWaitDI diClamp, 1;\nWaitDO doReady, 1;\nWaitUntil Counter > 10;\nWaitSyncTask sync1;" }
-            }
-        };
-
-        var vars = new List<DeviceVariable>
-        {
-            new DeviceVariable { Label = "Counter" },
-            new DeviceVariable { Label = "sync1" }
-        };
-
-        var topologyContext = new TopologyContext();
-
-        var errors = linter.Lint(doc, vars, topologyContext);
-
-        Assert.Empty(errors);
-    }
-
     [Fact]
     public void TopologyAnalyzer_ClassifiesSequentialWaitAndJumpTransitions()
     {
@@ -150,80 +51,6 @@ public class RobotCodegenTests
     }
 
     [Fact]
-    public void RobotSkeletonEngine_ThrowsWhenExecutionTreeIsMissing()
-    {
-        var engine = new RobotSkeletonEngine();
-        var doc = new SnippetMapDocument
-        {
-            Schema = "grafectstudio/robot-snippet-map/v1",
-            Platform = "ABB_RAPID",
-            Module = "PickModule",
-            Signals = new List<SnippetSignal>
-            {
-                new SnippetSignal("gripper", "DO", "DO1")
-            },
-            Positions = new List<SnippetPosition>
-            {
-                new SnippetPosition("pPick", "Linear", "v500", "Pick position target")
-            },
-            Tools = new List<SnippetTool> { new SnippetTool("tool1", "Gripper tool") },
-            Init = "WaitTime 0.1;",
-            Labels = "lbl_estop:\n    WaitTime 0.1;",
-            Steps = new Dictionary<int, string>
-            {
-                { 1, "SetDO gripper, 1;\nWaitTime 0.5;" }
-            }
-        };
-
-        var flow = new FlowInfo
-        {
-            Name = "PickModule",
-            Steps = new List<Step>
-            {
-                new Step { Id = "s1", Number = 1, Label = "Grip" },
-                new Step { Id = "s2", Number = 2, Label = "CallSub", Kind = "macro", MacroFlowId = "SubRoutine" }
-            }
-        };
-
-        var topologyContext = new TopologyContext
-        {
-            MacroCallMap = new Dictionary<int, string> { { 2, "SubRoutine" } },
-            JumpTargetStepNumbers = new HashSet<int> { 1 }
-        };
-
-        var error = Assert.Throws<InvalidOperationException>(() => engine.Render(doc, topologyContext, flow, "PickModule"));
-        Assert.Contains("no execution tree", error.Message);
-    }
-
-    [Fact]
-    public void TeachListGenerator_GeneratesChecklistText()
-    {
-        var gen = new TeachListGenerator();
-        var doc = new SnippetMapDocument
-        {
-            Platform = "ABB_RAPID",
-            Module = "PalletModule",
-            Positions = new List<SnippetPosition>
-            {
-                new SnippetPosition("pHome", "AbsJ", "v1000", "Home safety point"),
-                new SnippetPosition("pPalletBase", "Joint", "v500", "Base grid start")
-            },
-            Tools = new List<SnippetTool>
-            {
-                new SnippetTool("tool1", "Vacuum Gripper TCP")
-            }
-        };
-
-        var checklist = gen.GenerateTeachList(doc, "PalletModule");
-
-        Assert.Contains("ROBOT POSITION TEACH CHECKLIST (ABB_RAPID)", checklist);
-        Assert.Contains("Position Name : pHome", checklist);
-        Assert.Contains("Position Name : pPalletBase", checklist);
-        Assert.Contains("Tool Name     : tool1", checklist);
-        Assert.Contains("Status        : [ ] TAUGHT ON FLEXPENDANT", checklist);
-    }
-
-    [Fact]
     public void AbbRapidGenerator_WithoutAiConfigured_GeneratesFailureFile()
     {
         var generator = new AbbRapidGenerator();
@@ -256,31 +83,7 @@ public class RobotCodegenTests
     }
 
     [Fact]
-    public void RobotSnippetPromptBuilder_BuildsPromptsWithUpdatedRules()
-    {
-        var builder = new RobotSnippetPromptBuilder();
-        var flow = new FlowInfo
-        {
-            Name = "TestModule",
-            Steps = new List<Step>
-            {
-                new Step { Id = "s1", Number = 1, Label = "Init" },
-                new Step { Id = "s2", Number = 2, Label = "Branch" }
-            }
-        };
-
-        var (sysPrompt, userPrompt) = builder.BuildPrompts(flow, new List<DeviceVariable>(), new TopologyContext(), "TestModule");
-
-        Assert.Contains("DO NOT USE FORWARD GOTO", sysPrompt);
-        Assert.Contains("FIRST MERGE POINT & ALL-PATH CONVERGENCE RULE", sysPrompt);
-        Assert.Contains("MAXIMUM NESTING DEPTH (<= 4 LEVELS)", sysPrompt);
-        Assert.Contains("IF/ELSIF", sysPrompt);
-        Assert.Contains("TEST/CASE", sysPrompt);
-        Assert.Contains("Ensure max nesting depth <= 4 levels", userPrompt);
-    }
-
-    [Fact]
-    public void TopologyAnalyzer_SelectionBranchAndMergePoint_RendersStructuredRapidWithoutGoto()
+    public void TopologyAnalyzer_SelectionBranchAndMergePoint_PlansStructuredRapidWithoutGoto()
     {
         var flow = new FlowInfo
         {
@@ -309,32 +112,17 @@ public class RobotCodegenTests
 
         Assert.NotEmpty(topologyContext.ExecutionTree);
 
-        var doc = new SnippetMapDocument
-        {
-            Schema = "grafectstudio/robot-snippet-map/v1",
-            Platform = "ABB_RAPID",
-            Module = "Drop_Work",
-            Init = "WaitTime 0.1;",
-            Labels = "lbl_estop:\n    WaitTime 0.1;",
-            Steps = new Dictionary<int, string>
-            {
-                { 1, "MoveJ Pos1, v500, fine, T0;\nWaitDI sig1, 1;" },
-                { 2, "MoveJ Pos2, v500, fine, T0;" },
-                { 3, "MoveJ Pos3, v500, fine, T0;" },
-                { 4, "MoveJ Pos4, v500, fine, T0;" },
-                { 6, "MoveJ Pos5, v500, fine, T0;" }
-            }
-        };
+        var prompt = new RobotRapidPromptBuilder().BuildPrompts(flow, new List<DeviceVariable>(), topologyContext, "Drop_Work");
+        var plan = prompt.UserPrompt.Split("=== STRUCTURE PLAN")[1];
 
-        var engine = new RobotSkeletonEngine();
-        var rapidCode = engine.Render(doc, topologyContext, flow, "Drop_Work");
-
-        Assert.Contains("IF sig2 THEN", rapidCode);
-        Assert.Contains("ELSE", rapidCode);
-        Assert.Contains("END_IF;", rapidCode);
-        Assert.Contains("FIRST MERGE POINT (Transition: sig3)", rapidCode);
-        Assert.Contains("WaitDI sig3, 1;", rapidCode);
-        Assert.DoesNotContain("GOTO", rapidCode);
+        Assert.Contains("IF sig2 THEN", plan);
+        Assert.Contains("ELSE", plan);
+        Assert.Contains("ENDIF", plan);
+        Assert.DoesNotContain("END_IF", plan);
+        Assert.Contains("WaitDI sig3, 1;", prompt.RequiredFragments);
+        // The branch converges structurally; the only jump is the loop back from step 4 to step 1.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(plan, "GOTO"));
+        Assert.Contains("GOTO lbl_step1;", plan);
     }
 
     [Fact]
@@ -451,9 +239,9 @@ public class RobotCodegenTests
     }
 
     [Fact]
-    public void RobotSnippetPromptBuilder_FiltersUnusedVariablesAndOmitsQualifierN()
+    public void RobotRapidPromptBuilder_FiltersUnusedVariablesAndOmitsQualifierN()
     {
-        var builder = new RobotSnippetPromptBuilder();
+        var builder = new RobotRapidPromptBuilder();
         var flow = new FlowInfo
         {
             Name = "Drop_Work",
@@ -483,8 +271,8 @@ public class RobotCodegenTests
             new DeviceVariable { Label = "unused_clamp", Format = "BOOL", Address = "DO99" }
         };
 
-        var topologyContext = new TopologyContext();
-        var (_, userPrompt) = builder.BuildPrompts(flow, variables, topologyContext, "Drop_Work");
+        var topologyContext = new TopologyAnalyzer().Analyze(flow);
+        var userPrompt = builder.BuildPrompts(flow, variables, topologyContext, "Drop_Work").UserPrompt;
 
         Assert.Contains("Pos1 | POS | P1", userPrompt);
         Assert.Contains("sig1 | BOOL | DI1", userPrompt);
