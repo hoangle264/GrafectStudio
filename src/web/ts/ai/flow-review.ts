@@ -112,10 +112,12 @@ namespace GrafcetStudioFlowReview {
       });
     });
 
-    // Steps: dead ends and alternative branches with identical conditions
+    // Steps: the last step implicitly loops back to the initial step, so one step without an outgoing
+    // transition is the normal end of the cycle. Several of them usually means a transition is missing.
+    const terminal = steps.filter(function(s) { return !(outgoingByStep.get(s.id) || []).length; });
+    if (terminal.length > 1) findings.push({ severity: 'warning', code: 'multiple-ends', message: terminal.length + ' steps have no outgoing transition (' + terminal.map(stepName).join(', ') + '); only the last step of the cycle should end without one.', stepNumbers: terminal.map(function(s) { return s.number || 0; }) });
     steps.forEach(function(s) {
       const outgoing = outgoingByStep.get(s.id) || [];
-      if (!outgoing.length) findings.push({ severity: 'warning', code: 'dead-end', message: stepName(s) + ' has no outgoing transition; the sequence stops there.', stepNumbers: [s.number || 0] });
       const seen = new Map<string, string>();
       outgoing.forEach(function(t) {
         const key = String(t.condition || '').replace(/\s+/g, '').toLowerCase();
@@ -128,6 +130,8 @@ namespace GrafcetStudioFlowReview {
     // Reachability from initial steps
     if (initials.length) {
       const reached = new Set<string>();
+      // A step without outgoing transitions loops back to the initial steps.
+      terminal.forEach(function(s) { successors.set(s.id, new Set(initials.map(function(i) { return i.id; }))); });
       const queue = initials.map(function(s) { return s.id; });
       while (queue.length) {
         const id = queue.shift()!;
