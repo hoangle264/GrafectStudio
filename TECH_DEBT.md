@@ -94,8 +94,7 @@ Thiết kế gencode orchestrator thật (từ `OrchestratorConfig.Elements`), t
 **Đã sửa thêm:**
 - Chọn model qua dropdown lấy từ Gemini API (`GeminiModelLister`, nút "Load models"); lần gọi này cũng kiểm tra key đúng/sai nên thay cho nút Test connection.
 
-**Còn lại (chưa làm, mức thấp):**
-- Chuyển key từ query string `?key=` sang header `x-goog-api-key`.
+- Mọi request tới Gemini (sinh nội dung, streaming, danh sách model) gửi key qua header `x-goog-api-key`, không còn nằm trong URL.
 
 ### ✅ [TD-003] ABB RAPID Prompt — Rule 3 thiếu logic phân biệt `WaitDI`/`WaitDO` vs `WaitUntil`
 

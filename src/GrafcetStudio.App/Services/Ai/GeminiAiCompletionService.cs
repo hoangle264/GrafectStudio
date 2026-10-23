@@ -37,8 +37,8 @@ public class GeminiAiCompletionService : IAiCompletionService
             var serializedPayload = JsonSerializer.Serialize(payload, JsonOptions);
             var endpoint = BuildEndpoint(apiVersion, "generateContent");
             GeminiDebugLogger.LogRequest("generateContent", apiVersion, _model, endpoint, serializedPayload);
-            using var content = new StringContent(serializedPayload, Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+            using var httpRequest = CreateRequest(endpoint, serializedPayload);
+            using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -78,10 +78,7 @@ public class GeminiAiCompletionService : IAiCompletionService
             var serializedPayload = JsonSerializer.Serialize(payload, JsonOptions);
             var endpoint = BuildEndpoint(apiVersion, "streamGenerateContent", "alt=sse");
             GeminiDebugLogger.LogRequest("streamGenerateContent", apiVersion, _model, endpoint, serializedPayload);
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
-            {
-                Content = new StringContent(serializedPayload, Encoding.UTF8, "application/json")
-            };
+            using var httpRequest = CreateRequest(endpoint, serializedPayload);
 
             using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -132,12 +129,24 @@ public class GeminiAiCompletionService : IAiCompletionService
     }
 
 
-    private string BuildEndpoint(string apiVersion, string method, string? extraQuery = null)
+    // The key travels in the x-goog-api-key header, never in the URL, so it cannot leak through URLs in logs or proxies.
+    private static string BuildEndpoint(string apiVersion, string model, string method, string? extraQuery = null)
     {
-        var query = string.IsNullOrWhiteSpace(extraQuery)
-            ? "key=" + Uri.EscapeDataString(_apiKey)
-            : extraQuery + "&key=" + Uri.EscapeDataString(_apiKey);
-        return $"https://generativelanguage.googleapis.com/{apiVersion}/models/{Uri.EscapeDataString(_model)}:{method}?{query}";
+        var url = $"https://generativelanguage.googleapis.com/{apiVersion}/models/{Uri.EscapeDataString(model)}:{method}";
+        return string.IsNullOrWhiteSpace(extraQuery) ? url : url + "?" + extraQuery;
+    }
+
+    private string BuildEndpoint(string apiVersion, string method, string? extraQuery = null)
+        => BuildEndpoint(apiVersion, _model, method, extraQuery);
+
+    private HttpRequestMessage CreateRequest(string endpoint, string serializedPayload)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(serializedPayload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("x-goog-api-key", _apiKey);
+        return request;
     }
 
     private static string NormalizeModelName(string? model)
