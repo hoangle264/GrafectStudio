@@ -855,6 +855,8 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .ai-chat-panel.ai-floating .ai-chat-head{cursor:move;user-select:none;touch-action:none;}
 .ai-chat-body{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px;}
 .ai-bubble{border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg);font-size:var(--fs-xs);color:var(--text2);line-height:1.4;}
+/* Assistant replies and review findings are multi-line plain text. */
+.ai-bubble{white-space:pre-wrap;}
 .ai-bubble-user{align-self:flex-end;max-width:92%;border-color:rgba(79,163,227,.35);background:rgba(79,163,227,.08);}
 .ai-bubble-assistant{align-self:flex-start;max-width:96%;}
 .ai-bubble-error{border-color:rgba(227,90,79,.5);background:rgba(227,90,79,.08);}

@@ -785,11 +785,59 @@ function aiAgentReadData(name: string, args: Record<string, unknown>): unknown {
         diagram: sanitizer.sanitizeDiagram(meta),
         steps: content.steps || [],
         transitions: content.transitions || [],
-        connections: content.connections || []
+        connections: content.connections || [],
+        structuralFindings: aiFlowReviewRun(diagramId).findings
       };
     }
   }
   return null;
+}
+
+/** Every label an action or condition may legitimately reference in this diagram. */
+function aiFlowReviewKnownVariables(diagramState: { vars?: Array<{ label?: string }> } | null): string[] {
+  const labels: string[] = [];
+  const add = function(label: unknown) { const text = aiChatText(label, ''); if (text) labels.push(text); };
+  const buckets = project.variables || { imported: [], user: [] };
+  ([] as Array<{ label?: string }>).concat(buckets.imported || [], buckets.user || [], (project.excelVars || []) as Array<{ label?: string }>)
+    .forEach(function(v) { add(v && v.label); });
+  Object.keys(project.unitConfig || {}).forEach(function(key) { const cfg = (project.unitConfig as Record<string, { label?: string }>)[key]; add((cfg && cfg.label) || key); });
+  ((diagramState && diagramState.vars) || []).forEach(function(v) { add(v && v.label); });
+  return labels;
+}
+
+function aiFlowReviewRun(diagramId: string): { name: string; findings: GrafcetStudioFlowReview.Finding[] } {
+  const meta = (project.diagrams || []).find(function(d) { return d.id === diagramId; });
+  if (activeDiagramId === diagramId && typeof flushState === 'function') flushState();
+  const stored = typeof loadDiagramData === 'function' ? loadDiagramData(diagramId) : null;
+  const diagramState = (stored && stored.state) || { steps: [], transitions: [], connections: [] };
+  const extra = diagramState as unknown as { parallels?: Array<{ id: string }>; vars?: Array<{ label?: string }> };
+  return {
+    name: (meta && meta.name) || diagramId,
+    findings: GrafcetStudioFlowReview.reviewDiagram({
+      steps: diagramState.steps || [],
+      transitions: diagramState.transitions || [],
+      connections: diagramState.connections || [],
+      parallels: extra.parallels || [],
+      knownVariables: aiFlowReviewKnownVariables(extra)
+    })
+  };
+}
+
+/** Review button: structural findings immediately (offline), then a deeper AI review when a key is configured. */
+function aiChatReviewActiveFlow(): void {
+  toggleAiChatPanel(true);
+  if (!activeDiagramId || isVirtualTab(activeDiagramId)) {
+    aiChatAddMessage('assistant', 'Open a Grafcet diagram first, then press Review flow.', { error: true });
+    return;
+  }
+  const review = aiFlowReviewRun(activeDiagramId);
+  aiChatAddMessage('user', 'Review flow "' + review.name + '"');
+  aiChatAddMessage('assistant', 'Structural check of "' + review.name + '":\n' + GrafcetStudioFlowReview.formatFindings(review.findings), { error: review.findings.some(function(f) { return f.severity === 'error'; }) });
+  if (aiAgentHost() && AI_PERMISSION_STATE.liveAi !== false) {
+    aiChatRoute('Review the Grafcet flow "' + review.name + '" (diagramId: ' + activeDiagramId + '). ' +
+      'The app already ran a structural check (see structuralFindings in get_diagram); do not repeat it. ' +
+      'Explain the impact of those findings and point out sequence-logic problems they do not cover. Reply only; do not propose changes.');
+  }
 }
 
 /** Runs the same parser, validator and dry-run as any proposal; errors go back to the AI so it can fix them. */
@@ -1280,6 +1328,7 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { aiChatSend: typeof aiChatSend }).aiChatSend = aiChatSend;
 (window as unknown as { aiChatReroute: typeof aiChatReroute }).aiChatReroute = aiChatReroute;
 (window as unknown as { receiveAiAgentEvent: typeof receiveAiAgentEvent }).receiveAiAgentEvent = receiveAiAgentEvent;
+(window as unknown as { aiChatReviewActiveFlow: typeof aiChatReviewActiveFlow }).aiChatReviewActiveFlow = aiChatReviewActiveFlow;
 (window as unknown as { aiChatInsertMockProposal: typeof aiChatInsertMockProposal }).aiChatInsertMockProposal = aiChatInsertMockProposal;
 (window as unknown as { aiChatApplyProposal: typeof aiChatApplyProposal }).aiChatApplyProposal = aiChatApplyProposal;
 (window as unknown as { aiChatUndoProposal: typeof aiChatUndoProposal }).aiChatUndoProposal = aiChatUndoProposal;
