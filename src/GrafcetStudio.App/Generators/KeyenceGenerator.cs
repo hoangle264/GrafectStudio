@@ -101,21 +101,9 @@ public class KeyenceGenerator : LegacyCodeGeneratorBase
             }
         }
 
-        if (_templates.IsTemplateLoaded("uc.outputs"))
-        {
-            yield return "uc.outputs";
-        }
-        else if (_templates.IsTemplateLoaded("uc.unitMainOutput"))
+        if (_templates.IsTemplateLoaded("uc.unitMainOutput"))
         {
             yield return "uc.unitMainOutput";
-        }
-        else if (_templates.IsTemplateLoaded("uc.mainOutput"))
-        {
-            yield return "uc.mainOutput";
-        }
-        else if (_templates.IsTemplateLoaded("uc.outputLegacy"))
-        {
-            yield return "uc.outputLegacy";
         }
     }
 

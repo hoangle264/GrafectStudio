@@ -18,7 +18,7 @@ public class TemplateCatalogTests
     }
 
     [Fact]
-    public void List_ShowsOnlyAliasTheLoaderUses_AndNotesTheIgnoredOnes()
+    public void List_ShowsOnlyTheCanonicalName()
     {
         var root = MakeRoot("unit-error.hbs", "unitError.hbs", "error.hbs");
         try
@@ -26,7 +26,22 @@ public class TemplateCatalogTests
             var entries = TemplateCatalog.List(root);
             var error = Assert.Single(entries);
             Assert.Equal("unitError.hbs", error.Path);
-            Assert.Equal(new[] { "unit-error.hbs", "error.hbs" }, error.Ignored);
+            Assert.Empty(error.Ignored);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Load_ReportsFormerAliasNamesAsErrors()
+    {
+        var root = MakeRoot("unit-error.hbs", "output.hbs", "MapIO.hbs", "unitError.hbs");
+        try
+        {
+            var result = TemplateLoader.LoadFromPath(root);
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Errors, e => e.Contains("'unit-error.hbs'") && e.Contains("unitError.hbs"));
+            Assert.Contains(result.Errors, e => e.Contains("'output.hbs'") && e.Contains("unitMainOutput.hbs"));
+            Assert.Contains(result.Errors, e => e.Contains("'MapIO.hbs'") && e.Contains("simple/MapIO.hbs"));
         }
         finally { Directory.Delete(root, true); }
     }
@@ -116,9 +131,9 @@ public class TemplatePreviewServiceTests
     {
         var root = Path.Combine(Path.GetTempPath(), "tplprev-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "unitError.hbs"), "A");
-        File.WriteAllText(Path.Combine(root, "unit-error.hbs"), "B");
         WriteBaseTemplates(root);
+        Directory.CreateDirectory(Path.Combine(root, "packml"));
+        File.WriteAllText(Path.Combine(root, "packml", "Error.hbs"), "B");
         try
         {
             var payload = new GrafcetStudio.Domain.Models.CodegenPayload
@@ -126,7 +141,7 @@ public class TemplatePreviewServiceTests
                 Unit = new GrafcetStudio.Domain.Models.UnitInfo { Name = "Main" }
             };
 
-            var result = TemplatePreviewService.Render(root, Path.GetFullPath(Path.Combine(root, "unit-error.hbs")), "X", payload);
+            var result = TemplatePreviewService.Render(root, Path.GetFullPath(Path.Combine(root, "packml", "Error.hbs")), "X", payload);
 
             Assert.Single(result.Warnings);
         }

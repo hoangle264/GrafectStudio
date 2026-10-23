@@ -55,33 +55,51 @@ public static class TemplateLoader
         return result;
     }
 
-    // Alias lists are in priority order: the first file that exists wins and the rest are ignored.
+    // Each template has exactly one accepted file name.
     internal static readonly (string[] Filenames, string Id, bool IsPartial)[] StandardMappings =
     {
-        (new[] { "unitError.hbs", "unit-error.hbs", "error.hbs" }, "uc.unitError", false),
-        (new[] { "unitManual.hbs", "unit-manual.hbs", "manual.hbs" }, "uc.unitManual", false),
-        (new[] { "unitAuto.hbs", "unit-auto.hbs", "auto.hbs" }, "uc.unitAuto", false),
-        (new[] { "unitOrigin.hbs", "unit-origin.hbs", "origin.hbs" }, "uc.unitOrigin", false),
-        (new[] { "unitMainOutput.hbs", "unit-main-output.hbs", "main-output.hbs" }, "uc.unitMainOutput", false),
-        (new[] { "output.hbs" }, "uc.outputLegacy", false),
-        (new[] { "step-body.hbs" }, "uc.stepBody", true),
-        (new[] { "MapIO.hbs" }, "uc.mapIo", false)
+        (new[] { "unitError.hbs" }, "uc.unitError", false),
+        (new[] { "unitManual.hbs" }, "uc.unitManual", false),
+        (new[] { "unitAuto.hbs" }, "uc.unitAuto", false),
+        (new[] { "unitOrigin.hbs" }, "uc.unitOrigin", false),
+        (new[] { "unitMainOutput.hbs" }, "uc.unitMainOutput", false),
+        (new[] { "step-body.hbs" }, "uc.stepBody", true)
+    };
+
+    // Former alias names. They are no longer read, so their presence is reported instead of silently skipped.
+    internal static readonly (string Name, string Canonical)[] UnsupportedNames =
+    {
+        ("unit-error.hbs", "unitError.hbs"),
+        ("error.hbs", "unitError.hbs"),
+        ("unit-manual.hbs", "unitManual.hbs"),
+        ("manual.hbs", "unitManual.hbs"),
+        ("unit-auto.hbs", "unitAuto.hbs"),
+        ("auto.hbs", "unitAuto.hbs"),
+        ("unit-origin.hbs", "unitOrigin.hbs"),
+        ("origin.hbs", "unitOrigin.hbs"),
+        ("unit-main-output.hbs", "unitMainOutput.hbs"),
+        ("main-output.hbs", "unitMainOutput.hbs"),
+        ("output.hbs", "unitMainOutput.hbs"),
+        ("MapIO.hbs", "simple/MapIO.hbs")
     };
 
     private static void LoadStandardTemplates(string rootPath, TemplateLoadResult result)
     {
-        var mapping = StandardMappings;
-
-        foreach (var item in mapping)
+        foreach (var (name, canonical) in UnsupportedNames)
         {
-            foreach (var filename in item.Filenames)
+            if (File.Exists(Path.Combine(rootPath, name)))
             {
-                var fullPath = Path.Combine(rootPath, filename);
-                if (File.Exists(fullPath))
-                {
-                    LoadMappedTemplate(fullPath, item.Id, filename, item.IsPartial, result);
-                    break;
-                }
+                result.Errors.Add($"Unsupported template file '{name}'. Rename it to '{canonical}'.");
+            }
+        }
+
+        foreach (var item in StandardMappings)
+        {
+            var filename = item.Filenames[0];
+            var fullPath = Path.Combine(rootPath, filename);
+            if (File.Exists(fullPath))
+            {
+                LoadMappedTemplate(fullPath, item.Id, filename, item.IsPartial, result);
             }
         }
     }

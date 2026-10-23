@@ -29,9 +29,7 @@ public static class TemplateCatalog
         ["uc.unitAuto"] = "Unit auto mode section",
         ["uc.unitOrigin"] = "Unit origin (homing) section",
         ["uc.unitMainOutput"] = "Unit main output section",
-        ["uc.outputLegacy"] = "Legacy output template",
-        ["uc.stepBody"] = "Step body partial shared by unit sections",
-        ["uc.mapIo"] = "I/O mapping"
+        ["uc.stepBody"] = "Step body partial shared by unit sections"
     };
 
     public static List<TemplateCatalogEntry> List(string rootPath)

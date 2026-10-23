@@ -107,6 +107,30 @@ Gắn `schemaVersion` vào project; chỉ chạy migrate khi version cũ hơn, h
 
 ---
 
+## [TD-005] Gencode Orchestrator mới là skeleton, chưa có template
+
+| Trường | Nội dung |
+|---|---|
+| **Ngày ghi nhận** | 2026-10-23 |
+| **Mức độ** | 🟠 Trung bình — project có flow `category = "orchestrator"` không sinh được code Keyence |
+| **Module liên quan** | [`SystemControlGenerator.cs`](src/GrafcetStudio.App/Generators/SystemControlGenerator.cs) — `GenerateOrchestrator`, [`MultiFileGenerator.cs`](src/GrafcetStudio.App/Generators/MultiFileGenerator.cs), [`CodeGeneratorService.cs`](src/GrafcetStudio.App/Generators/CodeGeneratorService.cs) — `ResolveTemplateKey` |
+
+### Vấn đề
+
+`GenerateOrchestrator` chỉ xuất JSON (`phase = 1`, `skeleton = true`) gồm danh sách flow orchestrator và `OrchestratorConfig.Elements`. Chưa có logic sinh mnemonic và chưa có `Orchestrator.hbs` trong `templates/simple` hay `templates/packml`.
+
+Trước đây `Orchestrator.mnm` âm thầm ra JSON thô. Sau khi bỏ fallback template, codegen báo `Template '<profile>.Orchestrator' is not loaded` và dừng khi project có flow orchestrator.
+
+### Phương án đề xuất khi xử lý
+
+Thiết kế gencode orchestrator thật (từ `OrchestratorConfig.Elements`), thêm `Orchestrator.hbs` vào các profile. Không dùng lại fallback JSON thô.
+
+### Điều kiện để ưu tiên xử lý
+
+- Khi cần dùng flow orchestrator trong project thật
+
+---
+
 *File này được duy trì thủ công. Khi một mục được xử lý xong, chuyển nó sang mục `## Đã Xử Lý` bên dưới và ghi ngày hoàn thành.*
 
 ## Đã Xử Lý
