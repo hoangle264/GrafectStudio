@@ -879,6 +879,12 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .ai-settings-form{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
 .ai-settings-form[hidden]{display:none;}
 .ai-settings-grants-row{display:flex;align-items:center;gap:6px;justify-content:space-between;color:var(--text2);}
+.ai-preview-grid{width:100%;margin-top:6px;}
+.ai-preview-grid th{text-align:left;color:var(--text2);font-weight:600;}
+.ai-edit-form{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.ai-edit-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.ai-edit-label{min-width:72px;color:var(--text2);}
+.ai-edit-field{flex:1 1 90px;width:auto;padding:4px 6px;}
 .ai-route-label{align-self:center;color:var(--text2);}
 .ai-perm-granted{color:var(--text2);opacity:.7;}
 .ai-perm-details summary{cursor:pointer;margin-top:4px;}

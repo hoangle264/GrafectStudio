@@ -45,6 +45,8 @@ interface AiChatProposalRecord {
   preview: AiChatApplyResult;
   sourceText: string;
   editing: boolean;
+  /** Form editing is the default; JSON stays available as "Advanced". */
+  editJson?: boolean;
   editError: string;
   /** Captured around a successful Apply so the change can be reverted from the bubble. */
   undo?: { before: AiProjectSnapshot; after: AiProjectSnapshot };
@@ -450,7 +452,134 @@ function aiChatRenderPreview(proposal: AiChatProposal): string {
     }).join('');
     return sourceRows + variableTables;
   }
+  if (proposal.intent === 'map-io') return aiChatRenderMapIOPreview(data as unknown as GrafcetStudioAIContracts.MapIOProposalData);
+  if (proposal.intent === 'create-structure') return aiChatRenderStructurePreview(data as unknown as GrafcetStudioAIContracts.CreateStructureProposalData);
+  if (proposal.intent === 'create-flow') return aiChatRenderFlowPreview(data as unknown as GrafcetStudioAIContracts.CreateFlowProposalData);
   return '<pre class="ai-preview-json">' + aiChatEscape(JSON.stringify(data, null, 2)) + '</pre>';
+}
+
+function aiChatRenderTable(headers: string[], rows: unknown[][]): string {
+  return '<table class="ai-preview-table ai-preview-grid"><thead><tr>' + headers.map(function(h) { return '<th>' + aiChatEscape(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    rows.map(function(row) { return '<tr>' + row.map(function(cell) { return '<td>' + aiChatEscape(cell) + '</td>'; }).join('') + '</tr>'; }).join('') +
+    '</tbody></table>';
+}
+
+function aiChatRenderMapIOPreview(data: GrafcetStudioAIContracts.MapIOProposalData): string {
+  const io = project.ioMapping || { physicalIOs: [], entries: [] };
+  const rows = (Array.isArray(data.entries) ? data.entries : []).map(function(entry) {
+    const physical = (io.physicalIOs || []).find(function(p) { return p.id === entry.physicalIOId; });
+    const current = (io.entries || []).find(function(e) { return e.physicalIOId === entry.physicalIOId; });
+    const before = current && current.appVariable ? current.appVariable : '-';
+    return [
+      physical ? physical.deviceTag : entry.physicalIOId,
+      physical ? physical.plcAddress : '?',
+      physical ? physical.direction : '?',
+      before === entry.appVariable ? before + ' (unchanged)' : before + ' -> ' + entry.appVariable
+    ];
+  });
+  return aiChatRenderTable(['IO', 'PLC address', 'Dir', 'Mapping'], rows);
+}
+
+function aiChatRenderStructurePreview(data: GrafcetStudioAIContracts.CreateStructureProposalData): string {
+  const signals = Array.isArray(data.signals) ? data.signals : [];
+  return aiChatRenderRows([['Name', data.name], ['Signals', signals.length]]) +
+    aiChatRenderTable(['Signal', 'Type', 'Var type', 'Comment'], signals.map(function(s) { return [s.name, s.dataType, s.varType, s.comment || '']; }));
+}
+
+function aiChatRenderFlowPreview(data: GrafcetStudioAIContracts.CreateFlowProposalData): string {
+  const flow = data.flow || ({ steps: [], transitions: [] } as unknown as GrafcetStudioAIContracts.AiFlowProposal);
+  const steps = (flow.steps || []).slice().sort(function(a, b) { return (a.number || 0) - (b.number || 0); });
+  const stepName = function(id: string): string {
+    const step = steps.find(function(s) { return s.id === id; });
+    return step ? 'S' + (step.number ?? '?') : id;
+  };
+  const connections = flow.connections || [];
+  const ends = function(transitionId: string, downstream: boolean): string {
+    const ids = connections.filter(function(c) { return (downstream ? (c.from || c.fromId) : (c.to || c.toId)) === transitionId; })
+      .map(function(c) { return String(downstream ? (c.to || c.toId) : (c.from || c.fromId)); });
+    return ids.length ? ids.map(stepName).join(', ') : '?';
+  };
+  const stepRows = steps.map(function(s) {
+    const actions = (s.actions || []).map(function(a) { return (a.qualifier || 'N') + ' ' + a.variable; }).join('; ');
+    return [(s.initial ? '>> ' : '') + 'S' + (s.number ?? '?'), s.label || '', actions || '-'];
+  });
+  const transitionRows = (flow.transitions || []).map(function(t) {
+    return [ends(t.id, false) + ' -> ' + ends(t.id, true), t.condition || '(always)'];
+  });
+  return aiChatRenderRows([['Flow', flow.name || flow.id], ['Mode', flow.mode]]) +
+    aiChatRenderTable(['Step', 'Label', 'Actions'], stepRows) +
+    aiChatRenderTable(['Transition', 'Condition'], transitionRows);
+}
+
+// ---------- Form editing ----------
+const AI_EDIT_DATA_TYPES = ['Bool', 'Int', 'Real', 'Word', 'DWord', 'Time'];
+const AI_EDIT_VAR_TYPES = ['Input', 'Output', 'Var'];
+
+function aiChatEditInput(proposalId: string, path: string, value: unknown, placeholder: string): string {
+  return '<input class="ai-chat-input ai-edit-field" data-ai-edit="' + aiChatEscape(proposalId) + '" data-path="' + aiChatEscape(path) + '" value="' + aiChatEscape(value == null ? '' : value) + '" placeholder="' + aiChatEscape(placeholder) + '">';
+}
+
+function aiChatEditSelect(proposalId: string, path: string, value: unknown, options: string[]): string {
+  const current = String(value == null ? '' : value);
+  const all = options.indexOf(current) >= 0 || !current ? options : [current].concat(options);
+  return '<select class="ai-chat-intent ai-edit-field" data-ai-edit="' + aiChatEscape(proposalId) + '" data-path="' + aiChatEscape(path) + '">' +
+    all.map(function(o) { return '<option value="' + aiChatEscape(o) + '"' + (o === current ? ' selected' : '') + '>' + aiChatEscape(o) + '</option>'; }).join('') + '</select>';
+}
+
+function aiChatEditRow(label: string, fields: string): string {
+  return '<div class="ai-edit-row"><span class="ai-edit-label">' + aiChatEscape(label) + '</span>' + fields + '</div>';
+}
+
+/** Returns form HTML, or '' when the intent is only editable as JSON. */
+function aiChatRenderEditForm(proposal: AiChatProposal): string {
+  const id = proposal.id;
+  const data = proposal.data as unknown as Record<string, unknown>;
+  const variableFields = function(prefix: string, v: Partial<GrafcetStudioAIContracts.AiVariableProposal>): string {
+    return aiChatEditInput(id, prefix + '.label', v.label, 'Label') + aiChatEditInput(id, prefix + '.address', v.address, 'Address') + aiChatEditInput(id, prefix + '.comment', v.comment, 'Comment');
+  };
+  switch (proposal.intent) {
+    case 'create-variable': {
+      const v = ((data.variable || {}) as Partial<GrafcetStudioAIContracts.AiVariableProposal>);
+      return aiChatEditRow('Variable', variableFields('variable', v)) + aiChatEditRow('Format', aiChatEditInput(id, 'variable.format', v.format, 'Format'));
+    }
+    case 'clone-variable':
+      return ((data.variables || []) as GrafcetStudioAIContracts.AiVariableProposal[]).map(function(v, i) {
+        return aiChatEditRow('Clone #' + (i + 1), variableFields('variables.' + i, v));
+      }).join('');
+    case 'map-io': {
+      const physicals = (project.ioMapping && project.ioMapping.physicalIOs) || [];
+      return ((data.entries || []) as GrafcetStudioProject.IOMappingEntry[]).map(function(e, i) {
+        const physical = physicals.find(function(p) { return p.id === e.physicalIOId; });
+        return aiChatEditRow(physical ? physical.deviceTag + ' (' + physical.plcAddress + ')' : e.physicalIOId, aiChatEditInput(id, 'entries.' + i + '.appVariable', e.appVariable, 'Variable or Variable.Signal'));
+      }).join('');
+    }
+    case 'create-structure':
+      return aiChatEditRow('Name', aiChatEditInput(id, 'name', data.name, 'Structure name')) +
+        ((data.signals || []) as GrafcetStudioAIContracts.AiSignalProposal[]).map(function(s, i) {
+          const p = 'signals.' + i;
+          return aiChatEditRow('Signal #' + (i + 1), aiChatEditInput(id, p + '.name', s.name, 'Name') + aiChatEditSelect(id, p + '.dataType', s.dataType, AI_EDIT_DATA_TYPES) +
+            aiChatEditSelect(id, p + '.varType', s.varType, AI_EDIT_VAR_TYPES) + aiChatEditInput(id, p + '.comment', s.comment, 'Comment'));
+        }).join('');
+  }
+  return '';
+}
+
+function aiChatSetPath(target: Record<string, unknown>, path: string, value: string): void {
+  const keys = path.split('.');
+  let node: Record<string, unknown> = target;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const next = node[keys[i]];
+    if (!next || typeof next !== 'object') return;
+    node = next as Record<string, unknown>;
+  }
+  node[keys[keys.length - 1]] = value;
+}
+
+function aiChatEditJson(proposalId: string): void {
+  const record = AI_CHAT_STATE.proposals[proposalId];
+  if (!record) return;
+  record.editJson = true;
+  aiChatRender();
 }
 
 function aiChatRenderList(items: unknown[] | undefined, className: string): string {
@@ -468,9 +597,13 @@ function aiChatRenderProposal(record: AiChatProposalRecord): string {
   const preview = record.preview || { ok: false, errors: ['Preview was not run.'], warnings: [] };
   const appliedOrDiscarded = proposal.status === 'applied' || proposal.status === 'discarded';
   const canApply = aiChatCanApply(record) && !appliedOrDiscarded;
+  const form = record.editing && !record.editJson ? aiChatRenderEditForm(proposal) : '';
   const editBox = record.editing
-    ? '<textarea class="ai-chat-input" id="ai-edit-' + aiChatEscape(proposal.id) + '" rows="8">' + aiChatEscape(JSON.stringify(proposal, null, 2)) + '</textarea>' +
-      '<div class="ai-proposal-actions"><button class="btn a" onclick="aiChatSaveEdit(\'' + aiChatEscape(proposal.id) + '\')">Save Edit</button><button class="btn" onclick="aiChatCancelEdit(\'' + aiChatEscape(proposal.id) + '\')">Cancel</button></div>'
+    ? (form
+        ? '<div class="ai-edit-form">' + form + '</div>'
+        : '<textarea class="ai-chat-input" id="ai-edit-' + aiChatEscape(proposal.id) + '" rows="8">' + aiChatEscape(JSON.stringify(proposal, null, 2)) + '</textarea>') +
+      '<div class="ai-proposal-actions"><button class="btn a" onclick="aiChatSaveEdit(\'' + aiChatEscape(proposal.id) + '\')">Save Edit</button><button class="btn" onclick="aiChatCancelEdit(\'' + aiChatEscape(proposal.id) + '\')">Cancel</button>' +
+      (form ? '<button class="btn" onclick="aiChatEditJson(\'' + aiChatEscape(proposal.id) + '\')">Advanced (JSON)</button>' : '') + '</div>'
     : '';
   return '<div class="ai-proposal-head"><span class="ai-proposal-title">' + aiChatEscape(proposal.intent) + '</span><span class="ai-proposal-status">' + aiChatEscape(proposal.status) + '</span></div>' +
     '<div class="ai-proposal-summary">' + aiChatEscape(proposal.summary || 'Review this proposal before applying.') + '</div>' +
@@ -609,18 +742,31 @@ function aiChatCancelEdit(proposalId: string): void {
   const record = AI_CHAT_STATE.proposals[proposalId];
   if (!record) return;
   record.editing = false;
+  record.editJson = false;
   record.editError = '';
   aiChatRender();
 }
 
+/** Form fields write into a copy of the proposal; the JSON textarea replaces it wholesale. */
+function aiChatReadEditedProposal(record: AiChatProposalRecord, proposalId: string): unknown {
+  const input = document.getElementById('ai-edit-' + proposalId) as HTMLTextAreaElement | null;
+  if (input) return JSON.parse(input.value);
+  const edited = aiChatClone(record.proposal) as unknown as Record<string, unknown>;
+  const fields = Array.prototype.slice.call(document.querySelectorAll('[data-ai-edit="' + proposalId + '"]')) as Array<HTMLInputElement | HTMLSelectElement>;
+  fields.forEach(function(field) {
+    const path = field.getAttribute('data-path');
+    if (path) aiChatSetPath(edited.data as Record<string, unknown>, path, field.value.trim());
+  });
+  return edited;
+}
+
 function aiChatSaveEdit(proposalId: string): void {
   const record = AI_CHAT_STATE.proposals[proposalId];
-  const input = document.getElementById('ai-edit-' + proposalId) as HTMLTextAreaElement | null;
-  if (!record || !input) return;
+  if (!record) return;
   try {
-    const edited = JSON.parse(input.value);
+    const edited = aiChatReadEditedProposal(record, proposalId);
     const bridge = aiChatBridge()!;
-    const normalized = bridge.proposalParser.normalizeAiProposal(edited);
+    const normalized = bridge.proposalParser.normalizeAiProposal(edited as AiChatProposal);
     const validation = bridge.contracts.validateAiProposal(normalized);
     if (!validation.ok || !validation.value) {
       record.editError = validation.errors.join('; ');
@@ -630,6 +776,7 @@ function aiChatSaveEdit(proposalId: string): void {
     record.proposal = validation.value;
     record.preview = aiChatValidatePreview(record.proposal);
     record.editing = false;
+    record.editJson = false;
     record.editError = '';
     if (record.proposal.id !== proposalId) {
       delete AI_CHAT_STATE.proposals[proposalId];
@@ -1336,6 +1483,7 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { aiChatEditProposal: typeof aiChatEditProposal }).aiChatEditProposal = aiChatEditProposal;
 (window as unknown as { aiChatCancelEdit: typeof aiChatCancelEdit }).aiChatCancelEdit = aiChatCancelEdit;
 (window as unknown as { aiChatSaveEdit: typeof aiChatSaveEdit }).aiChatSaveEdit = aiChatSaveEdit;
+(window as unknown as { aiChatEditJson: typeof aiChatEditJson }).aiChatEditJson = aiChatEditJson;
 (window as unknown as { aiSettingsToggle: typeof aiSettingsToggle }).aiSettingsToggle = aiSettingsToggle;
 (window as unknown as { aiSettingsSave: typeof aiSettingsSave }).aiSettingsSave = aiSettingsSave;
 (window as unknown as { aiSettingsClear: typeof aiSettingsClear }).aiSettingsClear = aiSettingsClear;
