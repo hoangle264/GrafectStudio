@@ -206,11 +206,22 @@
     const errors: string[] = [];
     ((projectState.ioMapping && projectState.ioMapping.physicalIOs) || []).forEach(function(io) { if (io && io.id) physicalIds[io.id] = true; });
     forEachVariable(projectState, function(variable) { if (variable.label) variableLabels[trimString(variable.label).toLowerCase()] = true; });
+    const warnings: string[] = [];
+    const seenPhysical: Record<string, true> = Object.create(null);
+    const existingByPhysical: Record<string, string> = Object.create(null);
+    ((projectState.ioMapping && projectState.ioMapping.entries) || []).forEach(function(e) { if (e && e.physicalIOId && e.appVariable) existingByPhysical[e.physicalIOId] = e.appVariable; });
+    if (!data.entries.length) errors.push('IO mapping proposal contains no entries.');
     data.entries.forEach(function(entry, index) {
+      // appVariable is "Label" or "Label.Signal" (device signal); the variable must exist by its base label.
+      const baseLabel = trimString(entry.appVariable).split('.')[0].toLowerCase();
       if (!physicalIds[entry.physicalIOId]) errors.push('IO mapping entry ' + index + ' references missing physicalIOId: ' + entry.physicalIOId + '.');
-      if (!variableLabels[trimString(entry.appVariable).toLowerCase()]) errors.push('IO mapping entry ' + index + ' references missing appVariable: ' + entry.appVariable + '.');
+      if (!baseLabel || !variableLabels[baseLabel]) errors.push('IO mapping entry ' + index + ' references missing appVariable: ' + entry.appVariable + '.');
+      if (seenPhysical[entry.physicalIOId]) errors.push('IO mapping proposal maps physicalIOId ' + entry.physicalIOId + ' more than once.');
+      seenPhysical[entry.physicalIOId] = true;
+      const previous = existingByPhysical[entry.physicalIOId];
+      if (previous && previous !== trimString(entry.appVariable)) warnings.push(entry.physicalIOId + ' is currently mapped to ' + previous + ' and will be remapped to ' + entry.appVariable + '.');
     });
-    return errors.length ? fail(proposal.id, true, unique(errors)) : success(proposal.id, true, data.entries.map(function(e) { return e.physicalIOId; }), [], false);
+    return errors.length ? fail(proposal.id, true, unique(errors), warnings) : success(proposal.id, true, data.entries.map(function(e) { return e.physicalIOId; }), warnings, false);
   }
   function connectionEndpoint(connection: GrafcetStudioProject.Connection, key: 'from' | 'to'): string { return trimString(key === 'from' ? (connection.from || connection.fromId) : (connection.to || connection.toId)); }
   function ensureProjectDiagrams(projectState: Project): DiagramMeta[] {
@@ -530,6 +541,32 @@
     return success(proposal.id, false, affectedIds, analysis.warnings, true);
   }
 
+  function applyMapIO(proposal: AiProposal, context: ApplyContext, preflight: ApplyResult): ApplyResult {
+    const projectState = context.getProject();
+    const data = proposal.data as GrafcetStudioAIContracts.MapIOProposalData;
+    if (!projectState.ioMapping) projectState.ioMapping = { physicalIOs: [], entries: [] };
+    if (!Array.isArray(projectState.ioMapping.entries)) projectState.ioMapping.entries = [];
+    const entries = projectState.ioMapping.entries;
+    // Same semantics as a manual mapping in the IO mapping table (GrafcetStudioIOMapping.ioSetEntryMapped).
+    data.entries.forEach(function(proposed) {
+      const appVariable = trimString(proposed.appVariable);
+      let entry = entries.find(function(item) { return item.physicalIOId === proposed.physicalIOId; });
+      if (!entry) {
+        entry = { physicalIOId: proposed.physicalIOId, appVariable: '', status: 'unmatched', matchScore: 0 };
+        entries.push(entry);
+      }
+      entry.appVariable = appVariable;
+      entry.status = 'mapped';
+      entry.matchScore = 1;
+    });
+    proposal.status = 'applied';
+    appliedProposalIds[proposal.id] = true;
+    if (context.saveProject) context.saveProject();
+    if (context.renderTree) context.renderTree();
+    if (context.refresh) context.refresh();
+    return success(proposal.id, false, preflight.affectedIds, preflight.warnings, true);
+  }
+
   function applyCreateStructure(proposal: AiProposal, context: ApplyContext, preflight: ApplyResult): ApplyResult {
     const projectState = context.getProject();
     const data = proposal.data as CreateStructureProposalData;
@@ -559,7 +596,7 @@
     switch (base.proposal.intent) {
       case 'create-variable': return applyCreateVariable(base.proposal, context, preflight);
       case 'clone-variable': return applyCloneVariable(base.proposal, context, preflight);
-      case 'map-io': return fail(base.proposal.id, false, ['Apply is not implemented for map-io yet; dry-run preconditions are available.'], preflight.warnings, preflight.affectedIds);
+      case 'map-io': return applyMapIO(base.proposal, context, preflight);
       case 'create-flow': return applyCreateFlow(base.proposal, context, preflight);
       case 'create-structure': return applyCreateStructure(base.proposal, context, preflight);
       default: return fail(base.proposal.id, false, ['Unsupported proposal intent.']);

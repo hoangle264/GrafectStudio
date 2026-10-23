@@ -15,6 +15,7 @@ declare function renderGlobalVarTable(): void;
 declare function syncStructDataFromProjectData(): boolean;
 declare function syncVariableSignalAddressesFromDeviceTypes(): boolean;
 declare function saveProject(): void;
+declare function renderIOMappingTable(filter?: string): void;
 
 interface AiChatMessage {
   id: string;
@@ -355,6 +356,7 @@ function aiChatMakeApplyContext(): GrafcetStudioAIApply.ApplyContext {
       if (typeof syncStructDataFromProjectData === 'function') syncStructDataFromProjectData();
       if (typeof syncVariableSignalAddressesFromDeviceTypes === 'function') syncVariableSignalAddressesFromDeviceTypes();
       if (activeDiagramId === VARS_TAB_ID && typeof renderGlobalVarTable === 'function') renderGlobalVarTable();
+      if (activeDiagramId === IO_MAPPING_TAB_ID && typeof renderIOMappingTable === 'function') renderIOMappingTable((document.getElementById('iomap-filter') as HTMLSelectElement | null)?.value || 'All');
       aiChatReloadActiveCanvasFromStorage();
     }
   };
