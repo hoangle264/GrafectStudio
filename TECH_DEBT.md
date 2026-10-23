@@ -84,6 +84,29 @@ Khi AI fail hoặc không được cấu hình, `GenerateFallbackJson` rơi vào
 
 ---
 
+## [TD-004] Migrate project cũ khi mở (`migrateFlowAddressConfigs` / `migrateFlowControlState`)
+
+| Trường | Nội dung |
+|---|---|
+| **Ngày ghi nhận** | 2026-10-23 |
+| **Mức độ** | 🟡 Thấp — chỉ ảnh hưởng project lưu bởi bản cũ |
+| **Module liên quan** | [`store.ts`](src/web/ts/core/store.ts) — `migrateFlowAddressConfigs`, `migrateFlowControlState`, `ensureFlowAddressConfig` |
+
+### Vấn đề
+
+Khi mở project, store tự điền giá trị mặc định cho các trường còn thiếu (`addressMode`, `boolAddressMode`, `baseMr`, `activeWord`, `completeWord`, `controlState`, `category`). Đây là lớp tương thích ngược cho project tạo bởi bản cũ, ngầm sửa dữ liệu mà người dùng không biết.
+
+### Phương án đề xuất khi xử lý
+
+Gắn `schemaVersion` vào project; chỉ chạy migrate khi version cũ hơn, hoặc bỏ hẳn khi không còn project cũ và để validate báo lỗi.
+
+### Điều kiện để ưu tiên xử lý
+
+- Khi xác nhận không còn project cũ cần mở
+- Khi thêm migrate mới (cần cơ chế version thay vì chạy mọi lần)
+
+---
+
 *File này được duy trì thủ công. Khi một mục được xử lý xong, chuyển nó sang mục `## Đã Xử Lý` bên dưới và ghi ngày hoàn thành.*
 
 ## Đã Xử Lý
