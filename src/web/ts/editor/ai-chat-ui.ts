@@ -15,6 +15,7 @@ declare function renderGlobalVarTable(): void;
 declare function syncStructDataFromProjectData(): boolean;
 declare function syncVariableSignalAddressesFromDeviceTypes(): boolean;
 declare function saveProject(): void;
+declare function flushState(): void;
 declare function renderIOMappingTable(filter?: string): void;
 
 interface AiChatMessage {
@@ -33,12 +34,22 @@ interface AiChatMessage {
   streamDone?: boolean;
 }
 
+interface AiProjectSnapshot {
+  project: string;
+  /** Raw stored diagram data per diagram id; null when the diagram had no stored data. */
+  diagrams: Record<string, string | null>;
+}
+
 interface AiChatProposalRecord {
   proposal: AiChatProposal;
   preview: AiChatApplyResult;
   sourceText: string;
   editing: boolean;
   editError: string;
+  /** Captured around a successful Apply so the change can be reverted from the bubble. */
+  undo?: { before: AiProjectSnapshot; after: AiProjectSnapshot };
+  undone?: boolean;
+  undoError?: string;
 }
 
 const AI_CHAT_STATE: {
@@ -467,10 +478,13 @@ function aiChatRenderProposal(record: AiChatProposalRecord): string {
     aiChatRenderList(proposal.errors, 'ai-errors') +
     aiChatRenderList(preview.errors, 'ai-errors') +
     (record.editError ? aiChatRenderList([record.editError], 'ai-errors') : '') +
+    (record.undoError ? aiChatRenderList([record.undoError], 'ai-errors') : '') +
+    (record.undone ? '<div class="ai-proposal-summary">Undone. The project was restored to its state before Apply.</div>' : '') +
     '<div class="ai-proposal-actions">' +
       '<button class="btn a" onclick="aiChatApplyProposal(\'' + aiChatEscape(proposal.id) + '\')" ' + (canApply ? '' : 'disabled') + '>Apply</button>' +
       '<button class="btn r" onclick="aiChatDiscardProposal(\'' + aiChatEscape(proposal.id) + '\')" ' + (appliedOrDiscarded ? 'disabled' : '') + '>Discard</button>' +
       '<button class="btn" onclick="aiChatEditProposal(\'' + aiChatEscape(proposal.id) + '\')" ' + (appliedOrDiscarded ? 'disabled' : '') + '>Edit</button>' +
+      (record.undo && !record.undone ? '<button class="btn" onclick="aiChatUndoProposal(\'' + aiChatEscape(proposal.id) + '\')">Undo</button>' : '') +
     '</div>' + editBox;
 }
 
@@ -488,6 +502,69 @@ function aiChatRender(): void {
   body.scrollTop = body.scrollHeight;
 }
 
+function aiChatDiagramKey(id: string): string {
+  return 'gf2-diag-' + id;
+}
+
+function aiChatReadStorage(key: string): string | null {
+  try { return localStorage.getItem(key); } catch (_) { return null; }
+}
+
+function aiChatTakeSnapshot(extraDiagramIds?: string[]): AiProjectSnapshot {
+  if (typeof flushState === 'function' && activeDiagramId && !isVirtualTab(activeDiagramId)) flushState();
+  const ids = (project.diagrams || []).map(function(d) { return d.id; }).concat(extraDiagramIds || []);
+  const diagrams: Record<string, string | null> = {};
+  ids.forEach(function(id) { if (id) diagrams[id] = aiChatReadStorage(aiChatDiagramKey(id)); });
+  return { project: JSON.stringify(project), diagrams };
+}
+
+/** Diagram content only; view position/zoom may change without counting as an edit. */
+function aiChatDiagramContent(raw: string | null): string {
+  if (!raw) return '';
+  try {
+    const data = JSON.parse(raw);
+    return JSON.stringify({ state: data.state, nextId: data.nextId, nextStepNum: data.nextStepNum });
+  } catch (_) {
+    return raw;
+  }
+}
+
+function aiChatSnapshotMatches(snapshot: AiProjectSnapshot): boolean {
+  const now = aiChatTakeSnapshot(Object.keys(snapshot.diagrams));
+  if (now.project !== snapshot.project) return false;
+  return Object.keys(snapshot.diagrams).every(function(id) {
+    return aiChatDiagramContent(now.diagrams[id]) === aiChatDiagramContent(snapshot.diagrams[id]);
+  });
+}
+
+function aiChatUndoProposal(proposalId: string): void {
+  const record = AI_CHAT_STATE.proposals[proposalId];
+  if (!record || !record.undo || record.undone) return;
+  if (!aiChatSnapshotMatches(record.undo.after)) {
+    record.undoError = 'The project changed after this proposal was applied; undoing now would discard those edits. Revert them first, or undo manually.';
+    aiChatRender();
+    return;
+  }
+  const before = record.undo.before;
+  const touched = Object.keys(before.diagrams).concat(Object.keys(record.undo.after.diagrams));
+  touched.forEach(function(id) {
+    const raw = Object.prototype.hasOwnProperty.call(before.diagrams, id) ? before.diagrams[id] : null;
+    try {
+      if (raw === null) localStorage.removeItem(aiChatDiagramKey(id));
+      else localStorage.setItem(aiChatDiagramKey(id), raw);
+    } catch (_) { /* storage unavailable */ }
+  });
+  project = JSON.parse(before.project);
+  const context = aiChatMakeApplyContext();
+  if (context.saveProject) context.saveProject();
+  if (context.renderTree) context.renderTree();
+  if (context.renderGlobalVarTable) context.renderGlobalVarTable();
+  if (context.refresh) context.refresh();
+  record.undone = true;
+  record.undoError = '';
+  aiChatRender();
+}
+
 function aiChatApplyProposal(proposalId: string): void {
   const record = AI_CHAT_STATE.proposals[proposalId];
   if (!record || record.proposal.status === 'applied' || record.proposal.status === 'discarded') return;
@@ -497,9 +574,13 @@ function aiChatApplyProposal(proposalId: string): void {
     return;
   }
   try {
+    const before = aiChatTakeSnapshot();
     const result = aiChatBridge()!.applyLayer.applyProposal(record.proposal, { context: aiChatMakeApplyContext() });
     if (!result.ok) record.preview = result;
-    else record.preview = Object.assign({}, result, { warnings: result.warnings || [], errors: [] });
+    else {
+      record.preview = Object.assign({}, result, { warnings: result.warnings || [], errors: [] });
+      record.undo = { before, after: aiChatTakeSnapshot(Object.keys(before.diagrams)) };
+    }
   } catch (error) {
     record.preview = { ok: false, proposalId, dryRun: false, affectedIds: [], warnings: [], errors: [error instanceof Error ? error.message : String(error)], changed: false };
   }
@@ -1089,6 +1170,7 @@ function runAiChatStreamingValidation(): { ok: boolean; errors: string[] } {
 (window as unknown as { receiveAiClassification: typeof receiveAiClassification }).receiveAiClassification = receiveAiClassification;
 (window as unknown as { aiChatInsertMockProposal: typeof aiChatInsertMockProposal }).aiChatInsertMockProposal = aiChatInsertMockProposal;
 (window as unknown as { aiChatApplyProposal: typeof aiChatApplyProposal }).aiChatApplyProposal = aiChatApplyProposal;
+(window as unknown as { aiChatUndoProposal: typeof aiChatUndoProposal }).aiChatUndoProposal = aiChatUndoProposal;
 (window as unknown as { aiChatDiscardProposal: typeof aiChatDiscardProposal }).aiChatDiscardProposal = aiChatDiscardProposal;
 (window as unknown as { aiChatEditProposal: typeof aiChatEditProposal }).aiChatEditProposal = aiChatEditProposal;
 (window as unknown as { aiChatCancelEdit: typeof aiChatCancelEdit }).aiChatCancelEdit = aiChatCancelEdit;
