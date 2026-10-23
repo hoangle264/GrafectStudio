@@ -64,7 +64,7 @@ public class RobotSkeletonEngine
                 "di" or "digitalinput" or "signaldi" => "signaldi",
                 "ao" or "analogoutput" or "signalao" => "signalao",
                 "ai" or "analoginput" or "signalai" => "signalai",
-                _ => "signaldo"
+                _ => throw new InvalidOperationException($"Unsupported robot signal type '{sig.Type}' for signal '{sig.Name}'.")
             };
             sb.AppendLine($"    VAR {rapidSigType} {sig.Name}; ! Alias: {sig.Alias}");
         }
@@ -97,65 +97,17 @@ public class RobotSkeletonEngine
 
     private static string RenderSteps(SnippetMapDocument doc, TopologyContext topologyContext, FlowInfo flow)
     {
-        if (topologyContext?.ExecutionTree != null && topologyContext.ExecutionTree.Count > 0)
+        if (topologyContext?.ExecutionTree == null || topologyContext.ExecutionTree.Count == 0)
         {
-            var sb = new StringBuilder();
-            foreach (var block in topologyContext.ExecutionTree)
-            {
-                RenderExecutionBlock(sb, block, doc, topologyContext, 8);
-            }
-            return sb.ToString().TrimEnd();
+            throw new InvalidOperationException($"Flow '{flow?.Name}' has no execution tree; cannot render robot steps.");
         }
 
-        // Fallback for legacy sequential steps
-        var legacySb = new StringBuilder();
-        var steps = flow?.Steps ?? new List<Step>();
-
-        foreach (var step in steps.OrderBy(s => s.Number))
+        var sb = new StringBuilder();
+        foreach (var block in topologyContext.ExecutionTree)
         {
-            var isJumpTarget = topologyContext.JumpTargetStepNumbers.Contains(step.Number);
-            var isMacro = string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase);
-
-            if (isJumpTarget)
-            {
-                legacySb.AppendLine($"lbl_step{step.Number}:");
-            }
-
-            if (isMacro)
-            {
-                var macroTarget = topologyContext.MacroCallMap.GetValueOrDefault(step.Number, "SubFlow");
-                legacySb.AppendLine($"        ! STEP {step.Number}: {step.Label}");
-                legacySb.AppendLine($"        {macroTarget};");
-
-                // Render outgoing transition wait for macro step (same as normal step)
-                var macroOutgoing = topologyContext.TransitionDetails
-                    .Where(td => td.FromStepNumber == step.Number)
-                    .FirstOrDefault();
-                if (macroOutgoing != null && !string.IsNullOrWhiteSpace(macroOutgoing.Condition)
-                    && !string.Equals(macroOutgoing.Condition, "always", StringComparison.OrdinalIgnoreCase))
-                {
-                    var waitInst = TopologyAnalyzer.FormatRapidWaitInstruction(macroOutgoing.Condition);
-                    if (!string.IsNullOrWhiteSpace(waitInst))
-                        legacySb.AppendLine($"        {waitInst}");
-                }
-            }
-            else
-            {
-                legacySb.AppendLine($"        ! STEP {step.Number}: {step.Label}");
-                if (doc.Steps != null && doc.Steps.TryGetValue(step.Number, out var snippet) && !string.IsNullOrWhiteSpace(snippet))
-                {
-                    legacySb.AppendLine(IndentText(snippet, 8));
-                }
-                else
-                {
-                    legacySb.AppendLine($"        ! Step {step.Number} snippet empty");
-                }
-            }
-
-            legacySb.AppendLine();
+            RenderExecutionBlock(sb, block, doc, topologyContext, 8);
         }
-
-        return legacySb.ToString().TrimEnd();
+        return sb.ToString().TrimEnd();
     }
 
     private static void RenderExecutionBlock(StringBuilder sb, ExecutionBlock block, SnippetMapDocument doc, TopologyContext topologyContext, int indent)

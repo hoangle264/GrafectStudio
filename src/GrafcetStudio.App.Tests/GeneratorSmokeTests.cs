@@ -47,6 +47,27 @@ public class GeneratorSmokeTests
                 Name = "MapIO.hbs",
                 Content = "; IO {{#each ioMap}}{{this.name}} => {{this.address}}{{/each}}",
                 IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.Error",
+                Name = "Error.hbs",
+                Content = "; Error",
+                IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.System",
+                Name = "System.hbs",
+                Content = "; System",
+                IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.DeviceManager",
+                Name = "DeviceManager.hbs",
+                Content = "; DeviceManager",
+                IsPartial = false
             }
         });
 
@@ -68,7 +89,7 @@ public class GeneratorSmokeTests
         {
             PhysicalIOs = new List<GrafcetStudio.Domain.Models.PhysicalIO>
             {
-                new() { Id = "io-1", PlcAddress = "X000" }
+                new() { Id = "io-1", PlcAddress = "X000", Direction = "Input" }
             },
             Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
             {
@@ -95,6 +116,27 @@ public class GeneratorSmokeTests
                 Id = "simple.MapIO",
                 Name = "MapIO.hbs",
                 Content = "{{#each ioMap}}{{#if (eq this.direction \"Output\")}}{{this.name}} -> OUT {{this.address}}\n{{else}}{{this.address}} -> OUT {{this.name}}\n{{/if}}{{/each}}",
+                IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.Error",
+                Name = "Error.hbs",
+                Content = "; Error",
+                IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.System",
+                Name = "System.hbs",
+                Content = "; System",
+                IsPartial = false
+            },
+            new()
+            {
+                Id = "simple.DeviceManager",
+                Name = "DeviceManager.hbs",
+                Content = "; DeviceManager",
                 IsPartial = false
             }
         });
@@ -124,8 +166,8 @@ public class GeneratorSmokeTests
             {
                 new() { Id = "io-out", PlcAddress = "Y000", Direction = "Output" },
                 new() { Id = "io-in-neg", PlcAddress = "!X000", Direction = "Input" },
-                new() { Id = "io-out-fallback", PlcAddress = "Y001" },
-                new() { Id = "io-in-fallback", PlcAddress = "X001" }
+                new() { Id = "io-out-fallback", PlcAddress = "Y001", Direction = "Output" },
+                new() { Id = "io-in-fallback", PlcAddress = "X001", Direction = "Input" }
             },
             Entries = new List<GrafcetStudio.Domain.Models.IOMappingEntry>
             {

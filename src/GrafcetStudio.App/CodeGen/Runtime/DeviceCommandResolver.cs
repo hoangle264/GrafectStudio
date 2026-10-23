@@ -118,18 +118,6 @@ public static class DeviceCommandResolver
             return true;
         }
 
-        // Fallback: match by suffix or case-insensitive name (e.g. cyl_coilA matching CoilA)
-        var key = System.Linq.Enumerable.FirstOrDefault(variable.SignalAddresses.Keys, k =>
-            string.Equals(k, signalName, StringComparison.OrdinalIgnoreCase) ||
-            k.EndsWith("_" + signalName, StringComparison.OrdinalIgnoreCase) ||
-            k.EndsWith(signalName, StringComparison.OrdinalIgnoreCase));
-
-        if (key != null && variable.SignalAddresses.TryGetValue(key, out found) && !string.IsNullOrWhiteSpace(found))
-        {
-            address = found;
-            return true;
-        }
-
         address = string.Empty;
         return false;
     }

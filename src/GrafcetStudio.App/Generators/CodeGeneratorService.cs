@@ -46,7 +46,7 @@ public class CodeGeneratorService : ICodeGeneratorService
         var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
         var folder = System.IO.Path.GetDirectoryName(path)?.Replace('\\', '/');
         var templateKey = ResolveTemplateKey(folder, fileName, profile);
-        if (string.IsNullOrWhiteSpace(templateKey) || !_templates.IsTemplateLoaded(templateKey))
+        if (string.IsNullOrWhiteSpace(templateKey))
         {
             return file.Content;
         }
@@ -120,16 +120,11 @@ public class CodeGeneratorService : ICodeGeneratorService
         {
             if (string.Equals(fileName, "DeviceManager", StringComparison.OrdinalIgnoreCase))
             {
-                var key = $"{profile}.DeviceManager";
-                if (_templates.IsTemplateLoaded(key)) return key;
-                return "simple.DeviceManager";
+                return RequireTemplate($"{profile}.DeviceManager");
             }
             if (string.Equals(fileName, "IOMapping", StringComparison.OrdinalIgnoreCase))
             {
-                var key = $"{profile}.MapIO";
-                if (_templates.IsTemplateLoaded(key)) return key;
-                if (_templates.IsTemplateLoaded("simple.MapIO")) return "simple.MapIO";
-                if (_templates.IsTemplateLoaded("uc.mapIo")) return "uc.mapIo";
+                return RequireTemplate($"{profile}.MapIO");
             }
         }
 
@@ -140,12 +135,15 @@ public class CodeGeneratorService : ICodeGeneratorService
                 string.Equals(fileName, "Orchestrator", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "SystemControl", StringComparison.OrdinalIgnoreCase))
             {
-                var key = $"{profile}.{fileName}";
-                if (_templates.IsTemplateLoaded(key)) return key;
-                return $"simple.{fileName}";
+                return RequireTemplate($"{profile}.{fileName}");
             }
         }
 
         return null;
     }
+
+    private string RequireTemplate(string key)
+        => _templates.IsTemplateLoaded(key)
+            ? key
+            : throw new InvalidOperationException($"Template '{key}' is not loaded.");
 }

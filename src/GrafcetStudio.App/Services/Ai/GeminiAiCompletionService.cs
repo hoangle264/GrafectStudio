@@ -203,30 +203,20 @@ public class GeminiAiCompletionService : IAiCompletionService
         }
 
         // Gemini API hỗ trợ systemInstruction riêng biệt (không merge vào user turn).
-        // Chỉ dùng systemInstruction khi có system prompt thực sự.
-        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        if (string.IsNullOrWhiteSpace(systemPrompt))
         {
-            return new
-            {
-                systemInstruction = new
-                {
-                    parts = new[] { new { text = systemPrompt } }
-                },
-                contents = new[]
-                {
-                    new { role = "user", parts = new[] { new { text = userPrompt } } }
-                },
-                generationConfig = new { temperature = 0.2 }
-            };
+            throw new InvalidOperationException("AI request has an empty system prompt.");
         }
 
-        // Fallback: gộp system + user prompt vào một turn (hành vi cũ)
-        var combinedPrompt = systemPrompt + Environment.NewLine + Environment.NewLine + userPrompt;
         return new
         {
+            systemInstruction = new
+            {
+                parts = new[] { new { text = systemPrompt } }
+            },
             contents = new[]
             {
-                new { role = "user", parts = new[] { new { text = combinedPrompt } } }
+                new { role = "user", parts = new[] { new { text = userPrompt } } }
             },
             generationConfig = new { temperature = 0.2 }
         };

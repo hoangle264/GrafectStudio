@@ -35,18 +35,9 @@ public sealed class MapIOGenerator : IMapIOGenerator
                 bool isOutput = dir == "output" || dir == "out" || dir == "ouput";
                 bool isInput = dir == "input" || dir == "in";
 
-                // Fallback to address prefix if direction is unspecified
-                if (!isOutput && !isInput && !string.IsNullOrEmpty(p.PlcAddress))
+                if (!isOutput && !isInput)
                 {
-                    var addressUpper = p.PlcAddress.ToUpperInvariant();
-                    if (addressUpper.StartsWith("X"))
-                    {
-                        isInput = true;
-                    }
-                    else if (addressUpper.StartsWith("Y"))
-                    {
-                        isOutput = true;
-                    }
+                    throw new InvalidOperationException($"Physical IO '{p.Id}' (address '{p.PlcAddress}') is mapped to '{appVar}' but has no valid direction (input/output).");
                 }
 
                 string normalizedDir = isOutput ? "Output" : "Input";

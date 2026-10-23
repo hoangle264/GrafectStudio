@@ -150,7 +150,7 @@ public class RobotCodegenTests
     }
 
     [Fact]
-    public void RobotSkeletonEngine_RendersValidRapidModuleWithInjections()
+    public void RobotSkeletonEngine_ThrowsWhenExecutionTreeIsMissing()
     {
         var engine = new RobotSkeletonEngine();
         var doc = new SnippetMapDocument
@@ -190,15 +190,8 @@ public class RobotCodegenTests
             JumpTargetStepNumbers = new HashSet<int> { 1 }
         };
 
-        var rapidText = engine.Render(doc, topologyContext, flow, "PickModule");
-
-        Assert.Contains("MODULE PickModule", rapidText);
-        Assert.Contains("VAR signaldo gripper;", rapidText);
-        Assert.Contains("PERS robtarget pPick", rapidText);
-        Assert.Contains("lbl_step1:", rapidText);
-        Assert.Contains("! === STEP 2: CallSub [MACRO CALL] ===", rapidText);
-        Assert.Contains("SubRoutine;", rapidText);
-        Assert.Contains("ENDMODULE", rapidText);
+        var error = Assert.Throws<InvalidOperationException>(() => engine.Render(doc, topologyContext, flow, "PickModule"));
+        Assert.Contains("no execution tree", error.Message);
     }
 
     [Fact]

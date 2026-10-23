@@ -74,6 +74,16 @@ public class TemplateSyntaxCheckerTests
 
 public class TemplatePreviewServiceTests
 {
+    private static void WriteBaseTemplates(string root)
+    {
+        var simple = Path.Combine(root, "simple");
+        Directory.CreateDirectory(simple);
+        foreach (var name in new[] { "Error", "System", "SystemControl", "DeviceManager", "MapIO" })
+        {
+            File.WriteAllText(Path.Combine(simple, name + ".hbs"), "; " + name);
+        }
+    }
+
     [Fact]
     public void Render_UsesUnsavedTextForTheEditedFileOnly()
     {
@@ -81,6 +91,7 @@ public class TemplatePreviewServiceTests
         Directory.CreateDirectory(root);
         var file = Path.Combine(root, "unitMainOutput.hbs");
         File.WriteAllText(file, "ON-DISK");
+        WriteBaseTemplates(root);
         try
         {
             var payload = new GrafcetStudio.Domain.Models.CodegenPayload
@@ -107,6 +118,7 @@ public class TemplatePreviewServiceTests
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, "unitError.hbs"), "A");
         File.WriteAllText(Path.Combine(root, "unit-error.hbs"), "B");
+        WriteBaseTemplates(root);
         try
         {
             var payload = new GrafcetStudio.Domain.Models.CodegenPayload
