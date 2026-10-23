@@ -831,7 +831,28 @@ function aiChatRoute(message: string): void {
   aiChatRouteLocally(message, null, '');
 }
 
-const AI_AGENT_SESSIONS: Record<string, { message: string; statusMessageId: string }> = {};
+const AI_AGENT_SESSIONS: Record<string, { message: string; statusMessageId: string; timer?: number }> = {};
+
+function aiAgentStopTimer(session: { timer?: number }): void {
+  if (session.timer !== undefined) {
+    window.clearInterval(session.timer);
+    session.timer = undefined;
+  }
+}
+
+/** Shows how long the host has been waiting for the model, so a slow answer is not mistaken for a hang. */
+function aiAgentStartTimer(session: { statusMessageId: string; timer?: number }, baseText: string): void {
+  aiAgentStopTimer(session);
+  const startedAt = Date.now();
+  const tick = function() {
+    const status = aiChatFindMessage(session.statusMessageId);
+    if (!status) return;
+    status.text = baseText + ' (' + Math.floor((Date.now() - startedAt) / 1000) + 's)';
+    aiChatRender();
+  };
+  tick();
+  session.timer = window.setInterval(tick, 1000);
+}
 
 function aiAgentHost(): ((message: unknown) => void) | null {
   const host = (window as Window & { chrome?: { webview?: { postMessage?: (message: unknown) => void } } }).chrome;
@@ -845,20 +866,24 @@ function receiveAiAgentEvent(event: { sessionId: string; kind: string; data?: { 
   const data = event.data || {};
   switch (event.kind) {
     case 'unavailable':
+      aiAgentStopTimer(session);
       delete AI_AGENT_SESSIONS[event.sessionId];
       aiChatRouteLocally(session.message, status, 'AI is not configured.');
       return;
     case 'status':
-      if (status) { status.text = data.text || status.text; aiChatRender(); }
+      aiAgentStartTimer(session, data.text || 'Assistant is working...');
       return;
     case 'tool_call':
+      aiAgentStopTimer(session);
       aiAgentRunTool(event.sessionId, String(data.callId || ''), String(data.name || ''), data.args || {}, status);
       return;
     case 'error':
+      aiAgentStopTimer(session);
       delete AI_AGENT_SESSIONS[event.sessionId];
       if (status) { status.text = data.text || 'Assistant failed.'; status.error = true; aiChatRender(); }
       return;
     case 'end':
+      aiAgentStopTimer(session);
       delete AI_AGENT_SESSIONS[event.sessionId];
       if (status) { status.text = 'Assistant finished.'; aiChatRender(); }
       return;
@@ -981,9 +1006,9 @@ function aiChatReviewActiveFlow(): void {
   aiChatAddMessage('user', 'Review flow "' + review.name + '"');
   aiChatAddMessage('assistant', 'Structural check of "' + review.name + '":\n' + GrafcetStudioFlowReview.formatFindings(review.findings), { error: review.findings.some(function(f) { return f.severity === 'error'; }) });
   if (aiAgentHost() && AI_PERMISSION_STATE.liveAi !== false) {
-    aiChatRoute('Review the Grafcet flow "' + review.name + '" (diagramId: ' + activeDiagramId + '). ' +
-      'The app already ran a structural check (see structuralFindings in get_diagram); do not repeat it. ' +
-      'Explain the impact of those findings and point out sequence-logic problems they do not cover. Reply only; do not propose changes.');
+    aiChatRoute('Hãy review flow Grafcet "' + review.name + '" (diagramId: ' + activeDiagramId + '). ' +
+      'App đã chạy kiểm tra cấu trúc (xem structuralFindings trong get_diagram), đừng lặp lại. ' +
+      'Giải thích tác động của các phát hiện đó và chỉ ra lỗi logic trình tự mà chúng chưa bao quát. Chỉ trả lời, không đề xuất thay đổi.');
   }
 }
 
