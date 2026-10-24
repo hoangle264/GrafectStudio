@@ -19,12 +19,11 @@ public static class AiAgentRunner
         string userMessage,
         Func<JsonArray, CancellationToken, Task<JsonObject>> callModel,
         Func<AiAgentToolCall, CancellationToken, Task<JsonObject>> executeTool,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        JsonArray? history = null)
     {
-        var contents = new JsonArray
-        {
-            new JsonObject { ["role"] = "user", ["parts"] = new JsonArray { new JsonObject { ["text"] = userMessage } } }
-        };
+        var contents = (JsonArray?)history?.DeepClone() ?? new JsonArray();
+        contents.Add(UserText(userMessage));
 
         for (var turn = 1; turn <= MaxModelTurns; turn++)
         {

@@ -44,7 +44,8 @@ public class AiAgentOrchestrator
         var client = new GeminiAgentClient(HttpClient, key!, model);
         var systemPrompt = AiAgentPrompt.BuildSystemPrompt();
         var tools = AiAgentPrompt.BuildTools();
-        var message = AiAgentPrompt.BuildUserMessage(payload.Message, payload.HistoryJson);
+        var message = AiAgentPrompt.TruncateMessage(payload.Message);
+        var history = AiAgentPrompt.BuildHistoryContents(payload.HistoryJson);
         var turn = 0;
 
         try
@@ -58,7 +59,8 @@ public class AiAgentOrchestrator
                     await _bridge.SendAiAgentEventAsync(sessionId, "status", new JsonObject { ["text"] = "Thinking (step " + turn + ")..." });
                     return await client.CallAsync(systemPrompt, contents, tools, ct);
                 },
-                (call, ct) => ExecuteToolInWebViewAsync(sessionId, call, ct));
+                (call, ct) => ExecuteToolInWebViewAsync(sessionId, call, ct),
+                history: history);
 
             await _bridge.SendAiAgentEventAsync(sessionId, result.Ok ? "end" : "error", result.Ok ? null : new JsonObject { ["text"] = result.Error });
         }

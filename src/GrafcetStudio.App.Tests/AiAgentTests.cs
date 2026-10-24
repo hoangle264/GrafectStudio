@@ -16,41 +16,67 @@ public class AiAgentTests
         return new JsonObject { ["role"] = "model", ["parts"] = new JsonArray { part } };
     }
 
+    private static JsonArray History(params (string Role, string Text)[] entries)
+        => new(entries.Select(e => (JsonNode)new JsonObject { ["role"] = e.Role, ["text"] = e.Text }).ToArray());
+
+    private static string TurnText(JsonNode? turn) => turn!["parts"]![0]!["text"]!.GetValue<string>();
+
     [Fact]
-    public void BuildUserMessage_WithoutHistory_IsTheRequestOnly()
+    public void HistoryContents_EmptyOrInvalid_IsEmpty()
     {
-        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", string.Empty));
-        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", "[]"));
-        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", "not json"));
+        Assert.Empty(AiAgentPrompt.BuildHistoryContents(string.Empty));
+        Assert.Empty(AiAgentPrompt.BuildHistoryContents("[]"));
+        Assert.Empty(AiAgentPrompt.BuildHistoryContents("not json"));
     }
 
     [Fact]
-    public void BuildUserMessage_KeepsOnlyTheLastEntries_BeforeTheRequest()
+    public void HistoryContents_KeepsTheLastEntries_AsAlternatingTurns()
     {
         var history = new JsonArray();
         for (var i = 1; i <= 10; i++)
             history.Add(new JsonObject { ["role"] = i % 2 == 1 ? "user" : "assistant", ["text"] = "msg" + i });
 
-        var text = AiAgentPrompt.BuildUserMessage("and step 3?", history.ToJsonString());
+        var contents = AiAgentPrompt.BuildHistoryContents(history.ToJsonString());
 
-        Assert.StartsWith("RECENT CONVERSATION", text);
-        Assert.DoesNotContain("User: msg1" + Environment.NewLine, text);
-        Assert.DoesNotContain("Assistant: msg2" + Environment.NewLine, text);
-        Assert.Contains("User: msg3", text);
-        Assert.Contains("Assistant: msg10", text);
-        Assert.EndsWith("CURRENT REQUEST:" + Environment.NewLine + "and step 3?", text);
-        Assert.True(text.IndexOf("msg10", StringComparison.Ordinal) < text.IndexOf("and step 3?", StringComparison.Ordinal));
+        Assert.Equal(8, contents.Count);
+        Assert.Equal("user", contents[0]!["role"]!.GetValue<string>());
+        Assert.Equal("msg3", TurnText(contents[0]));
+        Assert.Equal("model", contents[7]!["role"]!.GetValue<string>());
+        Assert.Equal("msg10", TurnText(contents[7]));
     }
 
     [Fact]
-    public void BuildUserMessage_TruncatesLongEntries()
+    public void HistoryContents_MergesSameRole_StartsWithUser_EndsWithModel()
     {
-        var history = new JsonArray { new JsonObject { ["role"] = "assistant", ["text"] = new string('x', 5000) } };
+        var contents = AiAgentPrompt.BuildHistoryContents(History(
+            ("assistant", "welcome"), ("user", "a"), ("user", "b"), ("assistant", "c"), ("assistant", "[Proposal map-io: x - applied]"), ("user", "pending")).ToJsonString());
 
-        var text = AiAgentPrompt.BuildUserMessage("ok", history.ToJsonString());
+        Assert.Equal(2, contents.Count);
+        Assert.Equal("a\n\nb", TurnText(contents[0]));
+        Assert.Equal("c\n\n[Proposal map-io: x - applied]", TurnText(contents[1]));
+    }
 
-        Assert.Contains("Assistant: " + new string('x', AiAgentPrompt.MaxHistoryEntryChars) + Environment.NewLine, text);
-        Assert.DoesNotContain(new string('x', AiAgentPrompt.MaxHistoryEntryChars + 1), text);
+    [Fact]
+    public void HistoryContents_TruncatesLongEntries()
+    {
+        var contents = AiAgentPrompt.BuildHistoryContents(History(("user", "q"), ("assistant", new string('x', 5000))).ToJsonString());
+
+        Assert.Equal(AiAgentPrompt.MaxHistoryEntryChars, TurnText(contents[1]).Length);
+    }
+
+    [Fact]
+    public async Task Runner_SendsHistoryBeforeTheCurrentRequest()
+    {
+        JsonArray? firstCall = null;
+        var history = AiAgentPrompt.BuildHistoryContents(History(("user", "q1"), ("assistant", "a1")).ToJsonString());
+
+        await AiAgentRunner.RunAsync("q2",
+            (contents, _) => { firstCall ??= (JsonArray)contents.DeepClone(); return Task.FromResult(ModelCall("reply", new JsonObject { ["text"] = "a2" })); },
+            (_, _) => Task.FromResult(new JsonObject { ["done"] = true }),
+            history: history);
+
+        Assert.Equal(new[] { "q1", "a1", "q2" }, firstCall!.Select(TurnText));
+        Assert.Equal(2, history.Count);
     }
 
     [Fact]
