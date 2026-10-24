@@ -962,7 +962,8 @@ function aiAgentReadData(name: string, args: Record<string, unknown>): unknown {
         steps: content.steps || [],
         transitions: content.transitions || [],
         connections: content.connections || [],
-        structuralFindings: aiFlowReviewRun(diagramId).findings
+        structuralFindings: aiFlowReviewRun(diagramId).findings,
+        conventions: 'Empty transition condition is valid (true, or wait for the previous step to complete). The last step implicitly loops back to the initial step. An empty structuralFindings list means the app found no structural problem.'
       };
     }
   }
@@ -1010,9 +1011,12 @@ function aiChatReviewActiveFlow(): void {
   aiChatAddMessage('user', 'Review flow "' + review.name + '"');
   aiChatAddMessage('assistant', 'Structural check of "' + review.name + '":\n' + GrafcetStudioFlowReview.formatFindings(review.findings), { error: review.findings.some(function(f) { return f.severity === 'error'; }) });
   if (aiAgentHost() && AI_PERMISSION_STATE.liveAi !== false) {
-    aiChatRoute('Hãy review flow Grafcet "' + review.name + '" (diagramId: ' + activeDiagramId + '). ' +
-      'App đã chạy kiểm tra cấu trúc (xem structuralFindings trong get_diagram), đừng lặp lại. ' +
-      'Giải thích tác động của các phát hiện đó và chỉ ra lỗi logic trình tự mà chúng chưa bao quát. Chỉ trả lời, không đề xuất thay đổi.');
+    aiChatRoute('Review flow Grafcet "' + review.name + '" (diagramId: ' + activeDiagramId + '). Gọi get_diagram rồi trả lời bằng reply.\n' +
+      'QUY ƯỚC (không được nêu các mục này như lỗi):\n' +
+      '- Điều kiện transition rỗng là hợp lệ: nghĩa là true hoặc chờ step trước hoàn thành.\n' +
+      '- Step cuối ngầm quay về step đầu.\n' +
+      'YÊU CẦU: chỉ báo vấn đề thật sự, mỗi ý nêu step và tên action. Gồm (a) các mục trong structuralFindings nếu có; (b) action không có `complete` sensor và không có TimeMs mà transition kế tiếp rỗng. ' +
+      'Chỉ dùng tên có trong dữ liệu; điều gì không thấy trong dữ liệu thì không khẳng định. Nếu không có vấn đề, trả lời đúng một câu: "Không thấy vấn đề." Không đề xuất thay đổi.');
   }
 }
 
