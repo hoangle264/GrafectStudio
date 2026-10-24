@@ -25,6 +25,8 @@ public class AiAgentStartPayload
 {
     public string SessionId { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    /// <summary>Recent chat as a JSON array of {role, text}; empty for a new conversation.</summary>
+    public string HistoryJson { get; set; } = string.Empty;
 }
 
 public class AiAgentToolResultPayload

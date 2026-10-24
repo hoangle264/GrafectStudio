@@ -156,7 +156,8 @@ public partial class MainWindow : Window
                     var message = new AiAgentStartPayload
                     {
                         SessionId = GetOptionalString(payload, "sessionId"),
-                        Message = GetOptionalString(payload, "message")
+                        Message = GetOptionalString(payload, "message"),
+                        HistoryJson = payload.TryGetProperty("history", out var historyElement) && historyElement.ValueKind == JsonValueKind.Array ? historyElement.GetRawText() : string.Empty
                     };
                     _eventAggregator.GetEvent<AiAgentStartRequestedEvent>().Publish(message);
                     break;

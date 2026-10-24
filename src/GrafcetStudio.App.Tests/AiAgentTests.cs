@@ -17,6 +17,43 @@ public class AiAgentTests
     }
 
     [Fact]
+    public void BuildUserMessage_WithoutHistory_IsTheRequestOnly()
+    {
+        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", string.Empty));
+        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", "[]"));
+        Assert.Equal("review flow", AiAgentPrompt.BuildUserMessage("review flow", "not json"));
+    }
+
+    [Fact]
+    public void BuildUserMessage_KeepsOnlyTheLastEntries_BeforeTheRequest()
+    {
+        var history = new JsonArray();
+        for (var i = 1; i <= 10; i++)
+            history.Add(new JsonObject { ["role"] = i % 2 == 1 ? "user" : "assistant", ["text"] = "msg" + i });
+
+        var text = AiAgentPrompt.BuildUserMessage("and step 3?", history.ToJsonString());
+
+        Assert.StartsWith("RECENT CONVERSATION", text);
+        Assert.DoesNotContain("User: msg1" + Environment.NewLine, text);
+        Assert.DoesNotContain("Assistant: msg2" + Environment.NewLine, text);
+        Assert.Contains("User: msg3", text);
+        Assert.Contains("Assistant: msg10", text);
+        Assert.EndsWith("CURRENT REQUEST:" + Environment.NewLine + "and step 3?", text);
+        Assert.True(text.IndexOf("msg10", StringComparison.Ordinal) < text.IndexOf("and step 3?", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildUserMessage_TruncatesLongEntries()
+    {
+        var history = new JsonArray { new JsonObject { ["role"] = "assistant", ["text"] = new string('x', 5000) } };
+
+        var text = AiAgentPrompt.BuildUserMessage("ok", history.ToJsonString());
+
+        Assert.Contains("Assistant: " + new string('x', AiAgentPrompt.MaxHistoryEntryChars) + Environment.NewLine, text);
+        Assert.DoesNotContain(new string('x', AiAgentPrompt.MaxHistoryEntryChars + 1), text);
+    }
+
+    [Fact]
     public async Task Runner_ExecutesToolsUntilDone_AndEchoesModelContentVerbatim()
     {
         var turns = new Queue<JsonObject>(new[]

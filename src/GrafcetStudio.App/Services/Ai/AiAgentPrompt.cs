@@ -7,6 +7,8 @@ namespace GrafcetStudio.App.Services.Ai;
 public static class AiAgentPrompt
 {
     public const int MaxMessageChars = 4000;
+    public const int MaxHistoryMessages = 8;
+    public const int MaxHistoryEntryChars = 1500;
 
     /// <summary>Read tools and the context scope whose permission each one needs (enforced in the WebView).</summary>
     public static readonly IReadOnlyDictionary<string, string> ReadToolScopes = new Dictionary<string, string>
@@ -29,6 +31,7 @@ public static class AiAgentPrompt
         sb.AppendLine("- Every turn you must call tools. Read only the data you need for the request.");
         sb.AppendLine("- The user approves each kind of data before it is shared. A tool may return {\"denied\": true}; then work with what you have or explain what is missing. Never guess project content.");
         sb.AppendLine("- Never invent ids, variable names or IO points; use only values returned by tools.");
+        sb.AppendLine("- The message may start with RECENT CONVERSATION: earlier messages for context only (what the user asked, what you answered, which proposals were applied/discarded/undone). It holds no project data; read current data with tools again before relying on it.");
         sb.AppendLine("- Finish with exactly ONE of:");
         sb.AppendLine("  * submit_proposal: when the user wants to change the project. The app validates it; if it returns accepted=false, fix the listed errors and submit again.");
         sb.AppendLine("  * reply: for questions, explanations and reviews, or when you cannot make a valid proposal.");
@@ -57,6 +60,48 @@ public static class AiAgentPrompt
         sb.AppendLine("If nothing is wrong, say so. Do not propose changes unless the user asks; reviews are read-only.");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The first user turn: the last <see cref="MaxHistoryMessages"/> chat entries (if any) followed by the current request.
+    /// History is text only; tool results from earlier sessions are never replayed.
+    /// </summary>
+    public static string BuildUserMessage(string message, string historyJson)
+    {
+        var request = Truncate(message, MaxMessageChars);
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(historyJson))
+        {
+            try
+            {
+                if (JsonNode.Parse(historyJson) is JsonArray entries)
+                {
+                    foreach (var entry in entries.OfType<JsonObject>())
+                    {
+                        var text = entry["text"] is JsonValue textValue && textValue.TryGetValue<string>(out var value) ? value.Trim() : string.Empty;
+                        if (text.Length == 0) continue;
+                        var who = entry["role"]?.ToString() == "user" ? "User" : "Assistant";
+                        lines.Add($"{who}: {Truncate(text, MaxHistoryEntryChars)}");
+                    }
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                lines.Clear();
+            }
+        }
+        if (lines.Count == 0) return request;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("RECENT CONVERSATION (oldest first, context only):");
+        foreach (var line in lines.Skip(Math.Max(0, lines.Count - MaxHistoryMessages)))
+            sb.AppendLine(line);
+        sb.AppendLine();
+        sb.AppendLine("CURRENT REQUEST:");
+        sb.Append(request);
+        return sb.ToString();
+    }
+
+    private static string Truncate(string text, int maxChars) => text.Length > maxChars ? text[..maxChars] : text;
 
     private static readonly string[] AiIntentNames = { "create-variable", "clone-variable", "map-io", "create-flow", "create-structure" };
 

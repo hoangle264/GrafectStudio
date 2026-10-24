@@ -32,6 +32,8 @@ interface AiChatMessage {
   streamStatus?: string[];
   streamText?: string;
   streamDone?: boolean;
+  /** Assistant answer from the `reply` tool; part of the conversation the assistant remembers. */
+  chatReply?: boolean;
 }
 
 interface AiProjectSnapshot {
@@ -61,7 +63,10 @@ const AI_CHAT_STATE: {
   pendingRequestId: string | null;
   pendingStreamMessageId: string | null;
   pendingStreamFinalText: string;
+  /** Index in `messages` where the current conversation starts (set by "New conversation"). */
+  conversationStart: number;
 } = {
+  conversationStart: 0,
   messages: [],
   proposals: {},
   pendingRawText: '',
@@ -799,6 +804,37 @@ function aiChatBuildRequest(message: string, intent: string): GrafcetStudioAICon
   });
 }
 
+const AI_AGENT_HISTORY_MESSAGES = 8;
+const AI_AGENT_HISTORY_CHARS = 1500;
+
+function aiChatProposalHistoryLine(record: AiChatProposalRecord): string {
+  const proposal = record.proposal;
+  const state = record.undone ? 'applied, then undone' : proposal.status === 'applied' ? 'applied' : proposal.status === 'discarded' ? 'discarded' : 'not applied yet';
+  return '[Proposal ' + proposal.intent + ': ' + aiChatText(proposal.summary, '(no summary)') + ' - ' + state + ']';
+}
+
+/**
+ * The last few conversation entries for the assistant: user messages, its replies and one line per proposal.
+ * Status lines, permission cards and tool data are never included; data must be read again through the tools.
+ * The newest user message is the current request and is sent separately.
+ */
+function aiChatConversationHistory(): Array<{ role: 'user' | 'assistant'; text: string }> {
+  const entries: Array<{ role: 'user' | 'assistant'; text: string }> = [];
+  AI_CHAT_STATE.messages.slice(AI_CHAT_STATE.conversationStart).forEach(function(message) {
+    const record = message.proposalId ? AI_CHAT_STATE.proposals[message.proposalId] : null;
+    const text = record ? aiChatProposalHistoryLine(record) : message.role === 'user' || message.chatReply ? message.text : '';
+    if (text) entries.push({ role: message.role, text: text.slice(0, AI_AGENT_HISTORY_CHARS) });
+  });
+  if (entries.length && entries[entries.length - 1].role === 'user') entries.pop();
+  return entries.slice(-AI_AGENT_HISTORY_MESSAGES);
+}
+
+function aiChatNewConversation(): void {
+  toggleAiChatPanel(true);
+  AI_CHAT_STATE.conversationStart = AI_CHAT_STATE.messages.length;
+  aiChatAddMessage('assistant', 'New conversation. The assistant no longer remembers the messages above.');
+}
+
 const AI_ASSISTANT_INTENT = 'assistant';
 const AI_ROUTABLE_INTENTS = ['create-variable', 'clone-variable', 'map-io', 'create-flow', 'create-structure'];
 
@@ -823,9 +859,10 @@ function aiChatRoute(message: string): void {
   const host = aiAgentHost();
   if (host && AI_PERMISSION_STATE.liveAi !== false) {
     const sessionId = 'agt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-    const status = aiChatAddMessage('assistant', 'Assistant is working (only your message is sent until you allow more)...');
+    const history = aiChatConversationHistory();
+    const status = aiChatAddMessage('assistant', 'Assistant is working (only your message' + (history.length ? ' and the recent chat are' : ' is') + ' sent until you allow more)...');
     AI_AGENT_SESSIONS[sessionId] = { message, statusMessageId: status.id, startedAt: Date.now() };
-    host({ type: 'AI_AGENT_START', payload: { sessionId, message } });
+    host({ type: 'AI_AGENT_START', payload: { sessionId, message, history } });
     return;
   }
   aiChatRouteLocally(message, null, '');
@@ -911,7 +948,7 @@ const AI_AGENT_READ_TOOLS: Record<string, { scope: string; label: string }> = {
 function aiAgentRunTool(sessionId: string, callId: string, name: string, args: Record<string, unknown>, status: AiChatMessage | null): void {
   try {
     if (name === 'reply') {
-      aiChatAddMessage('assistant', aiChatText(args.text, '(empty reply)'));
+      aiChatAddMessage('assistant', aiChatText(args.text, '(empty reply)'), { chatReply: true });
       aiAgentSendResult(sessionId, callId, { done: true });
       return;
     }

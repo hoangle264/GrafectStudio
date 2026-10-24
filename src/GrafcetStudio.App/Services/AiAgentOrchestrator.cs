@@ -44,7 +44,7 @@ public class AiAgentOrchestrator
         var client = new GeminiAgentClient(HttpClient, key!, model);
         var systemPrompt = AiAgentPrompt.BuildSystemPrompt();
         var tools = AiAgentPrompt.BuildTools();
-        var message = payload.Message.Length > AiAgentPrompt.MaxMessageChars ? payload.Message[..AiAgentPrompt.MaxMessageChars] : payload.Message;
+        var message = AiAgentPrompt.BuildUserMessage(payload.Message, payload.HistoryJson);
         var turn = 0;
 
         try
