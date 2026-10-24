@@ -47,6 +47,13 @@ public static class AiAgentPrompt
         sb.AppendLine("- alternative branches whose conditions are identical or can be true at the same time (an EMPTY transition condition is valid: it means true or an implicit wait for the previous step to complete, so never report it as a problem);");
         sb.AppendLine("- actions or conditions that use variables that do not exist;");
         sb.AppendLine("- connections that reference missing steps/transitions.");
+        sb.AppendLine();
+        sb.AppendLine("### GRAFCETSTUDIO SEMANTICS (use them when reviewing)");
+        sb.AppendLine("- Each step action may carry `complete` {sensor, sensorLabel, address}: the sensor that confirms the action finished. The step is considered done when all its actions' completion sensors are active, so an EMPTY transition condition normally means \"go on when the step is complete\". Do NOT claim there is no feedback/interlock for an action that has a `complete` sensor.");
+        sb.AppendLine("- Report missing feedback only for an action with qualifier N/S/P/L etc. that has no `complete` sensor, no TimeMs and whose next transition condition is empty. Name the step and the action.");
+        sb.AppendLine("- Flows run as a cycle: the last step returns to the initial step. Do not ask for a transition back unless the user's request is about changing that.");
+        sb.AppendLine("- Mention only names, steps and variables that appear in tool results. Never speculate about sensors, safety logic or system variables you were not shown; if something would be needed, say \"not visible in the data\" instead of asserting it is missing.");
+        sb.AppendLine("- Keep the review short: findings first (step numbers, action names), most severe first, then at most three suggestions.");
         sb.AppendLine("If nothing is wrong, say so. Do not propose changes unless the user asks; reviews are read-only.");
         return sb.ToString();
     }
