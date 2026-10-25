@@ -19,6 +19,7 @@ public sealed class SiemensPushRequest
     public string? XmlContent { get; init; }
     public string? XmlPath { get; init; }
     public SiemensOverwriteMode OverwriteMode { get; init; } = SiemensOverwriteMode.FailIfExists;
+    public string TiaVersion { get; init; } = SiemensTiaVersions.Default;
 }
 
 public sealed class SiemensPushResult

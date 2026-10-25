@@ -1,50 +1,70 @@
-# GrafcetStudio — Thư Thư Viện Tài Liệu Kỹ Thuật (Technical Docs)
+# GrafcetStudio
 
-Thư mục `docs/` chứa các tài liệu kỹ thuật chi tiết, hướng dẫn tích hợp và đặc tả kiến trúc cho dự án **GrafcetStudio**.
+Ứng dụng desktop vẽ sơ đồ **GRAFCET / SFC** (IEC 60848) và sinh code cho PLC và Robot, có trợ lý AI đề xuất.
 
----
+## Tính năng chính
+- Vẽ sơ đồ trên canvas SVG: Step, Transition, nhánh song song (AND-split/join), Macro Step, action qualifier (N, S, R, P, L, D...).
+- Quản lý project: Unit, Diagram, Struct Data, biến toàn cục, IO Mapping, PLC Block (DB/UDT).
+- Import CSV/Excel: Unit Station, Struct Data, Physical IO.
+- Sinh code (chạy ở C#):
+  - **Keyence**: file mnemonic `.mnm` (Units, Error, System, Orchestrator, Devices), dùng template Handlebars.
+  - **Siemens LAD**: XML SimaticML cho FC, từ template `.hbs` dạng text.
+  - **Siemens DB/UDT**: XML cho UDT, DB (shared flow struct và block).
+  - **ABB RAPID**: AI sinh snippet, qua linter, ghép vào skeleton thành `.mod`. Bắt buộc có AI thật.
+- Đẩy XML vào TIA Portal qua Openness bridge (V19). Luôn có đường import thủ công.
+- Trợ lý AI (Gemini): đề xuất biến, struct, IO mapping, flow. Luôn xem trước rồi mới Apply.
 
-## 🗂️ Danh Mục Tài Liệu Theo Chủ Đề
+## Kiến trúc
+```text
+WPF Window (WebView2)
+ ├─ Web UI (HTML + TypeScript → JS, classic script)   src/web
+ └─ C# Core (Prism + DryIoc)                          src/GrafcetStudio.App
+      ├─ Generators, Template (Handlebars), AI, File I/O
+      └─ SimaticML (XML Siemens) + TiaBridge.V19 (.NET 4.8)
+```
+- Hai bên giao tiếp bằng `chrome.webview.postMessage` (web → C#) và `ExecuteScriptAsync` (C# → web).
+- Chi tiết xem [ARCHITECTURE.md](ARCHITECTURE.md).
 
-### 1. Siemens TIA Portal & SimaticML Integration
-Các tài liệu hướng dẫn sinh mã Ladder Logic (LAD) và tích hợp với phần mềm Siemens TIA Portal:
+## Cấu trúc thư mục
+```text
+src/
+  GrafcetStudio.App/             WPF host, generators, AI, services
+  GrafcetStudio.App.Tests/       xUnit tests
+  GrafcetStudio.TiaBridge.V19/   bridge .NET 4.8 gọi TIA Openness
+  GrafcetStudio.TiaBridge.Contracts/  model dùng chung với bridge
+  SimaticML/                     thư viện dựng XML Siemens
+  web/                           ts/ (nguồn), js/ (biên dịch), css/, index.html
+templates/   template .hbs (Keyence, siemens-lad, devices)
+assets/      RAG và skeleton cho ABB RAPID
+docs/        tài liệu kỹ thuật
+tests/       báo cáo kiểm thử
+```
 
-- 📘 [SIEMENS_LAD_DSL_REFERENCE.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/SIEMENS_LAD_DSL_REFERENCE.md)  
-  *Đặc tả cú pháp Siemens LAD JSON DSL, cấu trúc template `.lad.json` và bảng tra cứu các block/networks.*
-- ⚙️ [SIEMENS_TIA_OPENNESS_SETUP.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/SIEMENS_TIA_OPENNESS_SETUP.md)  
-  *Hướng dẫn cấu hình môi trường TIA Portal Openness API, cấp quyền Windows User Group và biến môi trường bridge.*
-- 📥 [SIEMENS_TIA_OPENNESS_IMPORT.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/SIEMENS_TIA_OPENNESS_IMPORT.md)  
-  *Quy trình xuất SimaticML XML từ GrafcetStudio và import/compile trực tiếp vào TIA Portal project.*
-- 🚀 [SIEMENS_TIA_V19_QUICK_SETUP.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/SIEMENS_TIA_V19_QUICK_SETUP.md)  
-  *Hướng dẫn thiết lập nhanh cho phiên bản Siemens TIA Portal V19.*
-- ✅ [SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/SIEMENS_TIA_LAD_MANUAL_TEST_CHECKLIST.md)  
-  *Danh sách kiểm thử thủ công (Checklist) cho tính năng sinh mã Siemens LAD.*
+## Yêu cầu và cách chạy
+- Windows 10/11, **.NET 8 SDK**, Node.js 18+.
+- TIA Portal V16–V19 (tùy chọn, chỉ cần khi dùng Push to TIA).
 
----
+```powershell
+npm install
+npm run typecheck
+npm run build          # biên dịch ts -> src/web/js
+dotnet build GrafectStudio.sln
+dotnet test
+dotnet run --project src/GrafcetStudio.App/GrafcetStudio.App.csproj
+```
 
-### 2. AI Service Integration (Gemini & Claude)
-- 🤖 [Plan_AI.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/Plan_AI.md)  
-  *Kế hoạch & đặc tả tích hợp AI API Client: Bảo mật API Key, Sanitization layer, Context Builder, proposal dry-run và streaming response.*
+## Cấu hình AI (biến môi trường)
+- `GRAFCETSTUDIO_AI_MODE=gemini`
+- `GEMINI_API_KEY` (hoặc `GRAFCETSTUDIO_GEMINI_API_KEY`)
+- `GRAFCETSTUDIO_GEMINI_MODEL` (tùy chọn)
 
----
+Không có cấu hình này, app dùng mock AI; riêng ABB RAPID sẽ báo lỗi chứ không sinh code.
 
-### 3. Kiến Trúc & Phát Triển Frontend (Web & TypeScript)
-- 📐 [P10-architecture-review.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/P10-architecture-review.md)  
-  *Báo cáo đánh giá kiến trúc `src/web`, phân tích độ phụ thuộc module, kích thước file và định hướng refactor.*
-- 💻 [src/web/instruction.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/src/web/instruction.md)  
-  *Cẩm nang lập trình viên Frontend: Mô hình dữ liệu `project`, quy tắc Sync Variable Table, CSV import pipeline và Handlebars context rendering.*
-
----
-
-### 4. Báo Cáo Kiểm Thử & Tri Thức RAG
-- 🧪 [tests/robot_stability_results.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/tests/robot_stability_results.md)  
-  *Báo cáo kết quả kiểm thử độ ổn định (Stability Test) cho bộ sinh mã ABB RAPID Robot.*
-- 📦 [assets/rag/abb/](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/assets/rag/abb/)  
-  *Thư mục chứa tri thức RAG (Patterns & Rules) hỗ trợ AI sinh lập trình Robot ABB.*
-
----
-
-## 🔗 Liên Kết Nhanh
-- 🏠 Quay lại trang chính: [README.md (Project Root)](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/README.md)
-- 🏛️ Xem kiến trúc tổng quan: [ARCHITECTURE.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/ARCHITECTURE.md)
-- 📋 Danh sách Nợ Kỹ Thuật: [TECH_DEBT.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/TECH_DEBT.md)
+## Tài liệu
+| Tài liệu | Nội dung |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Kiến trúc, bridge, AI |
+| [TECH_DEBT.md](TECH_DEBT.md) | Nợ kỹ thuật |
+| [plan.md](plan.md) | Kế hoạch chuyển JS sang TypeScript |
+| [docs/README.md](docs/README.md) | Thư viện tài liệu kỹ thuật |
+| [src/web/instruction.md](src/web/instruction.md) | Hướng dẫn phát triển phần web |

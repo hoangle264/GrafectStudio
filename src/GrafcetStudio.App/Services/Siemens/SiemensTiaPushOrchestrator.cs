@@ -50,7 +50,9 @@ public sealed class SiemensTiaPushOrchestrator
     {
         try
         {
-            var codegenOutput = GenerateSiemensXml(payload);
+            var tiaVersion = SiemensTiaVersions.Normalize(string.IsNullOrWhiteSpace(payload.TiaVersion) ? SiemensTiaVersions.Default : payload.TiaVersion)
+                ?? throw new InvalidOperationException($"TIA version '{payload.TiaVersion}' is not supported. Supported versions: {string.Join(", ", SiemensTiaVersions.Supported)}.");
+            var codegenOutput = GenerateSiemensXml(payload, tiaVersion);
             var xmlFile = SelectXmlFile(codegenOutput, payload.Platform)
                 ?? throw new InvalidOperationException(BuildMissingXmlMessage(payload.Platform));
 
@@ -62,10 +64,11 @@ public sealed class SiemensTiaPushOrchestrator
                 TargetFolderPath = string.IsNullOrWhiteSpace(payload.TargetFolderPath) ? "Program blocks" : payload.TargetFolderPath,
                 BlockName = ExtractBlockName(xmlFile),
                 XmlContent = xmlFile.Content,
-                OverwriteMode = ParseOverwriteMode(payload.OverwriteMode)
+                OverwriteMode = ParseOverwriteMode(payload.OverwriteMode),
+                TiaVersion = tiaVersion
             };
 
-            await config.SaveSiemensTiaConfigAsync(request.ProjectPath, request.DeviceName, request.PlcName, request.TargetFolderPath, request.OverwriteMode.ToString());
+            await config.SaveSiemensTiaConfigAsync(request.ProjectPath, request.DeviceName, request.PlcName, request.TargetFolderPath, request.OverwriteMode.ToString(), request.TiaVersion);
             var result = await tiaProjectService.PushBlockXmlAsync(request);
             await bridge.SendSiemensTiaPushResultAsync(new { kind = "result", result = ToBridgeResult(result, xmlFile.Path) });
             return result;
@@ -78,7 +81,7 @@ public sealed class SiemensTiaPushOrchestrator
         }
     }
 
-    private CodegenOutput GenerateSiemensXml(PushSiemensLadPayload message)
+    private CodegenOutput GenerateSiemensXml(PushSiemensLadPayload message, string tiaVersion)
     {
         var payload = JsonSerializer.Deserialize<CodegenPayload>(message.RawJson, PayloadJsonOptions)
             ?? throw new InvalidOperationException("Invalid Siemens codegen payload.");
@@ -106,6 +109,8 @@ public sealed class SiemensTiaPushOrchestrator
         }
 
         payload.EnrichVariables();
+        // The push target decides the SimaticML version; it overrides TIA_VERSION in the template.
+        payload.TiaVersion = SiemensTiaVersions.ToNumber(tiaVersion);
         var platform = string.IsNullOrWhiteSpace(message.Platform) ? "siemens-lad" : message.Platform;
         if (!string.Equals(platform, "siemens-lad", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(platform, "siemens-db", StringComparison.OrdinalIgnoreCase))

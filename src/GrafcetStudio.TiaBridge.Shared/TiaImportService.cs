@@ -9,9 +9,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace GrafcetStudio.TiaBridge.V19;
+namespace GrafcetStudio.TiaBridge;
 
-internal sealed class TiaV19ImportService
+internal sealed class TiaImportService
 {
     public TiaBridgeResponse Import(TiaBridgeRequest request)
     {
@@ -26,7 +26,7 @@ internal sealed class TiaV19ImportService
             if (tiaPortal is null)
             {
                 return Failure(TiaBridgeStatus.TiaNotInstalled,
-                    "Could not attach to or open a TIA Portal V19 process. Ensure TIA Portal is installed, licensed, and Openness access is allowed for this Windows user.");
+                    $"Could not attach to or open a TIA Portal {BridgeVersion.TiaVersion} process. Ensure TIA Portal is installed, licensed, and Openness access is allowed for this Windows user.");
             }
 
             using (tiaPortal)
@@ -60,7 +60,7 @@ internal sealed class TiaV19ImportService
                 }
 
                 ImportBlock(blockFolder, request.XmlPath, request.OverwriteMode, request.BlockName);
-                return Success($"Imported Siemens block XML '{request.BlockName}' into '{request.TargetFolderPath}'.", request.XmlPath, request.TiaVersion);
+                return Success($"Imported Siemens block XML '{request.BlockName}' into '{request.TargetFolderPath}'.", request.XmlPath);
             }
         }
         catch (EngineeringSecurityException error)
@@ -75,7 +75,7 @@ internal sealed class TiaV19ImportService
                 "TIA Openness or XML file access was denied. Check Windows permissions and TIA Openness user-group membership.",
                 error.Message);
         }
-        catch (FileNotFoundException error)
+        catch (FileNotFoundException error) when (!Program.IsOpennessAssemblyLoadFailure(error))
         {
             return Failure(TiaBridgeStatus.XmlNotFound,
                 "XML file was not found.",
@@ -286,14 +286,14 @@ internal sealed class TiaV19ImportService
             && !string.IsNullOrWhiteSpace(expected)
             && string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
 
-    private static TiaBridgeResponse Success(string message, string importedPath, string? tiaVersion)
+    private static TiaBridgeResponse Success(string message, string importedPath)
         => new()
         {
             Success = true,
             Status = TiaBridgeStatus.Success,
             Message = message,
             ImportedPath = importedPath,
-            TiaVersion = string.IsNullOrWhiteSpace(tiaVersion) ? "V19" : tiaVersion
+            TiaVersion = BridgeVersion.TiaVersion
         };
 
     private static TiaBridgeResponse Failure(TiaBridgeStatus status, string message, string? details = null)
@@ -303,7 +303,7 @@ internal sealed class TiaV19ImportService
             Status = status,
             Message = message,
             Details = details,
-            TiaVersion = "V19"
+            TiaVersion = BridgeVersion.TiaVersion
         };
 
     private static string FlattenException(Exception error)
@@ -322,6 +322,6 @@ internal sealed class TiaV19ImportService
 
     private static void WriteDebug(string message)
     {
-        Console.Error.WriteLine("[TiaBridge.V19] " + message);
+        Console.Error.WriteLine($"[TiaBridge.{BridgeVersion.TiaVersion}] " + message);
     }
 }

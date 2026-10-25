@@ -1,0 +1,59 @@
+<Project>
+  <!--
+    Shared build logic for every GrafcetStudio.TiaBridge.V{n} project.
+    A version project only sets <TiaVersion>V{n}</TiaVersion> and imports this file.
+    Siemens.Engineering.dll is referenced with Private=false and resolved at runtime
+    from the TIA Portal install; it is never copied next to the bridge exe.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>GrafcetStudio.TiaBridge.$(TiaVersion)</AssemblyName>
+    <RootNamespace>GrafcetStudio.TiaBridge</RootNamespace>
+    <DefineConstants>$(DefineConstants);TIA_$(TiaVersion)</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Openness folder lookup: GRAFCETSTUDIO_TIA_OPENNESS_DIR_V{n} -> default install -> GRAFCETSTUDIO_TIA_OPENNESS_DIR (only if it names this version). -->
+  <PropertyGroup>
+    <_TiaOpennessDirVersioned>$([System.Environment]::GetEnvironmentVariable('GRAFCETSTUDIO_TIA_OPENNESS_DIR_$(TiaVersion)'))</_TiaOpennessDirVersioned>
+    <_TiaOpennessDirDefault>C:\Program Files\Siemens\Automation\Portal $(TiaVersion)\PublicAPI\$(TiaVersion)</_TiaOpennessDirDefault>
+    <_TiaOpennessDirGeneric>$(GRAFCETSTUDIO_TIA_OPENNESS_DIR)</_TiaOpennessDirGeneric>
+    <TiaOpennessDir Condition="'$(TiaOpennessDir)' == '' and '$(_TiaOpennessDirVersioned)' != '' and Exists('$(_TiaOpennessDirVersioned)\Siemens.Engineering.dll')">$(_TiaOpennessDirVersioned)</TiaOpennessDir>
+    <TiaOpennessDir Condition="'$(TiaOpennessDir)' == '' and Exists('$(_TiaOpennessDirDefault)\Siemens.Engineering.dll')">$(_TiaOpennessDirDefault)</TiaOpennessDir>
+    <TiaOpennessDir Condition="'$(TiaOpennessDir)' == '' and '$(_TiaOpennessDirGeneric)' != '' and $(_TiaOpennessDirGeneric.Contains('$(TiaVersion)')) and Exists('$(_TiaOpennessDirGeneric)\Siemens.Engineering.dll')">$(_TiaOpennessDirGeneric)</TiaOpennessDir>
+    <DefineConstants Condition="'$(TiaOpennessDir)' == ''">$(DefineConstants);TIA_OPENNESS_MISSING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\GrafcetStudio.TiaBridge.Contracts\GrafcetStudio.TiaBridge.Contracts.csproj" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <Compile Include="$(MSBuildThisFileDirectory)Program.cs" Link="Shared\Program.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TiaImportService.cs" Link="Shared\TiaImportService.cs" Condition="'$(TiaOpennessDir)' != ''" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TiaOpennessDir)' != ''">
+    <Reference Include="Siemens.Engineering">
+      <HintPath>$(TiaOpennessDir)\Siemens.Engineering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="WarnTiaOpennessMissing" BeforeTargets="CoreCompile" Condition="'$(TiaOpennessDir)' == ''">
+    <Warning Text="TIA Openness $(TiaVersion) (Siemens.Engineering.dll) was not found. Building a stub $(AssemblyName).exe that reports TiaNotInstalled. Install TIA Portal $(TiaVersion) Openness or set GRAFCETSTUDIO_TIA_OPENNESS_DIR_$(TiaVersion)." />
+  </Target>
+
+  <Target Name="GenerateTiaBridgeVersion" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_TiaBridgeVersionFile>$(IntermediateOutputPath)BridgeVersion.g.cs</_TiaBridgeVersionFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_TiaBridgeVersionFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="// &lt;auto-generated /&gt; from TiaVersion in TiaBridge.Shared.targets;namespace GrafcetStudio.TiaBridge%3B;internal static class BridgeVersion;{;    public const string TiaVersion = &quot;$(TiaVersion)&quot;%3B;}" />
+    <ItemGroup>
+      <Compile Include="$(_TiaBridgeVersionFile)" />
+      <FileWrites Include="$(_TiaBridgeVersionFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -2,15 +2,15 @@
 {{#each Commands~}}
 ;{{CommandId}}
 {{#each FlowCommands~}}
-{{#if IsFirst~}}
+{{#if IsFirst}}
 LD   {{SourceDoneBit}}
-{{else~}}
+{{else}}
 AND   {{SourceDoneBit}}
-{{/if~}}
-{{/each~}}
+{{/if}}
+{{/each}}
 {{#if (eq CommandId "CoilA")~}}
 SET  {{../SignalAddresses.bControl}}    ;coil A
 {{else~}}
 RES  {{../SignalAddresses.bControl}}    ;coil B
-{{/if~}}
-{{/each~}}
+{{/if}}
+{{/each}}

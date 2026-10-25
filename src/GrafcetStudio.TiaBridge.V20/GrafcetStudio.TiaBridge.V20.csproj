@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TiaVersion>V20</TiaVersion>
+  </PropertyGroup>
+  <Import Project="..\GrafcetStudio.TiaBridge.Shared\TiaBridge.Shared.targets" />
+</Project>

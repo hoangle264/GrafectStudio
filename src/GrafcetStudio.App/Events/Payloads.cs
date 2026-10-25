@@ -111,4 +111,5 @@ public class PushSiemensLadPayload
     public string PlcName { get; set; } = string.Empty;
     public string TargetFolderPath { get; set; } = string.Empty;
     public string OverwriteMode { get; set; } = string.Empty;
+    public string TiaVersion { get; set; } = string.Empty;
 }

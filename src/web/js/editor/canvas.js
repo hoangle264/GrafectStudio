@@ -119,6 +119,16 @@ function renderEl() {
   state.transitions.forEach(t=>layer.appendChild(buildTransEl(t)));
 }
 
+// Resolved {execAddress, doneAddress} for a step (manual override or auto from flow config); null if unresolvable
+function getStepAddresses(s) {
+  try {
+    const api=window.GrafcetStudio && window.GrafcetStudio.codegenPayload;
+    const diagram=(project.diagrams||[]).find(d=>d.id===activeDiagramId);
+    if(!api || !diagram) return null;
+    return api.resolveStepAddress(s, diagram);
+  } catch(e) { return null; }
+}
+
 function buildStepEl(s) {
   const g=svgE('g'); g.setAttribute('class','gf-step'); g.id='el-'+s.id;
   g.dataset.id=s.id; g.dataset.type='step';
@@ -157,12 +167,22 @@ function buildStepEl(s) {
     g.appendChild(tag);
   }
 
-  // Label area (right of divider)
+  // Label (right of divider); shares the box with the active address when both exist
+  const curDiagram=(project.diagrams||[]).find(d=>d.id===activeDiagramId);
+  const addr=curDiagram && curDiagram.hideStepAddress ? null : getStepAddresses(s);
   if(s.label){
     const lbl=svgE('text'); lbl.setAttribute('class','s-lbl');
-    lbl.setAttribute('x',s.x+numW+6); lbl.setAttribute('y',s.y+SH/2+4);
+    lbl.setAttribute('x',s.x+numW+6); lbl.setAttribute('y',addr?s.y+20:s.y+SH/2+4);
     lbl.textContent=s.label.length>13?s.label.slice(0,12)+'…':s.label;
     g.appendChild(lbl);
+  }
+
+  // Active-step (exec) address inside the step
+  if(addr){
+    const at=svgE('text'); at.setAttribute('class','s-addr'+(s.addressManual?' manual':''));
+    at.setAttribute('x',s.x+numW+6); at.setAttribute('y',s.label?s.y+SH-10:s.y+SH/2+3);
+    at.textContent=addr.execAddress;
+    g.appendChild(at);
   }
 
   buildStepActionBox(g, s);

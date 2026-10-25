@@ -116,6 +116,8 @@ namespace GrafcetStudioProject {
     actions?: StepAction[];
     execAddress?: string | null;
     doneAddress?: string | null;
+    // true => execAddress/doneAddress are typed by hand; otherwise derived from the flow address config
+    addressManual?: boolean;
     // canvas-only, not serialized to C#
     x?: number;
     y?: number;
@@ -244,6 +246,7 @@ namespace GrafcetStudioProject {
     addressMode?: AddressMode;
     boolAddressMode?: BoolAddressMode;
     baseMr?: string | null;
+    hideStepAddress?: boolean;   // true => canvas hides the address inside steps
     activeWord?: string;
     completeWord?: string;
     activeWordTag?: string;
@@ -276,6 +279,8 @@ namespace GrafcetStudioProject {
     deviceTypes: DeviceType[];
     deviceLibraryPath: string;
     templateProfile: string;
+    /** Siemens only: SimaticML version (19, 20). Omitted = template TIA_VERSION. */
+    tiaVersion?: number;
     sharedFlowStruct?: SharedFlowStructSchema;
     ioMapping?: IOMapping;
     unitConfig?: Record<string, UnitConfig>;

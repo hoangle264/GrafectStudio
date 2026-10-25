@@ -14,11 +14,11 @@ namespace GrafcetStudio.App.Services.Siemens;
 public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
 {
     public const string ImportModeEnvironmentVariable = "GRAFCETSTUDIO_TIA_IMPORT_MODE";
+    /// <summary>Exe path, or a folder holding GrafcetStudio.TiaBridge.V{n}.exe. A versioned variant (…_PATH_V20) wins over it.</summary>
     public const string BridgePathEnvironmentVariable = "GRAFCETSTUDIO_TIA_BRIDGE_PATH";
-    public const string DefaultBridgeExecutableName = "GrafcetStudio.TiaBridge.V19.exe";
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(90);
 
-    private readonly Func<string?> bridgePathProvider;
+    private readonly Func<string, string?> bridgePathProvider;
     private readonly TimeSpan timeout;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -29,11 +29,17 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
     };
 
     public BridgeSiemensTiaProjectService()
-        : this(() => ResolveDefaultBridgePath())
+        : this(tiaVersion => ResolveDefaultBridgePath(tiaVersion))
     {
     }
 
     public BridgeSiemensTiaProjectService(Func<string?> bridgePathProvider, TimeSpan? timeout = null)
+        : this(_ => bridgePathProvider(), timeout)
+    {
+    }
+
+    /// <param name="bridgePathProvider">Receives the canonical TIA version ("V19", "V20") and returns the bridge exe path.</param>
+    public BridgeSiemensTiaProjectService(Func<string, string?> bridgePathProvider, TimeSpan? timeout = null)
     {
         this.bridgePathProvider = bridgePathProvider;
         this.timeout = timeout ?? DefaultTimeout;
@@ -63,7 +69,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
 
             var bridgeRequest = new TiaBridgeRequest
             {
-                TiaVersion = "V19",
+                TiaVersion = SiemensTiaVersions.NormalizeOrDefault(request.TiaVersion),
                 ProjectPath = request.ProjectPath,
                 DeviceName = request.DeviceName!,
                 PlcName = request.PlcName!,
@@ -118,7 +124,7 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         {
             return SiemensPushResult.Failure(
                 SiemensTiaProjectServiceStatus.BridgeNotFound,
-                $"TIA bridge executable was not found or could not be started at '{bridgePath}'. Set {BridgePathEnvironmentVariable} to a valid {DefaultBridgeExecutableName} path. Details: {error.Message}",
+                $"TIA bridge executable was not found or could not be started at '{bridgePath}'. Set {BridgePathEnvironmentVariable} to a valid {SiemensTiaVersions.BridgeExecutableName(request.TiaVersion)} path. Details: {error.Message}",
                 request);
         }
 
@@ -231,12 +237,14 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
 
     private BridgePathResolution ResolveBridgePath(SiemensPushRequest request)
     {
-        var configured = bridgePathProvider()?.Trim().Trim('"');
+        var tiaVersion = SiemensTiaVersions.NormalizeOrDefault(request.TiaVersion);
+        var executableName = SiemensTiaVersions.BridgeExecutableName(tiaVersion);
+        var configured = bridgePathProvider(tiaVersion)?.Trim().Trim('"');
         if (string.IsNullOrWhiteSpace(configured))
         {
             return new BridgePathResolution(null, SiemensPushResult.Failure(
                 SiemensTiaProjectServiceStatus.BridgeNotFound,
-                $"TIA bridge is not configured. Set {BridgePathEnvironmentVariable} or place {DefaultBridgeExecutableName} next to the app. The Siemens XML was generated successfully and can still be imported manually in TIA Portal.",
+                $"TIA Portal {tiaVersion} bridge is not configured. Set {BridgePathEnvironmentVariable} or place {executableName} next to the app. The Siemens XML was generated successfully and can still be imported manually in TIA Portal.",
                 request));
         }
 
@@ -245,29 +253,44 @@ public sealed class BridgeSiemensTiaProjectService : ISiemensTiaProjectService
         {
             return new BridgePathResolution(null, SiemensPushResult.Failure(
                 SiemensTiaProjectServiceStatus.BridgeNotFound,
-                $"TIA bridge executable was not found at '{fullPath}'. Set {BridgePathEnvironmentVariable} to a valid {DefaultBridgeExecutableName} path. The Siemens XML was generated successfully and remains available for manual TIA import.",
+                $"TIA Portal {tiaVersion} bridge executable was not found at '{fullPath}'. Set {BridgePathEnvironmentVariable} to a valid {executableName} path. The Siemens XML was generated successfully and remains available for manual TIA import.",
                 request));
         }
 
         return new BridgePathResolution(fullPath, null);
     }
 
-    private static string? ResolveDefaultBridgePath()
+    public static string ResolveDefaultBridgePath(string tiaVersion)
+        => ResolveDefaultBridgePath(tiaVersion, AppContext.BaseDirectory, Environment.GetEnvironmentVariable);
+
+    /// <summary>Lookup order: env var (versioned, then generic) -> next to the app -> tia-bridge/ -> repo build output.</summary>
+    public static string ResolveDefaultBridgePath(string tiaVersion, string baseDirectory, Func<string, string?> getEnvironmentVariable)
     {
-        var envPath = Environment.GetEnvironmentVariable(BridgePathEnvironmentVariable)?.Trim();
-        if (!string.IsNullOrWhiteSpace(envPath))
+        tiaVersion = SiemensTiaVersions.NormalizeOrDefault(tiaVersion);
+        var executableName = SiemensTiaVersions.BridgeExecutableName(tiaVersion);
+
+        foreach (var variable in new[] { BridgePathEnvironmentVariable + "_" + tiaVersion, BridgePathEnvironmentVariable })
         {
-            return envPath;
+            var envPath = getEnvironmentVariable(variable)?.Trim().Trim('"');
+            if (!string.IsNullOrWhiteSpace(envPath))
+            {
+                return Directory.Exists(envPath) ? Path.Combine(envPath, executableName) : envPath;
+            }
         }
 
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidate = Path.Combine(baseDirectory, DefaultBridgeExecutableName);
+        var candidate = Path.Combine(baseDirectory, executableName);
         if (File.Exists(candidate))
         {
             return candidate;
         }
 
-        var repoCandidate = Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "..", "GrafcetStudio.TiaBridge.V19", "bin", "Debug", "net48", DefaultBridgeExecutableName));
+        var shippedCandidate = Path.Combine(baseDirectory, "tia-bridge", executableName);
+        if (File.Exists(shippedCandidate))
+        {
+            return shippedCandidate;
+        }
+
+        var repoCandidate = Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "..", "GrafcetStudio.TiaBridge." + tiaVersion, "bin", "Debug", "net48", executableName));
         return File.Exists(repoCandidate) ? repoCandidate : candidate;
     }
 

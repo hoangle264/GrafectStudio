@@ -23,18 +23,32 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
     }
 
+    /// <summary>Prefers the folder shipped next to the exe (publish output), then the repo layout used in development.</summary>
+    private static string? ResolveContentFolder(string name)
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var shipped = Path.Combine(baseDir, name);
+        if (Directory.Exists(shipped)) return shipped;
+        var devPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", name));
+        return Directory.Exists(devPath) ? devPath : null;
+    }
+
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        var userDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "GrafcetStudio", "WebView2");
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        // A "portable.flag" file next to the exe keeps all WebView2 state inside the app folder.
+        var userDataFolder = File.Exists(Path.Combine(baseDir, "portable.flag"))
+            ? Path.Combine(baseDir, "data", "WebView2")
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "GrafcetStudio", "WebView2");
         var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
         await webView.EnsureCoreWebView2Async(environment);
         var bridge = ((App)System.Windows.Application.Current).Container.Resolve<IWebViewBridgeService>();
         bridge.Init(webView);
 
         webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
-        var webPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web"));
+        var webPath = ResolveContentFolder("web");
         if (webPath == null)
         {
             var tried = string.Join(Environment.NewLine, Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "web")));
@@ -43,8 +57,8 @@ public partial class MainWindow : Window
         }
         webView.CoreWebView2.SetVirtualHostNameToFolderMapping("grafcet.local", webPath, CoreWebView2HostResourceAccessKind.Allow);
 
-        var templatesPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "templates"));
-        if (Directory.Exists(templatesPath))
+        var templatesPath = ResolveContentFolder("templates");
+        if (templatesPath != null)
         {
             webView.CoreWebView2.SetVirtualHostNameToFolderMapping("templates.grafcet.local", templatesPath, CoreWebView2HostResourceAccessKind.Allow);
         }
@@ -70,7 +84,8 @@ public partial class MainWindow : Window
                     deviceName = config.SiemensTia.DeviceName,
                     plcName = config.SiemensTia.PlcName,
                     targetFolderPath = config.SiemensTia.TargetFolderPath,
-                    overwriteMode = config.SiemensTia.OverwriteMode
+                    overwriteMode = config.SiemensTia.OverwriteMode,
+                    tiaVersion = config.SiemensTia.TiaVersion
                 }
             });
             if (!string.IsNullOrWhiteSpace(config.DeviceLibraryPath) && File.Exists(config.DeviceLibraryPath))
@@ -306,7 +321,8 @@ public partial class MainWindow : Window
                         DeviceName = GetOptionalString(payload, "deviceName"),
                         PlcName = GetOptionalString(payload, "plcName"),
                         TargetFolderPath = GetOptionalString(payload, "targetFolderPath"),
-                        OverwriteMode = GetOptionalString(payload, "overwriteMode")
+                        OverwriteMode = GetOptionalString(payload, "overwriteMode"),
+                        TiaVersion = GetOptionalString(payload, "tiaVersion")
                     };
                     _eventAggregator.GetEvent<PushSiemensLadRequestedEvent>().Publish(message);
                     break;

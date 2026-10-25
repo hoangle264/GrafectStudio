@@ -1,16 +1,18 @@
 using GrafcetStudio.TiaBridge.Contracts;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace GrafcetStudio.TiaBridge.V19;
+namespace GrafcetStudio.TiaBridge;
 
 internal static class Program
 {
     private const string OpennessDirectoryEnvironmentVariable = "GRAFCETSTUDIO_TIA_OPENNESS_DIR";
-    private const string EngineeringAssemblyName = "Siemens.Engineering.dll";
+    private const string EngineeringAssemblyPrefix = "Siemens.Engineering";
     private const int SuccessExitCode = 0;
     private const int InvalidRequestExitCode = 1;
     private const int TiaUnavailableExitCode = 2;
@@ -25,8 +27,13 @@ internal static class Program
         Converters = { new JsonStringEnumConverter() }
     };
 
+    private static string VersionedOpennessDirectoryEnvironmentVariable => OpennessDirectoryEnvironmentVariable + "_" + BridgeVersion.TiaVersion;
+
     private static int Main(string[] args)
     {
+        // Must run before any Siemens.Engineering type is touched, so Openness is loaded from the TIA install.
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveEngineeringAssembly;
+
         try
         {
             var requestPath = TryGetRequestPath(args);
@@ -37,7 +44,7 @@ internal static class Program
                     Success = false,
                     Status = TiaBridgeStatus.InvalidRequest,
                     Message = "Missing required '--request <path>' argument.",
-                    TiaVersion = "V19",
+                    TiaVersion = BridgeVersion.TiaVersion,
                     ExitCode = InvalidRequestExitCode
                 }, InvalidRequestExitCode);
             }
@@ -50,7 +57,7 @@ internal static class Program
                     Status = TiaBridgeStatus.InvalidRequest,
                     Message = "Request JSON file was not found.",
                     Details = requestPath,
-                    TiaVersion = "V19",
+                    TiaVersion = BridgeVersion.TiaVersion,
                     ExitCode = InvalidRequestExitCode
                 }, InvalidRequestExitCode);
             }
@@ -69,7 +76,7 @@ internal static class Program
                     Status = TiaBridgeStatus.InvalidRequest,
                     Message = "Request JSON is invalid.",
                     Details = error.Message,
-                    TiaVersion = "V19",
+                    TiaVersion = BridgeVersion.TiaVersion,
                     ExitCode = InvalidRequestExitCode
                 }, InvalidRequestExitCode);
             }
@@ -80,9 +87,36 @@ internal static class Program
                 return WriteResponse(validation.Response, validation.ExitCode);
             }
 
-            var service = new TiaV19ImportService();
-            var response = service.Import(request!);
+#if TIA_OPENNESS_MISSING
+            return WriteResponse(new TiaBridgeResponse
+            {
+                Success = false,
+                Status = TiaBridgeStatus.TiaNotInstalled,
+                Message = $"This bridge was built without TIA Portal {BridgeVersion.TiaVersion} Openness (Siemens.Engineering.dll was not found at build time). Rebuild GrafcetStudio.TiaBridge.{BridgeVersion.TiaVersion} on a machine with TIA Portal {BridgeVersion.TiaVersion} Openness installed.",
+                TiaVersion = BridgeVersion.TiaVersion,
+                ExitCode = TiaUnavailableExitCode
+            }, TiaUnavailableExitCode);
+#else
+            TiaBridgeResponse response;
+            try
+            {
+                response = RunImport(request!);
+            }
+            catch (Exception error) when (IsOpennessAssemblyLoadFailure(error))
+            {
+                return WriteResponse(new TiaBridgeResponse
+                {
+                    Success = false,
+                    Status = TiaBridgeStatus.TiaNotInstalled,
+                    Message = $"TIA Openness {BridgeVersion.TiaVersion} assemblies could not be loaded. Install TIA Portal {BridgeVersion.TiaVersion} Openness or set {VersionedOpennessDirectoryEnvironmentVariable} to the folder containing Siemens.Engineering.dll.",
+                    Details = error.Message,
+                    TiaVersion = BridgeVersion.TiaVersion,
+                    ExitCode = TiaUnavailableExitCode
+                }, TiaUnavailableExitCode);
+            }
+
             return WriteResponse(response, MapExitCode(response.Status));
+#endif
         }
         catch (Exception error)
         {
@@ -93,11 +127,31 @@ internal static class Program
                 Status = TiaBridgeStatus.UnexpectedError,
                 Message = "Unexpected bridge error.",
                 Details = error.ToString(),
-                TiaVersion = "V19",
+                TiaVersion = BridgeVersion.TiaVersion,
                 ExitCode = UnexpectedErrorExitCode
             }, UnexpectedErrorExitCode);
         }
     }
+
+#if !TIA_OPENNESS_MISSING
+    // Kept out of Main so the JIT does not need Siemens.Engineering before AssemblyResolve is registered.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static TiaBridgeResponse RunImport(TiaBridgeRequest request)
+        => new TiaImportService().Import(request);
+#endif
+
+    internal static bool IsOpennessAssemblyLoadFailure(Exception error)
+        => error switch
+        {
+            FileNotFoundException notFound => IsOpennessAssemblyName(notFound.FileName),
+            FileLoadException loadFailed => IsOpennessAssemblyName(loadFailed.FileName),
+            BadImageFormatException badImage => IsOpennessAssemblyName(badImage.FileName),
+            _ => false
+        };
+
+    private static bool IsOpennessAssemblyName(string? fileName)
+        => !string.IsNullOrWhiteSpace(fileName)
+            && fileName!.IndexOf(EngineeringAssemblyPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
 
     private static Assembly? ResolveEngineeringAssembly(object? sender, ResolveEventArgs args)
     {
@@ -111,32 +165,58 @@ internal static class Program
             return null;
         }
 
-        if (!string.Equals(requestedAssembly.Name, "Siemens.Engineering", StringComparison.OrdinalIgnoreCase))
+        if (requestedAssembly.Name is null
+            || !requestedAssembly.Name.StartsWith(EngineeringAssemblyPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var configuredDirectory = Environment.GetEnvironmentVariable(OpennessDirectoryEnvironmentVariable)?.Trim().Trim('"');
-        if (!string.IsNullOrWhiteSpace(configuredDirectory))
+        foreach (var directory in GetOpennessDirectories())
         {
-            var configuredAssemblyPath = Path.Combine(configuredDirectory, EngineeringAssemblyName);
-            if (File.Exists(configuredAssemblyPath))
+            var assemblyPath = Path.Combine(directory, requestedAssembly.Name + ".dll");
+            if (File.Exists(assemblyPath) && MatchesMajorVersion(assemblyPath, requestedAssembly.Version))
             {
-                return Assembly.LoadFrom(configuredAssemblyPath);
+                return Assembly.LoadFrom(assemblyPath);
             }
         }
 
-        var defaultAssemblyPath = @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll";
-        if (File.Exists(defaultAssemblyPath))
+        return null;
+    }
+
+    // Same order as the build: versioned env var -> default install -> generic env var.
+    // The generic env var may point at another TIA version; MatchesMajorVersion filters that out.
+    private static IEnumerable<string> GetOpennessDirectories()
+    {
+        var versioned = Environment.GetEnvironmentVariable(VersionedOpennessDirectoryEnvironmentVariable)?.Trim().Trim('"');
+        if (!string.IsNullOrWhiteSpace(versioned))
         {
-            return Assembly.LoadFrom(defaultAssemblyPath);
+            yield return versioned!;
         }
 
-        throw new FileNotFoundException(
-            $"TIA Openness assembly '{EngineeringAssemblyName}' was not found. Install TIA Portal Openness V19 or set {OpennessDirectoryEnvironmentVariable} to the folder containing {EngineeringAssemblyName}.",
-            !string.IsNullOrWhiteSpace(configuredDirectory)
-                ? Path.Combine(configuredDirectory, EngineeringAssemblyName)
-                : defaultAssemblyPath);
+        yield return $@"C:\Program Files\Siemens\Automation\Portal {BridgeVersion.TiaVersion}\PublicAPI\{BridgeVersion.TiaVersion}";
+
+        var generic = Environment.GetEnvironmentVariable(OpennessDirectoryEnvironmentVariable)?.Trim().Trim('"');
+        if (!string.IsNullOrWhiteSpace(generic))
+        {
+            yield return generic!;
+        }
+    }
+
+    private static bool MatchesMajorVersion(string assemblyPath, Version? requestedVersion)
+    {
+        if (requestedVersion is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return AssemblyName.GetAssemblyName(assemblyPath).Version?.Major == requestedVersion.Major;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string? TryGetRequestPath(string[] args)
@@ -165,6 +245,13 @@ internal static class Program
         if (request is null)
         {
             return ValidationFailure.Invalid("Request payload is required.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.TiaVersion)
+            && !string.Equals(request.TiaVersion.Trim(), BridgeVersion.TiaVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationFailure.Invalid(
+                $"Request targets TIA Portal {request.TiaVersion.Trim()} but this is the TIA Portal {BridgeVersion.TiaVersion} bridge. Use GrafcetStudio.TiaBridge.{request.TiaVersion.Trim().ToUpperInvariant()}.exe.");
         }
 
         if (string.IsNullOrWhiteSpace(request.DeviceName))
@@ -200,7 +287,7 @@ internal static class Program
                 Status = TiaBridgeStatus.XmlNotFound,
                 Message = "XML file was not found.",
                 Details = request.XmlPath,
-                TiaVersion = string.IsNullOrWhiteSpace(request.TiaVersion) ? "V19" : request.TiaVersion,
+                TiaVersion = BridgeVersion.TiaVersion,
                 ExitCode = InvalidRequestExitCode
             }, InvalidRequestExitCode);
         }
@@ -249,11 +336,8 @@ internal static class Program
                 Success = false,
                 Status = TiaBridgeStatus.InvalidRequest,
                 Message = message,
-                TiaVersion = "V19",
+                TiaVersion = BridgeVersion.TiaVersion,
                 ExitCode = InvalidRequestExitCode
             }, InvalidRequestExitCode);
     }
 }
-
-
-

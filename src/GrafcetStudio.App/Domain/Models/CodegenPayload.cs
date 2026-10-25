@@ -40,6 +40,10 @@ public class CodegenPayload
     [JsonPropertyName("templateProfile")]
     public string TemplateProfile { get; set; } = "simple";
 
+    /// <summary>SimaticML version for Siemens generators (19, 20, ...). 0 = use the template's TIA_VERSION.</summary>
+    [JsonPropertyName("tiaVersion")]
+    public uint TiaVersion { get; set; }
+
     [JsonPropertyName("ioMapping")]
     public IOMapping IOMapping { get; set; } = new();
 

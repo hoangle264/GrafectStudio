@@ -146,6 +146,14 @@ namespace GrafcetStudioCodegenPayload {
   }
 
   export function resolveStepAddress(step: Step, flow: DiagramMeta, platform?: string): ResolvedStepAddress {
+    const manualExec = step && step.addressManual ? String(step.execAddress || '').trim() : '';
+    const manualDone = step && step.addressManual ? String(step.doneAddress || '').trim() : '';
+    if (manualExec && manualDone) return { execAddress: manualExec, doneAddress: manualDone };
+    const auto = resolveAutoStepAddress(step, flow, platform);
+    return { execAddress: manualExec || auto.execAddress, doneAddress: manualDone || auto.doneAddress };
+  }
+
+  function resolveAutoStepAddress(step: Step, flow: DiagramMeta, platform?: string): ResolvedStepAddress {
     const stepNumber = Number(step && step.number);
     if (!Number.isInteger(stepNumber) || stepNumber < 1) {
       throw new Error('Step number must be an integer >= 1');

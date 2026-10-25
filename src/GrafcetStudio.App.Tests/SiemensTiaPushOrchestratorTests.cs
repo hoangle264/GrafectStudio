@@ -95,13 +95,75 @@ public class SiemensTiaPushOrchestratorTests
         Assert.Contains("manually in TIA Portal", json);
     }
 
+    [Theory]
+    [InlineData("", "V19", 19u)]
+    [InlineData("V20", "V20", 20u)]
+    public async Task PushAsync_PassesTiaVersionToGeneratorRequestAndConfig(string payloadVersion, string expectedVersion, uint expectedXmlVersion)
+    {
+        var codegen = new FakeCodeGeneratorService();
+        var tia = new CapturingSiemensTiaProjectService();
+        var configPath = Path.Combine(Path.GetTempPath(), "grafcetstudio-test-" + Guid.NewGuid().ToString("N"), "config.json");
+        var config = new ConfigService(configPath);
+        var orchestrator = new SiemensTiaPushOrchestrator(
+            new EventAggregator(),
+            codegen,
+            tia,
+            new CapturingBridgeService(),
+            config,
+            new TemplateManager(Handlebars.Create()));
+
+        var result = await orchestrator.PushAsync(new PushSiemensLadPayload
+        {
+            Platform = "siemens-lad",
+            RawJson = "{\"platform\":\"siemens-lad\",\"project\":{\"name\":\"Demo\"}}",
+            DeviceName = "PLC Station",
+            PlcName = "PLC_1",
+            TargetFolderPath = "Program blocks",
+            TiaVersion = payloadVersion
+        });
+
+        Assert.True(result.Ok);
+        Assert.Equal(expectedXmlVersion, codegen.TiaVersion);
+        Assert.Equal(expectedVersion, tia.Request!.TiaVersion);
+        Assert.Equal(expectedVersion, (await config.LoadAsync()).SiemensTia.TiaVersion);
+    }
+
+    [Fact]
+    public async Task PushAsync_RejectsUnsupportedTiaVersion()
+    {
+        var tia = new CapturingSiemensTiaProjectService();
+        var orchestrator = new SiemensTiaPushOrchestrator(
+            new EventAggregator(),
+            new FakeCodeGeneratorService(),
+            tia,
+            new CapturingBridgeService(),
+            new ConfigService(Path.Combine(Path.GetTempPath(), "grafcetstudio-test-" + Guid.NewGuid().ToString("N"), "config.json")),
+            new TemplateManager(Handlebars.Create()));
+
+        var result = await orchestrator.PushAsync(new PushSiemensLadPayload
+        {
+            Platform = "siemens-lad",
+            RawJson = "{\"platform\":\"siemens-lad\"}",
+            DeviceName = "PLC Station",
+            PlcName = "PLC_1",
+            TargetFolderPath = "Program blocks",
+            TiaVersion = "V18"
+        });
+
+        Assert.False(result.Ok);
+        Assert.Contains("V18", result.Message);
+        Assert.Null(tia.Request);
+    }
+
     private sealed class FakeCodeGeneratorService : ICodeGeneratorService
     {
         public string? Platform { get; private set; }
+        public uint TiaVersion { get; private set; }
 
         public CodegenOutput Generate(string platform, CodegenPayload data)
         {
             Platform = platform;
+            TiaVersion = data.TiaVersion;
             return new CodegenOutput
             {
                 Files = new List<CodegenFile>

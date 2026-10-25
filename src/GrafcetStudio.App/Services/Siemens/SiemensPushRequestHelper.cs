@@ -9,6 +9,11 @@ internal static class SiemensPushRequestHelper
 {
     public static SiemensPushResult? ValidateRequest(SiemensPushRequest request)
     {
+        if (SiemensTiaVersions.Normalize(request.TiaVersion) is null)
+        {
+            return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, $"TIA version '{request.TiaVersion}' is not supported. Supported versions: {string.Join(", ", SiemensTiaVersions.Supported)}.", request);
+        }
+
         if (string.IsNullOrWhiteSpace(request.DeviceName))
         {
             return SiemensPushResult.Failure(SiemensTiaProjectServiceStatus.InvalidRequest, "DeviceName is required for TIA import.", request);

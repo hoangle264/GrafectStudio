@@ -20,15 +20,15 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\..\..\web\**\*">
+    <Content Include="..\web\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>web\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\templates\siemens-lad\**\*">
+    <Content Include="..\..\templates\**\*" Exclude="..\..\templates\**\*.rar;..\..\templates\**\*.bak">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>templates\siemens-lad\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <Link>templates\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
   <ItemGroup>

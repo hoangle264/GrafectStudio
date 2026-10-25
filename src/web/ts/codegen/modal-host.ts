@@ -16,6 +16,7 @@ declare function cgGetSiemensTiaConfig(): {
   plcName: string;
   targetFolderPath: string;
   overwriteMode: string;
+  tiaVersion: string;
 };
 declare function cgSetSiemensLadStatus(message: string, ok: boolean | null): void;
 declare function cgRenderGeneratedFiles(files: GrafcetStudioProject.CodegenFile[]): void;
@@ -62,7 +63,12 @@ function resolveStepAddress(step: GrafcetStudioProject.Step, flow: GrafcetStudio
 function cgBuildCSharpPayload(platform: string, unitId?: string): MhCodegenPayload {
   if (typeof gvtFlushFocusedAddressInput === 'function') gvtFlushFocusedAddressInput();
   if (activeDiagramId && typeof flushState === 'function') flushState();
-  return cgGetPayloadApi()!.buildCSharpPayload(cgBuildPayloadContext(), platform, unitId || cgGetDefaultUnitId() || '');
+  const payload = cgGetPayloadApi()!.buildCSharpPayload(cgBuildPayloadContext(), platform, unitId || cgGetDefaultUnitId() || '');
+  if ((platform === 'siemens-lad' || platform === 'siemens-db') && typeof cgGetSiemensTiaConfig === 'function') {
+    // Preview and push both emit SimaticML for the TIA version picked in the modal.
+    payload.tiaVersion = Number(cgGetSiemensTiaConfig().tiaVersion.replace(/^V/i, '')) || undefined;
+  }
+  return payload;
 }
 
 function cgGenerateSelectedUnit(): boolean {
@@ -117,7 +123,7 @@ function cgGenerateViaHost(platform: string, diagId: string): boolean {
           };
         })
       });
-      const tiaConfig = typeof cgGetSiemensTiaConfig === 'function' ? cgGetSiemensTiaConfig() : { projectPath: '', deviceName: '', plcName: '', targetFolderPath: '', overwriteMode: '' };
+      const tiaConfig = typeof cgGetSiemensTiaConfig === 'function' ? cgGetSiemensTiaConfig() : { projectPath: '', deviceName: '', plcName: '', targetFolderPath: '', overwriteMode: '', tiaVersion: 'V19' };
       if (!tiaConfig.deviceName || !tiaConfig.plcName || !tiaConfig.targetFolderPath) {
         if (typeof cgSetSiemensLadStatus === 'function') cgSetSiemensLadStatus('Push failed: device, PLC, and block folder are required', false);
         if (stat) stat.textContent = 'Siemens TIA target config is incomplete';

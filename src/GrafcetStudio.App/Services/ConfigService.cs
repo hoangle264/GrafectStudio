@@ -20,6 +20,7 @@ public class SiemensTiaConfig
     public string PlcName { get; set; } = string.Empty;
     public string TargetFolderPath { get; set; } = "Program blocks";
     public string OverwriteMode { get; set; } = "FailIfExists";
+    public string TiaVersion { get; set; } = Siemens.SiemensTiaVersions.Default;
 }
 
 public class ConfigService
@@ -73,7 +74,7 @@ public class ConfigService
         await SaveAsync(config);
     }
 
-    public async Task SaveSiemensTiaConfigAsync(string? projectPath, string? deviceName, string? plcName, string? targetFolderPath, string? overwriteMode)
+    public async Task SaveSiemensTiaConfigAsync(string? projectPath, string? deviceName, string? plcName, string? targetFolderPath, string? overwriteMode, string? tiaVersion = null)
     {
         var config = await LoadAsync();
         config.SiemensTia = new SiemensTiaConfig
@@ -82,7 +83,8 @@ public class ConfigService
             DeviceName = deviceName?.Trim() ?? string.Empty,
             PlcName = plcName?.Trim() ?? string.Empty,
             TargetFolderPath = string.IsNullOrWhiteSpace(targetFolderPath) ? "Program blocks" : targetFolderPath.Trim(),
-            OverwriteMode = string.IsNullOrWhiteSpace(overwriteMode) ? "FailIfExists" : overwriteMode.Trim()
+            OverwriteMode = string.IsNullOrWhiteSpace(overwriteMode) ? "FailIfExists" : overwriteMode.Trim(),
+            TiaVersion = Siemens.SiemensTiaVersions.NormalizeOrDefault(tiaVersion)
         };
 
         await SaveAsync(config);

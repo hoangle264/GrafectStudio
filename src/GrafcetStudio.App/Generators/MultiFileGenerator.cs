@@ -121,6 +121,7 @@ public sealed class MultiFileGenerator : ICodeGenerator
                 DeviceTypes = payload.DeviceTypes,
                 DeviceLibraryPath = payload.DeviceLibraryPath,
                 TemplateProfile = payload.TemplateProfile,
+                TiaVersion = payload.TiaVersion,
                 IOMapping = payload.IOMapping,
                 UnitConfig = payload.UnitConfig
             };

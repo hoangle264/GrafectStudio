@@ -1,137 +1,84 @@
-# GRAFCET Studio v2 — Architecture
+# GrafcetStudio — Kiến trúc
 
-## Tổng quan Kiến trúc
-
+## Tổng quan
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                           WPF Window                            │
-│                  (container host WebView2)                      │
-│                                                                 │
-│  ┌─────────────────────────────┐  ┌──────────────────────────┐  │
-│  │          WebView2           │  │         C# Core          │  │
-│  │                             │  │                          │  │
-│  │  Toàn bộ HTML/TS UI         │  │  Code Generators         │  │
-│  │  - Canvas GRAFCET (SVG)     │  │  - Keyence Mnemonic      │  │
-│  │  - Drag & Drop / Editor     │◄─┤  - TwinCAT ST            │  │
-│  │  - Variable Tables          │─►│  - Siemens LAD ML XML    │  │
-│  │  - localStorage Persistence │  │  - ABB RAPID Robot       │  │
-│  │                             │  │  AI Client Services      │  │
-│  │                             │  │  File I/O Native         │  │
-│  └─────────────────────────────┘  └────────────┬─────────────┘  │
-└────────────────────────────────────────────────┼────────────────┘
-                                                 │
-                                           AI Services API
-                                       (Gemini & Claude Sonnet)
+WPF Window (.NET 8, WebView2)
+ ├─ Web UI (src/web)                 HTML + CSS + TypeScript → JS (classic script)
+ │    canvas SVG, bảng biến, tree, AI chat, modal sinh code
+ └─ C# Core (src/GrafcetStudio.App)  Prism + DryIoc, IEventAggregator
+      ├─ Generators (ICodeGenerator, tra theo Platform)
+      ├─ TemplateManager (Handlebars.Net) + TemplateLoader
+      ├─ AI (IAiCompletionService: Mock / Gemini)
+      ├─ File I/O, ConfigService
+      └─ Siemens TIA push (Bridge / Reflection / Unavailable)
+src/SimaticML                         dựng XML Siemens (FC, FB, DB, UDT)
+src/GrafcetStudio.TiaBridge.Shared    source + MSBuild dùng chung cho mọi bridge TIA
+src/GrafcetStudio.TiaBridge.V19/.V20  exe .NET 4.8 mỗi version TIA, gọi TIA Openness
+src/GrafcetStudio.TiaBridge.Contracts model dùng chung App ↔ Bridge
 ```
-
----
 
 ## Phân chia trách nhiệm
+**Web (`src/web`)**: toàn bộ giao diện, soạn sơ đồ, lưu `localStorage`, dựng payload sinh code (`payload.ts`), tính địa chỉ step, làm sạch context cho AI, xem trước/Apply đề xuất AI.
 
-### 1. HTML / TypeScript / WebView2 (`src/web/`)
-- Toàn bộ UI: canvas, panels, toolbar, sidebar, dialogs.
-- Drag & Drop, kết nối node, zoom/pan sơ đồ GRAFCET/SFC.
-- State management & persistence (localStorage).
-- Hiển thị generated code, streaming AI response realtime.
+**C# (`src/GrafcetStudio.App`)**: sinh code, render template, gọi AI, hộp thoại file native, đẩy XML vào TIA. Địa chỉ step do web tính, C# chỉ đọc (thiếu là báo lỗi).
 
-### 2. C# Core (`src/GrafcetStudio.App/` & `src/SimaticML/`)
-- **Code Generation (`ICodeGenerator` Strategy Pattern):**
-  - Keyence Mnemonic (`KeyenceMnemonicGenerator`)
-  - TwinCAT ST (`TwinCatStGenerator`)
-  - Siemens TIA Portal LAD (`SiemensLadDslGenerator` + thư viện `SimaticML` dựng XML)
-  - ABB RAPID Robot (`AbbRapidGenerator`)
-- **AI Client Services:** Gọi Anthropic Claude / Google Gemini API, mã hóa & lưu trữ API key an toàn, buffer + stream response về UI.
-- **File I/O:** Save/Open project native Windows dialog (`.grafcet` JSON), export code files (`.txt`, `.xml`, `.mod`).
-- **WPF Shell:** Host WebView2 control, quản lý DI container (Prism + DryIoc).
-
-### 3. C# Internal — Prism & DryIoc
-```text
-ViewModel ──► IEventAggregator.Publish(event)
-                    │
-            IWebViewBridgeService (subscriber)
-                    │
-            webView.ExecuteScriptAsync(...)
-```
-
----
-
-## Bridge API Protocol
-
-### JS → C# (`chrome.webview.postMessage`)
-
-| Event | Payload | Mô tả |
+## Nền tảng sinh code
+| Platform | Generator | Đầu ra |
 |---|---|---|
-| `GENERATE_CODE` | `{ platform, steps, transitions, actions, variables }` | User bấm nút Generate code |
-| `AI_REQUEST` | `{ type, prompt, diagramContext }` | User kích hoạt tính năng AI |
-| `SAVE_FILE` | `{ projectJson }` | Mở Native SaveFileDialog và ghi file |
-| `OPEN_FILE` | _(không có payload)_ | Mở Native OpenFileDialog và đọc file |
+| `Keyence` | `MultiFileGenerator` (+ `KeyenceGenerator`, Error, System, Orchestrator, DeviceManager, MapIO) | `.mnm` |
+| `siemens-lad` | `SiemensLadDslGenerator` | XML FC (template `.hbs` dạng text → SimaticML) |
+| `siemens-db` | `SiemensDbUdtGenerator` | XML UDT/DB |
+| `abb-rapid` | `AbbRapidGenerator` | `.mod`, teach list, prompt log (cần AI thật) |
+| `runtime-plan` | `RuntimePlanGenerator` | JSON debug |
 
-> **Debounce** áp dụng cho `AI_REQUEST` khi `diagramContext` lớn (hệ thống nhiều servo + cylinder).
+Template Handlebars nằm ở `templates/`, nạp bởi `TemplateLoader` theo tên chuẩn (unitAuto, unitOrigin, step-body, devices/*.hbs...). Đầu ra Keyence dạng `điều kiện -> INST đích` được `MnemonicEmitter` đổi thành mnemonic.
 
-### C# → JS (`ExecuteScriptAsync`)
+## Giao thức bridge
+**Web → C#** (`chrome.webview.postMessage({ type, payload })`):
 
-| Function Callback | Tham số | Mô tả |
-|---|---|---|
-| `receiveGeneratedCode(code)` | string | Kết quả code generation từ C# |
-| `receiveAiChunk(chunk)` | string | Streaming AI response (đã buffer 100ms) |
-| `loadProjectData(json)` | string | Dữ liệu project đẩy vào UI sau khi Open file |
-| `updateDiagramState(actions)` | array | AI auto-fix: patch từng node cục bộ |
-| `receiveError(error)` | object | Thông báo lỗi từ C# về JS UI |
-
-#### Schema `updateDiagramState`
-```json
-[
-  { "op": "addStep",       "id": 7, "x": 100, "y": 200 },
-  { "op": "addTransition", "from": 6, "to": 7, "condition": "X1" },
-  { "op": "removeStep",    "id": 3 },
-  { "op": "updateAction",  "stepId": 4, "actions": ["Y1 := TRUE"] }
-]
-```
-
-#### Schema `receiveError`
-```json
-{ "source": "codeGen | aiClient | fileIO", "message": "..." }
-```
-
----
-
-## AI Integration Architecture
-
-### API Key Management
-- Lưu trữ trong mã hóa Windows DPAPI hoặc biến môi trường OS (`GRAFCETSTUDIO_GEMINI_KEY` / `ANTHROPIC_API_KEY`).
-- Không bao giờ expose API Key sang môi trường HTML/JS.
-
-### Streaming Pipeline
-```text
-Gemini / Anthropic API Stream
-              │
-              ▼
-C# Buffer (gom chunk, flush mỗi 100ms)
-              │
-              ▼
-ExecuteScriptAsync("receiveAiChunk(...)")
-              │
-              ▼
-HTML UI render realtime
-```
-
----
-
-## Tech Stack Summary
-
-| Layer | Technology |
+| type | Việc |
 |---|---|
-| Shell Host | WPF (.NET 10) |
-| UI Engine | WebView2 (Microsoft Edge Chromium) |
-| Frontend | HTML5 + Vanilla CSS + TypeScript (`src/web/ts`) |
-| State | localStorage (trong WebView2 profile) |
-| Code Generators | C# — Strategy Pattern (`ICodeGenerator`) |
-| SimaticML Engine | C# (.NET 10) — `SimaticML` library |
-| AI Integration | Google Gemini API & Anthropic Claude API |
-| Dependency Injection | Prism + DryIoc |
-| Messaging | Prism `IEventAggregator` |
-| Bridge Service | `IWebViewBridgeService` |
+| `GENERATE_CODE` | sinh code theo payload |
+| `AI_REQUEST` | yêu cầu AI (có thể stream) |
+| `SAVE_FILE` / `OPEN_FILE` | lưu/mở project |
+| `EXPORT_CODE` | xuất file hoặc ZIP |
+| `BROWSE_CODEGEN_PATH` | chọn đường dẫn device library / template / output |
+| `READ_TEMPLATE_FILE` | đọc template cho Template Editor |
+| `PUSH_SIEMENS_LAD` | sinh XML và đẩy vào TIA |
 
----
+**C# → Web** (`ExecuteScriptAsync`): `receiveGeneratedCode`, `receiveError`, `receiveAiChunk`, `receiveAiStreamEvent`, `loadProjectData`, `updateDiagramState`, `receiveCodegenPath`, `receiveSavedPaths`, `receiveTemplateFile`, `receiveSiemensTiaPushResult`.
 
-👉 *Xem danh mục tài liệu liên quan tại [docs/README.md](file:///c:/Users/NITRO%205/source/vscode/GrafectStudio/docs/README.md).*
+Đổi tên callback hoặc `type` phải sửa cả hai phía.
+
+## Luồng AI
+```text
+UI (chọn intent) → ContextBuilder → Sanitizer (whitelist, bỏ path/secret)
+→ AI_REQUEST → AiContractGuard (làm sạch lần 2 ở host)
+→ IAiCompletionService (Mock | Gemini, có stream)
+→ parser + validator → xem trước (dry-run) → Apply
+```
+- AI chỉ đề xuất, không tự sửa project.
+- Intent: create-variable, clone-variable, map-io, create-flow, create-structure (map-io chưa có Apply).
+- API key chỉ ở host qua biến môi trường (`GRAFCETSTUDIO_AI_MODE`, `GEMINI_API_KEY`...). Lưu key qua UI bằng DPAPI chưa làm (TD-001).
+
+## Đẩy vào TIA Portal
+`SiemensTiaPushOrchestrator` sinh XML rồi gọi `ISiemensTiaProjectService`:
+- `bridge` (mặc định): chạy `GrafcetStudio.TiaBridge.{V19|V20}.exe` theo version chọn trong modal (`SiemensTiaConfig.TiaVersion`, mặc định V19), giao tiếp bằng file JSON và stdout. Bridge từ chối request của version khác.
+- Version TIA của push ghi đè `TIA_VERSION` trong template (`CodegenPayload.tiaVersion`). Cả `siemens-lad` và `siemens-db` set `SimaticMLAPI.TIA_VERSION` rõ ràng qua `SiemensTiaXmlVersion`.
+- Mỗi bridge chỉ là một csproj đặt `<TiaVersion>` và import `TiaBridge.Shared.targets`. `Siemens.Engineering.dll` tham chiếu `Private=false`, nạp lúc chạy qua `AssemblyResolve`. Máy không có Openness của version đó thì build ra stub báo `TiaNotInstalled`.
+- `reflection`: nạp `Siemens.Engineering.dll` bằng reflection (chỉ để debug, không theo version chọn trong modal).
+- Biến môi trường: `GRAFCETSTUDIO_TIA_IMPORT_MODE`, `GRAFCETSTUDIO_TIA_BRIDGE_PATH[_V{n}]` (exe hoặc thư mục), `GRAFCETSTUDIO_TIA_OPENNESS_DIR[_V{n}]`.
+- Luôn giữ đường import XML thủ công. Chưa xác nhận import và compile thật trên TIA (V19 lẫn V20). Setup V20: `docs/SIEMENS_TIA_V20_QUICK_SETUP.md`.
+
+## Công nghệ
+| Lớp | Công nghệ |
+|---|---|
+| Host | WPF, .NET 8, WebView2 |
+| Giao diện | HTML, CSS, TypeScript (tsc, không bundler) |
+| DI / sự kiện | Prism 9 + DryIoc |
+| Template | Handlebars.Net |
+| Parser biểu thức | Sprache |
+| Test | xUnit |
+| AI | Gemini (qua `GeminiAiCompletionService`) |
+
+Xem thêm [docs/README.md](docs/README.md).

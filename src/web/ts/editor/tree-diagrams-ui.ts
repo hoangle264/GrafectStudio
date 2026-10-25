@@ -158,6 +158,7 @@ function openDiagPropsPanel(id: string): void {
   (document.getElementById('dp-active-word') as HTMLInputElement).value = d.activeWordTag || d.activeWord || 'DM0';
   (document.getElementById('dp-complete-word') as HTMLInputElement).value = d.completeWordTag || d.completeWord || 'DM100';
   dpUpdateAddressFields();
+  (document.getElementById('dp-show-step-addr') as HTMLInputElement).checked = !d.hideStepAddress;
   // Header badge
   dpUpdateBadge(d.mode||'Auto');
   document.getElementById('dp-title')!.textContent = d.name;
@@ -332,6 +333,15 @@ function dpUpdateCodePreview(d: TdDiagramMeta | TdCodePreviewSource): void {
       : `${d.baseMr || 'MR100'} (${d.boolAddressMode||'linear'})`],
     ['name',    d.name||'GRAFCET'],
   ].map(([k,v])=>`<span class="k">${k}</span>: <span class="v">${esc(v as string)}</span>`).join('\n');
+}
+
+// Applies immediately (display-only), independent of Save Properties
+function dpToggleStepAddress(show: boolean): void {
+  const d = project.diagrams.find(x=>x.id===diagPropsId);
+  if(!d) return;
+  d.hideStepAddress = !show;
+  saveProject();
+  if (activeDiagramId === d.id) render();
 }
 
 function saveDiagPropsPanel(): void {

@@ -1601,6 +1601,78 @@ public class GeneratorSmokeTests
         Assert.Contains("UDT_FlowData", dbFile.Content);
     }
 
+    [Theory]
+    [InlineData(19u, "V19")]
+    [InlineData(20u, "V20")]
+    public void SiemensDbUdtGenerator_UsesPushTiaVersion(uint tiaVersion, string expectedEngineeringVersion)
+    {
+        var payload = BuildPayload();
+        payload.TiaVersion = tiaVersion;
+        payload.SharedFlowStruct = new SharedFlowStructSchema
+        {
+            Enabled = true,
+            StructTypeName = "UDT_FlowData",
+            Members = new List<SharedFlowStructMember> { new() { Name = "StartCmd", Type = "BOOL" } }
+        };
+
+        var files = new SiemensDbUdtGenerator().GenerateFiles(payload).ToList();
+
+        Assert.All(files, file => Assert.Contains($"<Engineering version=\"{expectedEngineeringVersion}\"", file.Content));
+    }
+
+    [Fact]
+    public void SiemensDbUdtGenerator_DoesNotInheritVersionLeftByPreviousGenerator()
+    {
+        SimaticML.API.SimaticMLAPI.TIA_VERSION = 20;
+        var payload = BuildPayload();
+        payload.SharedFlowStruct = new SharedFlowStructSchema
+        {
+            Enabled = true,
+            StructTypeName = "UDT_FlowData",
+            Members = new List<SharedFlowStructMember> { new() { Name = "StartCmd", Type = "BOOL" } }
+        };
+
+        var udt = new SiemensDbUdtGenerator().GenerateFiles(payload).First();
+
+        Assert.Contains("<Engineering version=\"V17\"", udt.Content);
+    }
+
+    [Theory]
+    [InlineData(0u, "V17", "FlgNet/v4")]
+    [InlineData(19u, "V19", "FlgNet/v5")]
+    [InlineData(20u, "V20", "FlgNet/v5")]
+    public void SiemensLadDslGenerator_PushTiaVersionOverridesTemplateVersion(uint pushTiaVersion, string expectedEngineeringVersion, string expectedFlgNet)
+    {
+        var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-version-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(templateRoot);
+        File.WriteAllText(Path.Combine(templateRoot, "siemens-lad.hbs"), """
+        TIA_VERSION 17
+        BLOCK_NAME Main_Version_LAD
+
+        NETWORK n1
+        TITLE N1
+        EXPR M0.0
+        COIL REF M0.1
+        END
+        """);
+
+        try
+        {
+            var payload = BuildPayload();
+            payload.TemplateRootPath = templateRoot;
+            payload.TiaVersion = pushTiaVersion;
+
+            var file = Assert.Single(new SiemensLadDslGenerator(new SequenceResolver()).GenerateFiles(payload));
+
+            Assert.Contains($"<Engineering version=\"{expectedEngineeringVersion}\"", file.Content);
+            Assert.Contains("/NetworkSource/" + expectedFlgNet, file.Content);
+        }
+        finally
+        {
+            if (Directory.Exists(templateRoot)) Directory.Delete(templateRoot, true);
+        }
+    }
+
     [Fact]
     public void LogAndVerify_CodegenPayload_ReceivedByCSharp()
     {

@@ -150,6 +150,7 @@ function updateProps() {
       document.getElementById('px-num').value=s.number;
       document.getElementById('px-lbl').value=s.label||'';
       document.getElementById('px-init').checked=s.initial||false;
+      renderStepAddressEditor(s);
       renderMacroStepEditor(s);
       renderActEditor(s);
       return;
@@ -239,6 +240,40 @@ function setMacroFlowId(val) {
   const s=state.steps.find(x=>x.id===id);
   if(!s || s.kind !== 'macro') return;
   s.macroFlowId = val || null;
+  afterChange();
+}
+function renderStepAddressEditor(s) {
+  const manual=!!s.addressManual;
+  const resolved=getStepAddresses(s) || {execAddress:'',doneAddress:''};
+  const exec=document.getElementById('px-addr-exec');
+  const done=document.getElementById('px-addr-done');
+  document.getElementById('px-addr-manual').checked=manual;
+  exec.readOnly=done.readOnly=!manual;
+  exec.value=resolved.execAddress||'';
+  done.value=resolved.doneAddress||'';
+}
+function setStepAddressManual(on) {
+  const id=[...selIds][0]; if(!id) return;
+  const s=state.steps.find(x=>x.id===id); if(!s) return;
+  if(on){
+    // seed the manual fields with the current auto address
+    const cur=getStepAddresses(Object.assign({}, s, {addressManual:false})) || {};
+    s.addressManual=true;
+    s.execAddress=cur.execAddress||'';
+    s.doneAddress=cur.doneAddress||'';
+  } else {
+    s.addressManual=false;
+    s.execAddress=null;
+    s.doneAddress=null;
+  }
+  afterChange();
+  renderStepAddressEditor(s);
+}
+function setStepAddress(prop, val) {
+  const id=[...selIds][0]; if(!id) return;
+  const s=state.steps.find(x=>x.id===id);
+  if(!s || !s.addressManual) return;
+  s[prop]=val.trim();
   afterChange();
 }
 function setProp(prop, val) {

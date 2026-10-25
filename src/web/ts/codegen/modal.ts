@@ -12,7 +12,7 @@ declare function cgResolveHostPlatform(target: string): string;
 declare function openTemplateEditor(): void;
 
 let cgSavedPaths: { deviceLibraryPath: string; templatePath: string; outputPath: string } = { deviceLibraryPath: '', templatePath: '', outputPath: '' };
-let cgSavedSiemensTiaConfig: { projectPath: string; deviceName: string; plcName: string; targetFolderPath: string; overwriteMode: string } = { projectPath: '', deviceName: '', plcName: '', targetFolderPath: 'Program blocks', overwriteMode: 'FailIfExists' };
+let cgSavedSiemensTiaConfig: { projectPath: string; deviceName: string; plcName: string; targetFolderPath: string; overwriteMode: string; tiaVersion: string } = { projectPath: '', deviceName: '', plcName: '', targetFolderPath: 'Program blocks', overwriteMode: 'FailIfExists', tiaVersion: 'V19' };
 let cgPendingSiemensTiaPush = false;
 
 let cgStep = 1;
@@ -62,6 +62,7 @@ function showGenerateCodeModal(): void {
             <span class="cg-field-label">Siemens TIA mode</span>
             <label><input type="radio" name="cg-siemens-lad-mode" value="preview" checked onchange="cgOnSiemensLadConfigChanged()"> Preview XML</label>
             <label><input type="radio" name="cg-siemens-lad-mode" value="push" onchange="cgOnSiemensLadConfigChanged()"> Push to TIA</label>
+            <label>TIA <select id="cg-tia-version" class="cg-select" onchange="cgOnSiemensLadConfigChanged()"><option value="V19">V19</option><option value="V20">V20</option></select></label>
             <span id="cg-siemens-lad-status" class="cg-mode-status">Preview XML mode</span>
           </div>
           <div id="cg-siemens-tia-config" class="cg-tia-grid">
@@ -255,13 +256,14 @@ function cgGetSiemensLadMode(): string {
   return document.querySelector<HTMLInputElement>('input[name="cg-siemens-lad-mode"]:checked')?.value || 'preview';
 }
 
-function cgGetSiemensTiaConfig(): { projectPath: string; deviceName: string; plcName: string; targetFolderPath: string; overwriteMode: string } {
+function cgGetSiemensTiaConfig(): { projectPath: string; deviceName: string; plcName: string; targetFolderPath: string; overwriteMode: string; tiaVersion: string } {
   return {
     projectPath: ((document.getElementById('cg-tia-project-path') as HTMLInputElement | null)?.value || '').trim(),
     deviceName: ((document.getElementById('cg-tia-device-name') as HTMLInputElement | null)?.value || '').trim(),
     plcName: ((document.getElementById('cg-tia-plc-name') as HTMLInputElement | null)?.value || '').trim(),
     targetFolderPath: ((document.getElementById('cg-tia-target-folder') as HTMLInputElement | null)?.value || 'Program blocks').trim(),
-    overwriteMode: (document.getElementById('cg-tia-overwrite-mode') as HTMLSelectElement | null)?.value || 'FailIfExists'
+    overwriteMode: (document.getElementById('cg-tia-overwrite-mode') as HTMLSelectElement | null)?.value || 'FailIfExists',
+    tiaVersion: (document.getElementById('cg-tia-version') as HTMLSelectElement | null)?.value || 'V19'
   };
 }
 
@@ -272,7 +274,8 @@ function cgApplySavedSiemensTiaConfig(): void {
     'cg-tia-device-name': config.deviceName || '',
     'cg-tia-plc-name': config.plcName || '',
     'cg-tia-target-folder': config.targetFolderPath || 'Program blocks',
-    'cg-tia-overwrite-mode': config.overwriteMode || 'FailIfExists'
+    'cg-tia-overwrite-mode': config.overwriteMode || 'FailIfExists',
+    'cg-tia-version': config.tiaVersion || 'V19'
   };
   Object.keys(values).forEach(id => {
     const input = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;

@@ -28,6 +28,8 @@ public sealed class SiemensDbUdtGenerator : ICodeGenerator
             yield break;
         }
 
+        SiemensTiaXmlVersion.Apply(payload.TiaVersion);
+
         if (hasSharedStruct && payload.SharedFlowStruct != null)
         {
             var structTypeName = SanitizeBlockName(payload.SharedFlowStruct.StructTypeName);

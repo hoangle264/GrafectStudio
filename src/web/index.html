@@ -242,6 +242,13 @@
                             <div class="prop-label">LABEL</div>
                             <input class="prop-input" id="px-lbl" type="text" placeholder="Step name..." oninput="setProp('label',this.value)">
                         </div>
+                        <div class="prop-group">
+                            <div class="prop-label">STEP ADDRESS (ACTIVE / DONE)</div>
+                            <label class="prop-check">
+                                <input type="checkbox" id="px-addr-manual" onchange="setStepAddressManual(this.checked)"> Manual address</label>
+                            <input class="prop-input" id="px-addr-exec" type="text" placeholder="Active address" oninput="setStepAddress('execAddress',this.value)">
+                            <input class="prop-input" id="px-addr-done" type="text" placeholder="Done address" oninput="setStepAddress('doneAddress',this.value)">
+                        </div>
                         <div class="prop-group" id="px-macro-flow-group" style="display:none">
                             <div class="prop-label">MACRO FLOW</div>
                             <select class="prop-input" id="px-macro-flow" onchange="setMacroFlowId(this.value)"></select>
@@ -382,6 +389,9 @@
                             <button class="dp-chip dp-chip-auto" data-address-mode="bool" onclick="dpSetAddressMode('bool')">Bool</button>
                             <button class="dp-chip dp-chip-origin" data-address-mode="word" onclick="dpSetAddressMode('word')">Word</button>
                         </div>
+
+                        <label class="prop-check">
+                            <input type="checkbox" id="dp-show-step-addr" checked onchange="dpToggleStepAddress(this.checked)"> Show step addresses on canvas</label>
 
                         <div id="dp-bool-address-fields">
                             <div class="dp-label">Bool packing</div>

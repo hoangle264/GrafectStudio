@@ -43,7 +43,7 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
             var unitPayload = CloneForUnit(payload, unit);
             var context = GeneratorContextBuilder.Build(unitPayload, _sequenceResolver);
             var template = LoadTemplate(payload.TemplateRootPath, context);
-            var document = BuildDocument(template);
+            var document = BuildDocument(template, payload.TiaVersion);
             yield return new CodegenFile
             {
                 Path = $"{SanitizeBlockName(template.BlockName)}.xml",
@@ -52,12 +52,9 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
         }
     }
 
-    private static XmlDocument BuildDocument(SiemensLadTemplate template)
+    private static XmlDocument BuildDocument(SiemensLadTemplate template, uint pushTiaVersion)
     {
-        if (template.TiaVersion > 0)
-        {
-            SimaticMLAPI.TIA_VERSION = template.TiaVersion;
-        }
+        SiemensTiaXmlVersion.Apply(pushTiaVersion, template.TiaVersion);
 
         var block = new BlockFC();
         block.Init();
@@ -243,7 +240,8 @@ public sealed class SiemensLadDslGenerator : ICodeGenerator
             Variables = payload.Variables,
             DeviceTypes = payload.DeviceTypes,
             DeviceLibraryPath = payload.DeviceLibraryPath,
-            TemplateProfile = payload.TemplateProfile
+            TemplateProfile = payload.TemplateProfile,
+            TiaVersion = payload.TiaVersion
         };
 
     private static string ToString(XmlDocument document)

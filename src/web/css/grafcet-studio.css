@@ -780,6 +780,8 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .gf-step .s-init{fill:none;stroke:var(--amber);stroke-width:1px;}
 .gf-step .s-num{fill:var(--blue);font-size:12px;font-family:var(--font-mono);font-weight:bold;}
 .gf-step .s-lbl{fill:var(--text);font-size:10px;font-family:var(--font-mono);}
+.gf-step .s-addr{fill:var(--text-dim, var(--text));font-size:8px;font-family:var(--font-mono);opacity:.8;pointer-events:none;}
+.gf-step .s-addr.manual{fill:var(--blue);opacity:1;}
 .gf-step .s-kind{fill:var(--cyan);font-size:7px;font-family:var(--font-mono);letter-spacing:.6px;}
 .gf-step .s-divider{stroke:#2a3a55;stroke-width:1px;}
 .gf-step .s-act-box{fill:#0c1420;stroke:var(--blue);stroke-width:1px;}
