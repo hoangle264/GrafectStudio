@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using GrafcetStudio.Domain.Models;
 
 namespace GrafcetStudio.Domain.Resolution;
@@ -7,17 +6,13 @@ namespace GrafcetStudio.Domain.Resolution;
 /// <summary>Provides static helpers to resolve variables, signals, and PLC literal addresses.</summary>
 public static class SignalResolver
 {
-    private static readonly Regex PlcAddressRegex = new("^(@?[A-Z]{1,3}\\d+(?:\\.\\d+)?|%[IQM][A-Z]?\\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex SiemensBitSliceRegex = new(@"^(?:#?(?:""[^""]+""|[A-Za-z_][A-Za-z0-9_]*))(?:\.(?:""[^""]+""|[A-Za-z_][A-Za-z0-9_]*))*\.%X\d+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    public static string? ResolveAddress(string varOrAddr, IList<DeviceVariable> vars, PlcAddressFormat format)
+        => ResolveSignalInfo(varOrAddr, vars, format)?.PhysAddr;
 
-    public static string? ResolveAddress(string varOrAddr, IList<DeviceVariable> vars)
-        => ResolveSignalInfo(varOrAddr, vars)?.PhysAddr;
-
-    public static SignalInfo? ResolveSignalInfo(string varOrAddr, IList<DeviceVariable> vars)
+    public static SignalInfo? ResolveSignalInfo(string varOrAddr, IList<DeviceVariable> vars, PlcAddressFormat format)
     {
         if (string.IsNullOrWhiteSpace(varOrAddr)) return null;
-        if (IsPlcAddressLiteral(varOrAddr)) return new SignalInfo { PhysAddr = varOrAddr };
-        if (IsSiemensBitSliceLiteral(varOrAddr)) return new SignalInfo { PhysAddr = varOrAddr };
+        if (format.IsAddress(varOrAddr)) return new SignalInfo { PhysAddr = varOrAddr };
 
         var dotIndex = varOrAddr.IndexOf('.');
         if (dotIndex > 0 && dotIndex < varOrAddr.Length - 1)
@@ -27,18 +22,14 @@ public static class SignalResolver
             var device = vars.FirstOrDefault(v => string.Equals(v.Label, label, StringComparison.OrdinalIgnoreCase));
             if (device is not null)
             {
-                var address = device.GetSignalAddress(signal);
-                if (!string.IsNullOrWhiteSpace(address))
-                {
-                    return new SignalInfo { PhysAddr = address!, DevLabel = device.Label, SigName = signal, DevTypeName = device.Format };
-                }
+                return new SignalInfo { PhysAddr = device.GetSignalAddressOrLabel(signal), DevLabel = device.Label, SigName = signal, DevTypeName = device.Format };
             }
         }
 
         var variable = vars.FirstOrDefault(v => string.Equals(v.Label, varOrAddr, StringComparison.OrdinalIgnoreCase));
-        return string.IsNullOrWhiteSpace(variable?.Address)
+        return variable is null
             ? null
-            : new SignalInfo { PhysAddr = variable.Address!, DevLabel = variable.Label, DevTypeName = variable.Format };
+            : new SignalInfo { PhysAddr = variable.AddressOrLabel, DevLabel = variable.Label, DevTypeName = variable.Format };
     }
 
     public static SignalInfo? FindDeviceByAddress(string physAddr, IList<DeviceVariable> vars)
@@ -65,10 +56,4 @@ public static class SignalResolver
 
     public static string? FindErrorBit(IList<DeviceVariable> vars)
         => vars.FirstOrDefault(v => v.Label.Contains("error", StringComparison.OrdinalIgnoreCase))?.Address;
-
-    public static bool IsPlcAddressLiteral(string value)
-        => !string.IsNullOrWhiteSpace(value) && PlcAddressRegex.IsMatch(value.Trim());
-
-    public static bool IsSiemensBitSliceLiteral(string value)
-        => !string.IsNullOrWhiteSpace(value) && SiemensBitSliceRegex.IsMatch(value.Trim());
 }

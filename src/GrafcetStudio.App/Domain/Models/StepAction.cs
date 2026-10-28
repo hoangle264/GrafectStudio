@@ -51,10 +51,10 @@ public class StepAction
     [JsonIgnore]
     public string? interlockAddress => InterlockAddress;
 
-    public string ToPhysicalAddress(IList<DeviceVariable> vars)
+    public string ToPhysicalAddress(IList<DeviceVariable> vars, PlcAddressFormat format)
         => !string.IsNullOrWhiteSpace(Address)
             ? Address!
-            : SignalResolver.ResolveAddress(Variable, vars) ?? Variable;
+            : SignalResolver.ResolveAddress(Variable, vars, format) ?? Variable;
 }
 
 public class StepActionCompletion

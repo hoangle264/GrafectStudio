@@ -22,6 +22,6 @@ public class Transition
     [JsonPropertyName("toStepIds")]
     public IList<string> ToStepIds { get; init; } = new List<string>();
 
-    public string ResolveAddress(IList<DeviceVariable> vars)
-        => SignalResolver.ResolveAddress(Condition, vars) ?? Condition;
+    public string ResolveAddress(IList<DeviceVariable> vars, PlcAddressFormat format)
+        => SignalResolver.ResolveAddress(Condition, vars, format) ?? Condition;
 }

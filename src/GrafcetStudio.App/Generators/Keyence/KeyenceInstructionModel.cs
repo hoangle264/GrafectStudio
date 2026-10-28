@@ -1,5 +1,6 @@
 using GrafcetStudio.Domain.Enums;
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Resolution;
 using System;
 using System.Collections.Generic;
 
@@ -106,7 +107,7 @@ public abstract record KeyenceOutputInstruction : KeyenceInstruction
 
         var targetRef = !string.IsNullOrWhiteSpace(action.Address)
             ? action.Address!
-            : AddressResolver.Resolve(action.Variable, vars);
+            : AddressResolver.Resolve(action.Variable, vars, PlcAddressFormats.Keyence);
 
         return action.Qualifier switch
         {

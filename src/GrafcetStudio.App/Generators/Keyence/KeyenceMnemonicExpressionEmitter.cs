@@ -1,5 +1,6 @@
 using GrafcetStudio.App.Expressions;
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Resolution;
 using Sprache;
 using System;
 using System.Collections.Generic;
@@ -76,7 +77,7 @@ public static class KeyenceMnemonicExpressionEmitter
         KeyenceExpressionEmitOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(variables);
-        return EmitCondition(expression, operand => AddressResolver.Resolve(operand, variables), options);
+        return EmitCondition(expression, operand => AddressResolver.Resolve(operand, variables, PlcAddressFormats.Keyence), options);
     }
 
     public static IReadOnlyList<string> EmitCondition(

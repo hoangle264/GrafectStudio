@@ -75,7 +75,7 @@ public class StGenerator : ICodeGenerator
 
             foreach (var action in entry.Step.Actions.Where(a => a.Qualifier == Domain.Enums.ActionQualifier.N))
             {
-                lines.Add($"{action.ToPhysicalAddress(state.Variables)} := {exec};");
+                lines.Add($"{action.ToPhysicalAddress(state.Variables, PlcAddressFormats.Keyence)} := {exec};");
             }
 
             lines.Add(string.Empty);

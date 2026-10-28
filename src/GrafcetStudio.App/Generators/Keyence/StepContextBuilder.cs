@@ -45,7 +45,7 @@ internal static class StepContextBuilder
     {
         if (!string.IsNullOrWhiteSpace(action.Address)) return action.Address!;
 
-        var resolved = SignalResolver.ResolveAddress(action.Variable, variables);
+        var resolved = SignalResolver.ResolveAddress(action.Variable, variables, PlcAddressFormats.Keyence);
         return string.IsNullOrWhiteSpace(resolved) ? action.Variable : resolved!;
     }
 }

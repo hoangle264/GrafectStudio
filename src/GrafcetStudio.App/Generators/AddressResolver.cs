@@ -7,9 +7,9 @@ namespace GrafcetStudio.App.Generators;
 
 public static class AddressResolver
 {
-    public static string Resolve(string varOrAddr, IReadOnlyList<DeviceVariable> variables)
+    public static string Resolve(string varOrAddr, IReadOnlyList<DeviceVariable> variables, PlcAddressFormat format)
     {
         if (string.IsNullOrWhiteSpace(varOrAddr)) return string.Empty;
-        return SignalResolver.ResolveAddress(varOrAddr, variables.ToList()) ?? varOrAddr;
+        return SignalResolver.ResolveAddress(varOrAddr, variables.ToList(), format) ?? varOrAddr;
     }
 }

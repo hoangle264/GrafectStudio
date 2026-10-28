@@ -23,44 +23,23 @@ public static class DeviceCommandResolver
 
         if (!library.ById.TryGetValue(deviceVar.Format, out var entry)) return null;
         if (!TryResolveCommand(entry, commandId, out var command)) return null;
-        if (!TryGetSignalAddress(deviceVar, command.DriveSignal, out var driveAddr)) return null;
-
         var diagnostics = new List<Diagnostic>();
+        var driveAddr = ResolveSignalRef(deviceVar, command.DriveSignal, action.Variable, diagnostics);
         var feedbackSignals = new List<FeedbackSignalResult>();
         var interlockAddress = string.Empty;
         if (command.Complete is not null)
         {
-            if (TryGetSignalAddress(deviceVar, command.Complete.Sensor, out var feedbackAddr))
+            feedbackSignals.Add(new FeedbackSignalResult
             {
-                feedbackSignals.Add(new FeedbackSignalResult
-                {
-                    PhysicalAddress = feedbackAddr,
-                    SignalName = command.Complete.Sensor,
-                    Label = command.Complete.SensorLabel
-                });
-            }
-            else
-            {
-                diagnostics.Add(new Diagnostic
-                {
-                    Level = DiagnosticLevel.Warning,
-                    Code = "DEVICE_COMMAND_FEEDBACK_MISSING",
-                    Message = $"Feedback signal '{command.Complete.Sensor}' for action '{action.Variable}' was not found."
-                });
-            }
+                PhysicalAddress = ResolveSignalRef(deviceVar, command.Complete.Sensor, action.Variable, diagnostics),
+                SignalName = command.Complete.Sensor,
+                Label = command.Complete.SensorLabel
+            });
         }
 
         if (command.Interlock is not null && !string.IsNullOrWhiteSpace(command.Interlock.Signal))
         {
-            if (!TryGetSignalAddress(deviceVar, command.Interlock.Signal, out interlockAddress))
-            {
-                diagnostics.Add(new Diagnostic
-                {
-                    Level = DiagnosticLevel.Warning,
-                    Code = "DEVICE_COMMAND_INTERLOCK_MISSING",
-                    Message = $"Interlock signal '{command.Interlock.Signal}' for action '{action.Variable}' was not found."
-                });
-            }
+            interlockAddress = ResolveSignalRef(deviceVar, command.Interlock.Signal, action.Variable, diagnostics);
         }
 
         return new ActionResolveResult
@@ -108,6 +87,24 @@ public static class DeviceCommandResolver
 
         command = null!;
         return false;
+    }
+
+    /// <summary>
+    /// Returns the signal's address, or falls back to its label <c>{Device}.{Signal}</c>
+    /// (recording an info diagnostic) when the signal has no address assigned.
+    /// </summary>
+    private static string ResolveSignalRef(DeviceVariable variable, string signalName, string actionSymbol, List<Diagnostic> diagnostics)
+    {
+        if (TryGetSignalAddress(variable, signalName, out var address)) return address;
+
+        var label = variable.GetSignalAddressOrLabel(signalName);
+        diagnostics.Add(new Diagnostic
+        {
+            Level = DiagnosticLevel.Info,
+            Code = "DEVICE_SIGNAL_LABEL_FALLBACK",
+            Message = $"Signal '{signalName}' for action '{actionSymbol}' has no address; using label '{label}'."
+        });
+        return label;
     }
 
     public static bool TryGetSignalAddress(DeviceVariable variable, string signalName, out string address)

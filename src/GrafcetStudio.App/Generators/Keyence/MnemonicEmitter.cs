@@ -1,4 +1,5 @@
 using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Resolution;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +37,7 @@ public static class MnemonicEmitter
     {
         if (string.IsNullOrWhiteSpace(instruction) || string.IsNullOrWhiteSpace(target)) return null;
 
-        var resolvedTarget = AddressResolver.Resolve(target, vars.ToList());
+        var resolvedTarget = AddressResolver.Resolve(target, vars.ToList(), PlcAddressFormats.Keyence);
         return instruction.Trim().ToUpperInvariant() switch
         {
             "OUT" => KeyenceOutputInstruction.Create(KeyenceInstructionType.Out, resolvedTarget),

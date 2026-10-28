@@ -78,6 +78,57 @@ public class CodegenPayload
                 }
             }
         }
+
+        ApplyLabelFallback();
+    }
+
+    /// <summary>
+    /// Fills every missing PLC address with its label (<c>{Label}</c> for a plain variable,
+    /// <c>{Label}.{Signal}</c> for a device/unit/system signal) so generators and templates
+    /// reference the label instead of emitting an empty operand.
+    /// </summary>
+    public void ApplyLabelFallback()
+    {
+        var deviceTypesByName = DeviceTypes
+            .Where(type => !string.IsNullOrWhiteSpace(type.Name))
+            .GroupBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var variable in Variables)
+        {
+            deviceTypesByName.TryGetValue(variable.Format, out var deviceType);
+            var signalNames = deviceType?.Signals
+                .Where(signal => !variable.SignalAddresses.ContainsKey(signal.Id) && !variable.SignalAddresses.ContainsKey(signal.Name))
+                .Select(signal => string.IsNullOrWhiteSpace(signal.Name) ? signal.Id : signal.Name);
+            FillSignalLabels(variable.Label, variable.SignalAddresses, signalNames);
+
+            if (variable.SignalAddresses.Count == 0 && string.IsNullOrWhiteSpace(variable.Address))
+            {
+                variable.Address = variable.Label;
+            }
+        }
+
+        foreach (var (key, cfg) in UnitConfig)
+        {
+            FillSignalLabels(string.IsNullOrWhiteSpace(cfg.Label) ? key : cfg.Label, cfg.SignalAddresses, null);
+        }
+
+        if (System is not null) FillSignalLabels(System.Label, System.SignalAddresses, null);
+    }
+
+    private static void FillSignalLabels(string ownerLabel, IDictionary<string, string> signalAddresses, IEnumerable<string>? missingSignals)
+    {
+        if (string.IsNullOrWhiteSpace(ownerLabel)) return;
+
+        foreach (var signal in missingSignals ?? Enumerable.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(signal)) signalAddresses[signal] = string.Empty;
+        }
+
+        foreach (var signal in signalAddresses.Keys.ToList())
+        {
+            if (string.IsNullOrWhiteSpace(signalAddresses[signal])) signalAddresses[signal] = $"{ownerLabel}.{signal}";
+        }
     }
 }
 

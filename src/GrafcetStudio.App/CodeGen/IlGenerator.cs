@@ -73,7 +73,7 @@ public class IlGenerator : ICodeGenerator
                 foreach (var action in entry.Step.Actions)
                 {
                     lines.Add($"LD   {PadAddress(mr.Exec)}{opts.Profile.CommentPrefix} S{entry.Step.Number:D2} action");
-                    lines.Add($"{Map(action.Qualifier is Domain.Enums.ActionQualifier.S ? "SET" : action.Qualifier is Domain.Enums.ActionQualifier.R ? "RST" : "OUT"),-5}{action.ToPhysicalAddress(state.Variables)}");
+                    lines.Add($"{Map(action.Qualifier is Domain.Enums.ActionQualifier.S ? "SET" : action.Qualifier is Domain.Enums.ActionQualifier.R ? "RST" : "OUT"),-5}{action.ToPhysicalAddress(state.Variables, PlcAddressFormats.Keyence)}");
                 }
             }
 
