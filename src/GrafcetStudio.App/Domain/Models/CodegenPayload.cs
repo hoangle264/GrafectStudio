@@ -114,7 +114,6 @@ public class DiagramInfo
     [JsonPropertyName("diagramType")] public string? DiagramType { get; set; } = "Macro";
     [JsonPropertyName("controlState")] public string? ControlState { get; set; }
     [JsonPropertyName("category")] public string? Category { get; set; }
-    [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
     [JsonPropertyName("unitId")] public string? UnitId { get; set; }
     [JsonPropertyName("unit")] public string? Unit { get; set; }
     [JsonPropertyName("addressMode")] public string? AddressMode { get; set; }
@@ -124,17 +123,6 @@ public class DiagramInfo
     [JsonPropertyName("activeWordTag")] public string? ActiveWordTag { get; set; }
     [JsonPropertyName("completeWord")] public string? CompleteWord { get; set; }
     [JsonPropertyName("completeWordTag")] public string? CompleteWordTag { get; set; }
-}
-
-public class OrchestratorConfig
-{
-    [JsonPropertyName("elements")] public List<OrchestratorElement> Elements { get; set; } = new();
-}
-
-public class OrchestratorElement
-{
-    [JsonPropertyName("type")] public string? Type { get; set; }
-    [JsonPropertyName("config")] public JsonElement? Config { get; set; }
 }
 
 public class UnitInfo
@@ -153,7 +141,6 @@ public class FlowInfo
     [JsonPropertyName("diagramType")] public string? DiagramType { get; set; } = "Macro";
     [JsonPropertyName("controlState")] public string? ControlState { get; set; }
     [JsonPropertyName("category")] public string? Category { get; set; }
-    [JsonPropertyName("orchestratorConfig")] public OrchestratorConfig? OrchestratorConfig { get; set; }
     [JsonPropertyName("diagram")] public DiagramInfo? Diagram { get; set; }
     [JsonPropertyName("steps")] public List<Step> Steps { get; set; } = new();
     [JsonPropertyName("transitions")] public List<Transition> Transitions { get; set; } = new();

@@ -1,3 +1,4 @@
+using GrafcetStudio.App.Generators.Common;
 using GrafcetStudio.Domain.Models;
 using System;
 using System.Collections.Generic;
@@ -45,25 +46,17 @@ public sealed class SystemControlGenerator : ISystemControlGenerator
 
     public string GenerateOrchestrator(CodegenPayload payload)
     {
-        var orchestratorFlows = payload.Flows
-            .Where(flow => string.Equals(flow.Category, "orchestrator", StringComparison.OrdinalIgnoreCase))
-            .Select(flow => new
-            {
-                id = flow.Id,
-                name = flow.Name,
-                controlState = flow.ControlState ?? flow.Mode ?? string.Empty,
-                elements = flow.OrchestratorConfig?.Elements ?? new List<OrchestratorElement>()
-            })
-            .ToList();
-
+        var units = payload.Units ?? new List<UnitInfo>();
         var content = new
         {
             project = payload.Project,
             system = MapSystemControl(payload.Variables),
-            units = (payload.Units ?? new List<UnitInfo>()).Select(MapUnitBasic).ToList(),
-            orchestratorFlows,
-            phase = 1,
-            skeleton = true
+            units = units.Select(MapUnitBasic).ToList(),
+            orchestrators = OrchestratorContextBuilder.Build(
+                payload.Flows ?? new List<FlowInfo>(),
+                payload.Variables ?? new List<DeviceVariable>(),
+                payload.DeviceTypes ?? new List<DeviceType>(),
+                units)
         };
 
         return JsonSerializer.Serialize(content, JsonOptions);

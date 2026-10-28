@@ -13,7 +13,6 @@ public class DiagramMeta
 
     public string Category { get; init; } = "normal";
 
-    public OrchestratorConfig? OrchestratorConfig { get; init; }
 
     public string UnitId { get; init; } = string.Empty;
 

@@ -17,6 +17,9 @@ public static class CodegenPayloadExtensions
 
 public static class FlowInfoExtensions
 {
+    public static bool IsOrchestrator(this FlowInfo flow)
+        => string.Equals(flow.Category ?? flow.Diagram?.Category, FlowConstants.OrchestratorCategory, StringComparison.OrdinalIgnoreCase);
+
     public static DiagramState ToDiagramState(this FlowInfo flow, IList<DeviceVariable> variables)
     {
         var connections = flow.Transitions.SelectMany(t =>

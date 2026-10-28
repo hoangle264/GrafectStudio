@@ -419,40 +419,6 @@ public class GeneratorSmokeTests
     }
 
     [Fact]
-    public void SystemControlGenerator_GenerateOrchestrator_ContainsSystemAndFlows()
-    {
-        var generator = new SystemControlGenerator();
-        var payload = BuildPayload();
-        payload.Variables = new List<DeviceVariable>
-        {
-            new()
-            {
-                Label = "Machine",
-                Format = "SystemControl",
-                SignalAddresses = new Dictionary<string, string> { ["stateAuto"] = "M100" }
-            }
-        };
-        payload.Flows.Add(new FlowInfo
-        {
-            Id = "orch-1",
-            Name = "Orchestrator",
-            Category = "orchestrator",
-            ControlState = "Auto",
-            OrchestratorConfig = new OrchestratorConfig
-            {
-                Elements = new List<OrchestratorElement> { new() { Type = "noop" } }
-            }
-        });
-
-        var output = generator.GenerateOrchestrator(payload);
-
-        Assert.Contains("\"system\"", output);
-        Assert.Contains("\"stateAuto\": \"M100\"", output);
-        Assert.Contains("\"orchestratorFlows\"", output);
-        Assert.Contains("\"skeleton\"", output);
-    }
-
-    [Fact]
     public void SiemensLadDslGenerator_CustomHbsTextTemplateOverridesDefaultTemplate()
     {
         var templateRoot = Path.Combine(Path.GetTempPath(), "grafcetstudio-siemens-lad-" + Guid.NewGuid().ToString("N"));
@@ -954,11 +920,7 @@ public class GeneratorSmokeTests
                 Name = "System Control",
                 Category = "orchestrator",
                 ControlState = "Auto",
-                UnitId = "unit-1",
-                OrchestratorConfig = new OrchestratorConfig
-                {
-                    Elements = new List<OrchestratorElement> { new() { Type = "noop" } }
-                }
+                UnitId = "unit-1"
             }
         }));
 
@@ -966,7 +928,6 @@ public class GeneratorSmokeTests
 
         Assert.Single(payload.Flows);
         Assert.Equal("orchestrator", payload.Flows[0].Category);
-        Assert.NotNull(payload.Flows[0].OrchestratorConfig);
     }
 
 

@@ -17,6 +17,7 @@ public sealed record GeneratorContext
     public IList<MacroBindingContext> macroBindings { get; init; } = new List<MacroBindingContext>();
     public IList<MacroPortContext> macroPorts { get; init; } = new List<MacroPortContext>();
     public IList<DeviceOutputGroup> deviceOutputGroups { get; init; } = new List<DeviceOutputGroup>();
+    public IList<OrchestratorContext> orchestrators { get; init; } = new List<OrchestratorContext>();
     public IList<string> warnings { get; init; } = new List<string>();
 }
 
@@ -61,4 +62,58 @@ public sealed record MacroPortContext
     public string calleeFlowId { get; init; } = string.Empty;
     public string portName { get; init; } = string.Empty;
     public DeviceVariable? variable { get; init; }
+}
+
+/// <summary>
+/// An orchestrator flow resolved into stages. The macros of one stage run in parallel;
+/// the next stage starts once every macro of the stage reports Done.
+/// </summary>
+public sealed record OrchestratorContext
+{
+    public string id { get; init; } = string.Empty;
+    public string name { get; init; } = string.Empty;
+    public string controlState { get; init; } = string.Empty;
+    public OrchestratorUnitContext unit { get; init; } = new();
+    /// <summary>True when the last stage returns to the initial step, false when the sequence just ends.</summary>
+    public bool loopsToStart { get; init; }
+    public IList<OrchestratorStageContext> stages { get; init; } = new List<OrchestratorStageContext>();
+    /// <summary>Every macro of every stage, in stage order.</summary>
+    public IList<OrchestratorMacroContext> macros { get; init; } = new List<OrchestratorMacroContext>();
+}
+
+public sealed record OrchestratorUnitContext
+{
+    public string id { get; init; } = string.Empty;
+    public string name { get; init; } = string.Empty;
+    public string label { get; init; } = string.Empty;
+}
+
+public sealed record OrchestratorStageContext
+{
+    public int index { get; init; }
+    public bool isFirst { get; init; }
+    public bool isLast { get; init; }
+    public bool isParallel { get; init; }
+    public IList<OrchestratorMacroContext> macros { get; init; } = new List<OrchestratorMacroContext>();
+    /// <summary>Macros of the stage that follows; the first stage when the orchestrator loops, empty when it ends.</summary>
+    public IList<OrchestratorMacroContext> nextMacros { get; init; } = new List<OrchestratorMacroContext>();
+}
+
+public sealed record OrchestratorMacroContext
+{
+    public string stepId { get; init; } = string.Empty;
+    public int stepNumber { get; init; }
+    public string stepLabel { get; init; } = string.Empty;
+    public string execAddress { get; init; } = string.Empty;
+    public string doneAddress { get; init; } = string.Empty;
+    public string macroStepId { get; init; } = string.Empty;
+    public string macroStep { get; init; } = string.Empty;
+    public OrchestratorPortContext port { get; init; } = new();
+}
+
+public sealed record OrchestratorPortContext
+{
+    public string label { get; init; } = string.Empty;
+    /// <summary>Signal name (as defined in the MacroPort struct) to address.</summary>
+    public IDictionary<string, string> signals { get; init; } = new Dictionary<string, string>();
 }

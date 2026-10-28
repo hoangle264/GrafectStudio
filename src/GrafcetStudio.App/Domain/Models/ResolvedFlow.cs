@@ -17,6 +17,8 @@ public class ResolvedFlow
 
     public string diagramType { get; init; } = "Macro";
 
+    public bool isOrchestrator { get; init; }
+
     public DiagramInfo? diagram { get; init; }
 
     public DeviceVariable? macroPortVariable { get; init; }

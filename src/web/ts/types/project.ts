@@ -72,7 +72,6 @@ namespace GrafcetStudioProject {
     mode: DiagramMode;
     controlState?: string;
     category?: FlowCategory;
-    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
     diagramType?: DiagramType;
@@ -221,7 +220,6 @@ namespace GrafcetStudioProject {
     mode?: DiagramMode;
     controlState?: string;
     category?: FlowCategory;
-    orchestratorConfig?: OrchestratorConfig;
     diagramType?: DiagramType;
     diagram?: DiagramInfo;
     steps: Step[];
@@ -239,7 +237,6 @@ namespace GrafcetStudioProject {
     mode?: DiagramMode;
     controlState?: string;
     category?: FlowCategory;
-    orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
     diagramType?: DiagramType;
@@ -252,10 +249,6 @@ namespace GrafcetStudioProject {
     activeWordTag?: string;
     completeWordTag?: string;
     [key: string]: unknown;
-  }
-
-  export interface OrchestratorConfig {
-    elements: Array<{ type: string; config: JsonValue }>;
   }
 
   export interface CodegenFile {

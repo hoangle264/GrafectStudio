@@ -50,8 +50,9 @@ public static class GeneratorContextBuilder
         var unitAddresses = unitVariable?.SignalAddresses ?? new Dictionary<string, string>();
         var deviceOutputGroups = DeviceOutputGroupBuilder.BuildDeviceOutputGroups(outputBindings, payload.Variables, payload.DeviceTypes, unitAddresses);
         var unitStepRange = StepAddressHelper.BuildUnitStepAddressRange(resolvedFlows);
-        var macroFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "Macro", StringComparison.OrdinalIgnoreCase)).ToList();
-        var macroStepFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)).ToList();
+        // Orchestrator flows are sequenced by their own template, so unit templates must not drive their steps.
+        var macroFlows = resolvedFlows.Where(f => !f.isOrchestrator && string.Equals(f.diagramType, "Macro", StringComparison.OrdinalIgnoreCase)).ToList();
+        var macroStepFlows = resolvedFlows.Where(f => string.Equals(f.diagramType, FlowConstants.MacroStepDiagramType, StringComparison.OrdinalIgnoreCase)).ToList();
         var autoFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "auto", StringComparison.OrdinalIgnoreCase)).ToList();
         var originFlows = macroFlows.Where(f => string.Equals(f.normalizedType, "origin", StringComparison.OrdinalIgnoreCase)).ToList();
         var deviceTypesByName = payload.DeviceTypes.ToDictionaryIgnoreCase(d => d.Name);
@@ -102,6 +103,7 @@ public static class GeneratorContextBuilder
             macroBindings = macroBindings,
             macroPorts = macroPorts,
             deviceOutputGroups = deviceOutputGroups,
+            orchestrators = OrchestratorContextBuilder.Build(flows, payload.Variables, payload.DeviceTypes, payload.Units ?? new List<UnitInfo>()),
             warnings = Array.Empty<string>()
         };
     }
@@ -159,6 +161,7 @@ public static class GeneratorContextBuilder
             mode = flow.Mode,
             normalizedType = NormalizeFlowType(flow),
             diagramType = NormalizeDiagramType(flow),
+            isOrchestrator = flow.IsOrchestrator(),
             diagram = flow.Diagram,
             macroPortVariable = flow.MacroPortVariable,
             flowVariable = flowVar,
@@ -184,7 +187,6 @@ public static class GeneratorContextBuilder
             DiagramType = flow.DiagramType,
             ControlState = flow.ControlState,
             Category = flow.Category,
-            OrchestratorConfig = flow.OrchestratorConfig,
             Diagram = flow.Diagram,
             MacroPortVariable = flow.MacroPortVariable,
             Steps = resolvedSteps.Select(step => step.Step).ToList(),
@@ -301,16 +303,16 @@ public static class GeneratorContextBuilder
         foreach (var flow in flows)
         {
             var flowType = NormalizeDiagramType(flow);
-            if (string.Equals(flowType, "MacroStep", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(flowType, FlowConstants.MacroStepDiagramType, StringComparison.OrdinalIgnoreCase))
             {
                 ResolveAndValidateMacroPortVariable(flow, macroPortVariablesByName);
             }
 
             foreach (var step in flow.Steps ?? new List<Step>())
             {
-                if (!string.Equals(step.Kind, "macro", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.Equals(step.Kind, FlowConstants.MacroStepKind, StringComparison.OrdinalIgnoreCase)) continue;
 
-                if (string.Equals(flowType, "MacroStep", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(flowType, FlowConstants.MacroStepDiagramType, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException($"MacroStep {flow.Name ?? flow.Id} cannot contain nested macro steps.");
                 }
@@ -325,7 +327,7 @@ public static class GeneratorContextBuilder
                     throw new InvalidOperationException($"Step {step.LabelOrId()} references missing MacroStep flow: {step.MacroFlowId}.");
                 }
 
-                if (!string.Equals(NormalizeDiagramType(target), "MacroStep", StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(NormalizeDiagramType(target), FlowConstants.MacroStepDiagramType, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException($"Step {step.LabelOrId()} references flow {target.Name ?? target.Id}, but target diagramType is not MacroStep.");
                 }
@@ -381,7 +383,7 @@ public static class GeneratorContextBuilder
             throw new InvalidOperationException($"Duplicate MacroPort variable name for MacroStep {name}.");
         }
 
-        if (matches.Count == 1 && !string.Equals(matches[0].Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+        if (matches.Count == 1 && !string.Equals(matches[0].Format, FlowConstants.MacroPortFormat, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"MacroStep {name} has variable with same name but format/dataType/structure is {matches[0].Format}, expected MacroPort.");
         }
@@ -391,7 +393,7 @@ public static class GeneratorContextBuilder
             flow.MacroPortVariable = matches[0];
         }
 
-        if (flow.MacroPortVariable is not null && !string.Equals(flow.MacroPortVariable.Format, "MacroPort", StringComparison.OrdinalIgnoreCase))
+        if (flow.MacroPortVariable is not null && !string.Equals(flow.MacroPortVariable.Format, FlowConstants.MacroPortFormat, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"MacroStep {name} macroPortVariable format is {flow.MacroPortVariable.Format}, expected MacroPort.");
         }
@@ -421,8 +423,8 @@ public static class GeneratorContextBuilder
     }
 
     private static string NormalizeDiagramType(FlowInfo flow)
-        => string.Equals(flow.DiagramType ?? flow.Diagram?.DiagramType, "MacroStep", StringComparison.OrdinalIgnoreCase)
-            ? "MacroStep"
+        => string.Equals(flow.DiagramType ?? flow.Diagram?.DiagramType, FlowConstants.MacroStepDiagramType, StringComparison.OrdinalIgnoreCase)
+            ? FlowConstants.MacroStepDiagramType
             : "Macro";
 
     public static string NormalizeDeviceKind(string? format)

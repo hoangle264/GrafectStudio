@@ -187,6 +187,12 @@ namespace GrafcetStudioStoreHelpers {
         diag.category = 'normal';
         changed = true;
       }
+      // Orchestrators are drawn on the canvas now; the old typed element list is dropped.
+      const legacy = diag as { orchestratorConfig?: unknown };
+      if ('orchestratorConfig' in legacy) {
+        delete legacy.orchestratorConfig;
+        changed = true;
+      }
     });
     return changed;
   }

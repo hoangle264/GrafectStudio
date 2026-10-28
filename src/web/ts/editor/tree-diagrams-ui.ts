@@ -1,7 +1,6 @@
 "use strict";
 
 type TdDiagramMeta = GrafcetStudioProject.DiagramMeta;
-type TdOrchestratorConfig = GrafcetStudioProject.OrchestratorConfig;
 type TdAddressMode = GrafcetStudioProject.AddressMode;
 type TdBoolAddressMode = GrafcetStudioProject.BoolAddressMode;
 
@@ -149,7 +148,6 @@ function openDiagPropsPanel(id: string): void {
   dpSetControlState(d.controlState || d.mode || 'Auto');
   dpSetMode(d.mode||'Auto');
   dpSetOrchestrator(!!(d.category === 'orchestrator'));
-  dpRenderOrchestratorElements(d.orchestratorConfig);
   // Type chips
   dpSetType(d.diagramType||'Macro');
   dpSetAddressMode(d.addressMode||'bool');
@@ -267,26 +265,10 @@ function dpGetCurrentControlState(): string {
 function dpSetOrchestrator(enabled: boolean): void {
   const toggle = document.getElementById('dp-orchestrator-toggle') as HTMLInputElement | null;
   if (toggle) toggle.checked = !!enabled;
-  dpUpdateOrchestratorUi();
 }
 function dpIsOrchestrator(): boolean {
   const toggle = document.getElementById('dp-orchestrator-toggle') as HTMLInputElement | null;
   return !!(toggle && toggle.checked);
-}
-function dpUpdateOrchestratorUi(): void {
-  const area = document.getElementById('dp-orchestrator-area');
-  if (area) area.style.display = dpIsOrchestrator() ? 'block' : 'none';
-}
-function dpBuildOrchestratorConfig(): TdOrchestratorConfig {
-  const text = (document.getElementById('dp-orchestrator-elements') as HTMLTextAreaElement | null)?.value || '';
-  const elements = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(type => ({ type, config: {} }));
-  return { elements };
-}
-function dpRenderOrchestratorElements(config: TdOrchestratorConfig | null | undefined): void {
-  const area = document.getElementById('dp-orchestrator-elements') as HTMLTextAreaElement | null;
-  if (!area) return;
-  const elements = (config && Array.isArray(config.elements)) ? config.elements : [];
-  area.value = elements.map(el => el && el.type ? el.type : '').filter(Boolean).join('\n');
 }
 function dpUpdateBadge(mode: string): void {
   const cfg = MODE_CFG[mode]||{color:'var(--text2)',bg:'var(--s3)'};
@@ -307,7 +289,6 @@ function dpGetCurrentType(): string {
 function dpLiveUpdate(): void {
   const mode = dpGetCurrentMode();
   dpUpdateBadge(mode);
-  dpUpdateOrchestratorUi();
   // Build preview
   const machine = (document.getElementById('dp-machine') as HTMLInputElement).value||'Machine';
   const unitSel = document.getElementById('dp-unit') as HTMLSelectElement;
@@ -356,9 +337,9 @@ function saveDiagPropsPanel(): void {
   d.unit = unitSel.value ? (project.units.find(u=>u.id===unitSel.value)?.name||'') : '';
   d.mode = dpGetCurrentMode();
   d.controlState = dpGetCurrentControlState();
-  d.category = dpIsOrchestrator() ? 'orchestrator' : 'normal';
-  d.orchestratorConfig = dpIsOrchestrator() ? dpBuildOrchestratorConfig() : undefined;
   d.diagramType = dpGetCurrentType();
+  // Only a Macro flow can orchestrate; a MacroStep is what gets orchestrated.
+  d.category = dpIsOrchestrator() && d.diagramType !== 'MacroStep' ? 'orchestrator' : 'normal';
   const address = dpReadAddressConfig();
   if (!dpValidateAddressConfig(address)) return;
   d.addressMode = address.addressMode as TdAddressMode;

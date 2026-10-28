@@ -59,7 +59,7 @@ public sealed class MultiFileGenerator : ICodeGenerator
             Content = _systemControlGenerator.GenerateSystem(payload)
         };
 
-        if (payload.Flows.Any(flow => string.Equals(flow.Category, "orchestrator", StringComparison.OrdinalIgnoreCase)))
+        if (payload.Flows.Any(flow => flow.IsOrchestrator()))
         {
             yield return new CodegenFile
             {

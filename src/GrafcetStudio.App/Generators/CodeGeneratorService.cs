@@ -120,11 +120,11 @@ public class CodeGeneratorService : ICodeGeneratorService
         {
             if (string.Equals(fileName, "DeviceManager", StringComparison.OrdinalIgnoreCase))
             {
-                return RequireTemplate($"{profile}.DeviceManager");
+                return RequireTemplate(profile, "DeviceManager");
             }
             if (string.Equals(fileName, "IOMapping", StringComparison.OrdinalIgnoreCase))
             {
-                return RequireTemplate($"{profile}.MapIO");
+                return RequireTemplate(profile, "MapIO");
             }
         }
 
@@ -135,15 +135,22 @@ public class CodeGeneratorService : ICodeGeneratorService
                 string.Equals(fileName, "Orchestrator", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "SystemControl", StringComparison.OrdinalIgnoreCase))
             {
-                return RequireTemplate($"{profile}.{fileName}");
+                return RequireTemplate(profile, fileName);
             }
         }
 
         return null;
     }
 
-    private string RequireTemplate(string key)
-        => _templates.IsTemplateLoaded(key)
-            ? key
-            : throw new InvalidOperationException($"Template '{key}' is not loaded.");
+    /// <summary>Resolves "{profile}.{name}", falling back to the simple set that every profile loads.</summary>
+    private string RequireTemplate(string profile, string name)
+    {
+        var key = $"{profile}.{name}";
+        if (_templates.IsTemplateLoaded(key)) return key;
+
+        var fallback = $"simple.{name}";
+        if (_templates.IsTemplateLoaded(fallback)) return fallback;
+
+        throw new InvalidOperationException($"Template '{key}' is not loaded.");
+    }
 }

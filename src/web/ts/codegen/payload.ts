@@ -390,7 +390,6 @@ namespace GrafcetStudioCodegenPayload {
         mode: diagram.mode || '',
         controlState: diagram.controlState || diagram.mode || 'Auto',
         category: diagram.category || 'normal',
-        orchestratorConfig: diagram.category === 'orchestrator' ? (diagram.orchestratorConfig || { elements: [] }) : undefined,
         unitId: diagram.unitId || '',
         unit: diagram.unit || '',
         diagramType: diagram.diagramType || 'Macro',
@@ -523,9 +522,6 @@ namespace GrafcetStudioCodegenPayload {
         controlState: flow.diagram && (flow.diagram.controlState || flow.diagram.mode),
         category: flow.diagram && (flow.diagram.category || 'normal'),
         diagramType: flow.diagram && (flow.diagram.diagramType || 'Macro'),
-        orchestratorConfig: flow.diagram && flow.diagram.category === 'orchestrator'
-          ? (flow.diagram.orchestratorConfig || { elements: [] })
-          : undefined,
         diagram: flow.diagram,
         steps: flow.steps,
         transitions: flow.transitions,
