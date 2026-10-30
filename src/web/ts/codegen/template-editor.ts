@@ -24,9 +24,11 @@ namespace GrafcetStudioTemplateEditor {
   const SUGGESTIONS: Suggestion[] = [
     { label: '{{#each }}', insert: '{{#each items}}\n  \n{{/each}}', cursorToken: 'items' },
     { label: '{{#if }}', insert: '{{#if condition}}\n  \n{{/if}}', cursorToken: 'condition' },
+    { label: '{{#with }}', insert: '{{#with object}}\n  \n{{/with}}', cursorToken: 'object' },
     { label: '{{else}}', insert: '{{else}}' },
     { label: '{{/each}}', insert: '{{/each}}' },
     { label: '{{/if}}', insert: '{{/if}}' },
+    { label: '{{/with}}', insert: '{{/with}}' },
     { label: '{{> partial}}', insert: '{{> partial}}', cursorToken: 'partial' },
     { label: '{{! comment }}', insert: '{{! comment }}', cursorToken: 'comment' }
   ];
@@ -91,8 +93,8 @@ namespace GrafcetStudioTemplateEditor {
   function classForExpression(expression: string): string {
     const inner = expression.slice(2, -2).trim();
     if (inner.startsWith('!')) return 'hbs-comment';
-    if (/^#(each|if)\b/.test(inner)) return 'hbs-block';
-    if (/^\/(each|if)$/.test(inner)) return 'hbs-block-end';
+    if (/^#(each|if|unless|with)\b/.test(inner)) return 'hbs-block';
+    if (/^\/(each|if|unless|with)$/.test(inner)) return 'hbs-block-end';
     if (inner === 'else') return 'hbs-else';
     if (inner.startsWith('>')) return 'hbs-partial';
     return 'hbs-var';
@@ -536,6 +538,7 @@ namespace GrafcetStudioTemplateEditor {
     if (!input || !highlight) return;
     highlight.scrollTop = input.scrollTop;
     highlight.scrollLeft = input.scrollLeft;
+    if (suggestionVisible) positionCompletions();
   }
 
   function showCompletions(visible: boolean): void {
@@ -543,6 +546,42 @@ namespace GrafcetStudioTemplateEditor {
     if (!box) return;
     suggestionVisible = visible;
     box.classList.toggle('is-hidden', !visible);
+    if (visible) positionCompletions();
+  }
+
+  let measureCanvas: HTMLCanvasElement | null = null;
+
+  // Places the list just below the caret line (or above it when there is no room), so it never covers the line being typed.
+  function positionCompletions(): void {
+    const box = el<HTMLElement>('template-editor-completions');
+    const input = el<HTMLTextAreaElement>('template-editor-textarea');
+    const body = box?.parentElement;
+    if (!box || !input || !body) return;
+    const style = getComputedStyle(input);
+    measureCanvas = measureCanvas || document.createElement('canvas');
+    const context = measureCanvas.getContext('2d');
+    if (context) context.font = `${style.fontSize} ${style.fontFamily}`;
+    const charWidth = context ? context.measureText('M').width : 8;
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.55;
+    const caret = lineColumnAt(input.value, input.selectionStart || 0);
+
+    const inputRect = input.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    const caretLeft = inputRect.left - bodyRect.left + parseFloat(style.paddingLeft) + (caret.column - 1) * charWidth - input.scrollLeft;
+    const lineTop = inputRect.top - bodyRect.top + parseFloat(style.paddingTop) + (caret.line - 1) * lineHeight - input.scrollTop;
+
+    const boxHeight = box.offsetHeight;
+    const below = lineTop + lineHeight + 4;
+    const top = below + boxHeight > body.clientHeight && lineTop - boxHeight - 4 >= 0 ? lineTop - boxHeight - 4 : below;
+    const left = Math.max(0, Math.min(caretLeft, body.clientWidth - box.offsetWidth - 4));
+    box.style.top = `${top}px`;
+    box.style.left = `${left}px`;
+  }
+
+  // True when the text the suggestion would replace already equals what it inserts.
+  function isSuggestionComplete(input: HTMLTextAreaElement, item: Suggestion): boolean {
+    const range = item.range || replaceRangeForSuggestion(input);
+    return input.value.slice(range.start, range.end) === item.insert;
   }
 
   function completionContext(force: boolean): { typed: string; shouldShow: boolean } {
@@ -708,6 +747,11 @@ namespace GrafcetStudioTemplateEditor {
     const inArgument = variables.length > 0 && expressionStart >= 0 && /\s/.test(input.value.slice(expressionStart + 2, input.selectionStart || 0).trimStart());
     const snippets = inArgument ? [] : SUGGESTIONS.filter(item => !context.typed || item.label.toLowerCase().includes(context.typed) || item.insert.toLowerCase().includes(context.typed));
     visibleSuggestions = context.shouldShow ? [...variables, ...snippets] : variables;
+    // A single suggestion that is already fully typed has nothing left to offer.
+    if (!force && visibleSuggestions.length === 1 && isSuggestionComplete(input, visibleSuggestions[0])) {
+      showCompletions(false);
+      return;
+    }
     if (!visibleSuggestions.length) {
       showCompletions(false);
       return;
@@ -737,9 +781,10 @@ namespace GrafcetStudioTemplateEditor {
     const nextPos = range.start + (tokenIndex >= 0 ? tokenIndex : item.insert.length);
     input.focus();
     input.setSelectionRange(nextPos, nextPos + (tokenIndex >= 0 && item.cursorToken ? item.cursorToken.length : 0));
-    showCompletions(false);
     syncFromTextarea();
+    // syncFromTextarea re-opens the list with the word just inserted; only keep it open to drill into an object.
     if (item.range && item.insert.endsWith('.')) updateCompletions(true);
+    else showCompletions(false);
   }
 
   function showTemplateRoot(): void {
@@ -868,6 +913,13 @@ namespace GrafcetStudioTemplateEditor {
     }
 
     if (event.key === 'Enter' && suggestionVisible) {
+      const input = el<HTMLTextAreaElement>('template-editor-textarea');
+      const item = visibleSuggestions[suggestionIndex];
+      // Already typed in full: close the list and let Enter insert a newline as usual.
+      if (input && item && isSuggestionComplete(input, item)) {
+        showCompletions(false);
+        return;
+      }
       event.preventDefault();
       insertSuggestion(suggestionIndex);
     }
