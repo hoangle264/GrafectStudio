@@ -164,11 +164,21 @@ namespace GrafcetStudioTree {
     });
   }
 
+  // Struct Data names that codegen looks up by exact name; they cannot be renamed or deleted.
+  export const SYSTEM_STRUCT_NAMES = ['Unit Station', 'MacroPort', 'SystemControl'];
+
+  export function isSystemStruct(name: string | null | undefined): boolean {
+    return SYSTEM_STRUCT_NAMES.includes(String(name || ''));
+  }
+
   export function confirmDeviceType(context: TreeContext, input: ConfirmDeviceTypeInput): ConfirmDeviceTypeResult {
     const name = String(input.name || '').trim();
     if (!name) return { ok: false, message: 'Please enter a struct data name.', renamedSignalIds: {} };
     const devices = ensureDevices(context.project);
     const oldDevice = input.modalDeviceId ? devices.find(item => item.id === input.modalDeviceId) : null;
+    if (oldDevice && isSystemStruct(oldDevice.name) && oldDevice.name !== name) {
+      return { ok: false, message: `"${oldDevice.name}" is a system struct and cannot be renamed.`, renamedSignalIds: {} };
+    }
     const oldDeviceName = oldDevice && oldDevice.name ? oldDevice.name : name;
     const idMap: Record<string, string> = {};
     const usedSignalIds = new Set<string>();
@@ -228,6 +238,7 @@ namespace GrafcetStudioTree {
     const devices = ensureDevices(context.project);
     const device = devices.find(item => item.id === devId);
     if (!device) return { ok: false, message: 'Struct data not found.' };
+    if (isSystemStruct(device.name)) return { ok: false, message: `"${device.name}" is a system struct and cannot be deleted.` };
     context.project.devices = devices.filter(item => item.id !== devId);
     return { ok: true, value: device };
   }
@@ -242,6 +253,7 @@ namespace GrafcetStudioTree {
     makeSignalIdFromName(signalName: string): string;
     confirmDeviceType(context: TreeContext, input: ConfirmDeviceTypeInput): ConfirmDeviceTypeResult;
     removeDeviceType(context: TreeContext, devId: string): MutationResult<DeviceType>;
+    isSystemStruct(name: string | null | undefined): boolean;
   }
 
   export const api: TreeApi = {
@@ -253,7 +265,8 @@ namespace GrafcetStudioTree {
     addDiagramInUnit,
     makeSignalIdFromName,
     confirmDeviceType,
-    removeDeviceType
+    removeDeviceType,
+    isSystemStruct
   };
 }
 

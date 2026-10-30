@@ -160,6 +160,10 @@ function gvtMakeTypeSelect(entry: VuiVarEntry, v: VuiProjectVariable): HTMLSelec
   const structOptions = structDevices.length
     ? structDevices
     : ['Cylinder', 'Unit Station', 'Struct Data'];
+  const flowStructType = project.sharedFlowStruct && project.sharedFlowStruct.enabled !== false
+    ? (project.sharedFlowStruct.structTypeName || 'UDT_FlowData')
+    : '';
+  if (flowStructType && !structOptions.includes(flowStructType)) structOptions.push(flowStructType);
 
   structOptions.forEach(function(t) {
     const opt = document.createElement('option');
@@ -347,6 +351,8 @@ function renderGlobalVarTable(): void {
   const tbody = document.getElementById('gvt-tbody');
   if(!tbody) return;
   tbody.innerHTML = '';
+  // Diagrams can be added/renamed anywhere, so bring ST_<FlowName> variables up to date before showing them.
+  if (typeof syncFlowStructVariables === 'function' && syncFlowStructVariables()) saveProject();
   const entries = gvtGetEntries();
   const filter = ((document.getElementById('gvt-search') as HTMLInputElement | null)?.value||'').toLowerCase();
   const filtered = entries.filter(v=>

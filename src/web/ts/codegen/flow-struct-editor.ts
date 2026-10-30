@@ -58,184 +58,118 @@ namespace GrafcetStudioFlowStruct {
     return false;
   }
 
+  function escapeHtml(value: unknown): string {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Same dialog layout as the Struct Data editor (dlg-* / dev-sig-*). Edits a copy; nothing changes until Save.
   export function renderSharedFlowStructModal(project: Project, onSaveCallback?: () => void): void {
-    const schema = getSharedFlowStruct(project);
-    const existingModal = document.getElementById('shared-flow-struct-modal');
-    if (existingModal) {
-      existingModal.remove();
-    }
+    const schema: SharedFlowStructSchema = JSON.parse(JSON.stringify(getSharedFlowStruct(project)));
+    document.getElementById('shared-flow-struct-modal')?.remove();
 
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'shared-flow-struct-modal';
-    modalOverlay.className = 'modal-bg show sfs-overlay';
-
-    const container = document.createElement('div');
-    container.className = 'sfs-container';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'sfs-header';
-    header.innerHTML = `
-      <h3 class="sfs-title">⚙️ Shared Flow Struct Editor (ST_&lt;FlowName&gt;)</h3>
-      <button id="sfsm-close-btn" class="sfs-close">&times;</button>
-    `;
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'sfs-body';
-
-    // Top controls (Enable & Struct Type Name)
-    const topControls = document.createElement('div');
-    topControls.className = 'sfs-top';
-    topControls.innerHTML = `
-      <label class="sfs-check">
-        <input type="checkbox" id="sfsm-enabled-chk" ${schema.enabled !== false ? 'checked' : ''} /> Enable Shared Flow Struct
-      </label>
-      <div class="sfs-name-row">
-        <span class="sfs-name-lbl">Struct UDT Name:</span>
-        <input type="text" id="sfsm-typename-input" value="${schema.structTypeName || 'UDT_FlowData'}"  class="sfs-input" />
-      </div>
-    `;
-
-    // Table header & add button
-    const tableHeader = document.createElement('div');
-    tableHeader.className = 'sfs-table-bar';
-    tableHeader.innerHTML = `
-      <span class="sfs-table-title">Struct Members (empty by default - add your own)</span>
-      <button id="sfsm-add-btn" class="btn g">+ Add Member</button>
-    `;
-
-    // Members Table Container
-    const tableWrapper = document.createElement('div');
-    tableWrapper.className = 'sfs-table-wrap';
-
-    const renderTable = () => {
-      if (schema.members.length === 0) {
-        tableWrapper.innerHTML = `
-          <div class="sfs-empty">
-            No members in the Struct yet. Click <strong>+ Add Member</strong> to add a variable.
+    const overlay = document.createElement('div');
+    overlay.id = 'shared-flow-struct-modal';
+    overlay.className = 'modal-bg show';
+    overlay.innerHTML = `
+      <div class="modal dlg-modal dlg-w-800">
+        <div class="dlg-head">
+          <span class="dlg-head-title">Shared Flow Struct</span>
+          <span class="dlg-spacer"></span>
+          <span class="sfs-system-tag">System</span>
+        </div>
+        <div class="dlg-row">
+          <div class="dlg-col-grow">
+            <div class="dev-field-lbl">Struct type name</div>
+            <input id="sfsm-typename-input" type="text" class="dlg-input" placeholder="UDT_FlowData" value="${escapeHtml(schema.structTypeName || 'UDT_FlowData')}">
           </div>
-        `;
+          <div class="dlg-col-fixed">
+            <div class="dev-field-lbl">Status</div>
+            <label class="sfs-enable">
+              <input id="sfsm-enabled-chk" type="checkbox" ${schema.enabled !== false ? 'checked' : ''}> Enabled
+            </label>
+          </div>
+        </div>
+        <div class="sfs-hint">Every flow gets a variable <b>ST_&lt;FlowName&gt;</b> of this type in the Variable table.</div>
+        <div class="dlg-section-bar">
+          <span class="dlg-section-title">Members</span>
+          <button id="sfsm-add-btn" class="btn btn-cyan btn-sm">+ Add Member</button>
+        </div>
+        <div class="dlg-scroll">
+          <table class="dev-sig-table">
+            <thead><tr>
+              <th class="col-name">Member name</th>
+              <th class="col-var">Data type</th>
+              <th class="col-addr">Default value</th>
+              <th>Comment</th>
+              <th class="col-del"></th>
+            </tr></thead>
+            <tbody id="sfsm-tbody"></tbody>
+          </table>
+        </div>
+        <div class="dlg-foot">
+          <button id="sfsm-cancel-btn" class="btn">Cancel</button>
+          <button id="sfsm-save-btn" class="btn a">Save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const tbody = overlay.querySelector('#sfsm-tbody') as HTMLElement;
+    const renderTable = (): void => {
+      if (!schema.members.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="sfs-empty">No members yet. Click <b>+ Add Member</b>.</td></tr>';
         return;
       }
-
-      let html = `
-        <table class="sfs-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Default Value</th>
-              <th>Comment</th>
-              <th class="center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      schema.members.forEach(m => {
-        html += `
-          <tr>
-            <td>
-              <input type="text" data-field="name" data-id="${m.id}" value="${m.name}" class="sfs-input" />
-            </td>
-            <td>
-              <select data-field="type" data-id="${m.id}" class="sfs-input">
-                ${SUPPORTED_PLC_TYPES.map(t => `<option value="${t}" ${t === m.type ? 'selected' : ''}>${t}</option>`).join('')}
-              </select>
-            </td>
-            <td>
-              <input type="text" data-field="defaultValue" data-id="${m.id}" value="${m.defaultValue || ''}" class="sfs-input" />
-            </td>
-            <td>
-              <input type="text" data-field="comment" data-id="${m.id}" value="${m.comment || ''}" class="sfs-input" />
-            </td>
-            <td class="center">
-              <button data-action="delete" data-id="${m.id}" class="btn r btn-sm">✕</button>
-            </td>
-          </tr>
-        `;
-      });
-
-      html += `</tbody></table>`;
-      tableWrapper.innerHTML = html;
-
-      // Bind input events
-      tableWrapper.querySelectorAll('input, select').forEach(el => {
-        el.addEventListener('change', (e: Event) => {
-          const target = e.target as HTMLInputElement | HTMLSelectElement;
-          const id = target.getAttribute('data-id');
-          const field = target.getAttribute('data-field');
-          const member = schema.members.find(m => m.id === id);
-          if (member && field) {
-            (member as any)[field] = target.value;
-          }
-        });
-      });
-
-      tableWrapper.querySelectorAll('button[data-action="delete"]').forEach(btn => {
-        btn.addEventListener('click', (e: Event) => {
-          const target = e.currentTarget as HTMLButtonElement;
-          const id = target.getAttribute('data-id');
-          if (id) {
-            removeMemberFromSchema(schema, id);
-            renderTable();
-          }
-        });
-      });
+      tbody.innerHTML = schema.members.map(m => `
+        <tr data-id="${escapeHtml(m.id)}">
+          <td><input class="dev-sig-input" data-field="name" placeholder="Busy" value="${escapeHtml(m.name)}"></td>
+          <td>
+            <select class="dev-sig-select" data-field="type">
+              ${SUPPORTED_PLC_TYPES.map(t => `<option value="${t}" ${t === m.type ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+          </td>
+          <td><input class="dev-sig-input is-addr" data-field="defaultValue" placeholder="FALSE" value="${escapeHtml(m.defaultValue || '')}"></td>
+          <td><input class="dev-sig-input is-comment" data-field="comment" placeholder="e.g. Flow is running" value="${escapeHtml(m.comment || '')}"></td>
+          <td><button class="dev-del-row" data-action="delete" title="Remove">✕</button></td>
+        </tr>`).join('');
     };
-
-    body.appendChild(topControls);
-    body.appendChild(tableHeader);
-    body.appendChild(tableWrapper);
-
     renderTable();
 
-    // Footer
-    const footer = document.createElement('div');
-    footer.className = 'sfs-footer';
-    footer.innerHTML = `
-      <button id="sfsm-cancel-btn" class="btn">Cancel</button>
-      <button id="sfsm-save-btn" class="btn a">Save Changes</button>
-    `;
+    tbody.addEventListener('input', (e: Event) => {
+      const target = e.target as HTMLInputElement | HTMLSelectElement;
+      const field = target.getAttribute('data-field');
+      const member = schema.members.find(m => m.id === target.closest('tr')?.getAttribute('data-id'));
+      if (member && field) (member as any)[field] = target.value;
+    });
+    tbody.addEventListener('click', (e: Event) => {
+      const button = (e.target as HTMLElement).closest('[data-action="delete"]');
+      const id = button?.closest('tr')?.getAttribute('data-id');
+      if (id && removeMemberFromSchema(schema, id)) renderTable();
+    });
 
-    container.appendChild(header);
-    container.appendChild(body);
-    container.appendChild(footer);
-    modalOverlay.appendChild(container);
-    document.body.appendChild(modalOverlay);
-
-    // Event handlers
-    const closeBtn = document.getElementById('sfsm-close-btn');
-    const cancelBtn = document.getElementById('sfsm-cancel-btn');
-    const saveBtn = document.getElementById('sfsm-save-btn');
-    const addBtn = document.getElementById('sfsm-add-btn');
-
-    const closeModal = () => modalOverlay.remove();
-    if (closeBtn) closeBtn.onclick = closeModal;
-    if (cancelBtn) cancelBtn.onclick = closeModal;
-
-    if (addBtn) {
-      addBtn.onclick = () => {
-        addMemberToSchema(schema, `Var_${schema.members.length + 1}`, 'BOOL', '');
-        renderTable();
-      };
-    }
-
-    if (saveBtn) {
-      saveBtn.onclick = () => {
-        const enabledChk = document.getElementById('sfsm-enabled-chk') as HTMLInputElement;
-        const typeNameInput = document.getElementById('sfsm-typename-input') as HTMLInputElement;
-
-        schema.enabled = enabledChk ? enabledChk.checked : true;
-        schema.structTypeName = typeNameInput && typeNameInput.value.trim() ? typeNameInput.value.trim() : 'UDT_FlowData';
-
-        project.sharedFlowStruct = schema;
-        if (typeof onSaveCallback === 'function') {
-          onSaveCallback();
-        }
-        closeModal();
-      };
-    }
+    const close = (): void => overlay.remove();
+    (overlay.querySelector('#sfsm-cancel-btn') as HTMLButtonElement).onclick = close;
+    (overlay.querySelector('#sfsm-add-btn') as HTMLButtonElement).onclick = () => {
+      addMemberToSchema(schema, `Var_${schema.members.length + 1}`, 'BOOL', '');
+      renderTable();
+      (tbody.querySelector('tr:last-child input') as HTMLInputElement | null)?.select();
+    };
+    (overlay.querySelector('#sfsm-save-btn') as HTMLButtonElement).onclick = () => {
+      const typeName = (overlay.querySelector('#sfsm-typename-input') as HTMLInputElement).value.trim();
+      const members = schema.members.filter(m => String(m.name || '').trim());
+      members.forEach(m => { m.name = m.name.trim(); });
+      const seen = new Set<string>();
+      const duplicates = members.map(m => m.name).filter(name => seen.has(name.toLowerCase()) || !seen.add(name.toLowerCase()));
+      if (duplicates.length) {
+        notifyError('Duplicate member name is not allowed: ' + Array.from(new Set(duplicates)).join(', '));
+        return;
+      }
+      schema.enabled = (overlay.querySelector('#sfsm-enabled-chk') as HTMLInputElement).checked;
+      schema.structTypeName = typeName || 'UDT_FlowData';
+      schema.members = members;
+      project.sharedFlowStruct = schema;
+      if (typeof onSaveCallback === 'function') onSaveCallback();
+      close();
+    };
+    setTimeout(() => (overlay.querySelector('#sfsm-typename-input') as HTMLInputElement | null)?.focus(), 80);
   }
 }

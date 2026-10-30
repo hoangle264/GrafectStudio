@@ -65,22 +65,94 @@ function makeDevicesSection(): HTMLElement {
   return wrap;
 }
 
+// Structs that codegen looks up by exact name. Shown in their own group so they are not forgotten.
+const SYSTEM_STRUCT_HINTS: Record<string, string> = {
+  'Unit Station': 'Unit structure. Templates read it as {{unit.X}}.',
+  'MacroPort': 'MacroStep interface port. The variable name must match the MacroStep diagram name.',
+  'SystemControl': 'System-level control, kept separate. Not counted as a device.'
+};
+const FLOW_STRUCT_HINT = 'Shared struct for every flow. Creates ST_<FlowName> automatically.';
+
+function makeDevGroupLabel(text: string): HTMLElement {
+  const e = document.createElement('div');
+  e.className = 'tree-dev-group';
+  e.textContent = text;
+  return e;
+}
+
 function renderDevicesList(container?: HTMLElement | null): void {
   if(!container) container = document.getElementById('devices-body');
   if(!container) return;
   container.innerHTML = '';
   const devs = project.devices||[];
-  if(!devs.length){
+
+  container.appendChild(makeDevGroupLabel('System'));
+  Object.keys(SYSTEM_STRUCT_HINTS).forEach(name => {
+    const dev = devs.find(d => d.name === name);
+    container!.appendChild(dev ? makeDevTypeRow(dev, SYSTEM_STRUCT_HINTS[name]) : makeMissingSystemStructRow(name));
+  });
+  container.appendChild(makeFlowStructRow());
+
+  container.appendChild(makeDevGroupLabel('User'));
+  const userDevs = devs.filter(d => !treeGetApi().isSystemStruct(d.name));
+  if(!userDevs.length){
     const e=document.createElement('div');
     e.className='tree-dev-empty';
     e.textContent='no struct data defined';
     container.appendChild(e);
     return;
   }
-  devs.forEach(dev => container!.appendChild(makeDevTypeRow(dev)));
+  userDevs.forEach(dev => container!.appendChild(makeDevTypeRow(dev)));
 }
 
-function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
+function makeMissingSystemStructRow(name: string): HTMLElement {
+  const head = document.createElement('div');
+  head.className = 'tree-dev-type-head is-missing';
+  head.title = SYSTEM_STRUCT_HINTS[name] + '\nNot created yet. Click to create it.';
+  head.innerHTML = `
+    <span class="tree-dev-toggle"></span>
+    <span class="tree-dev-dot"></span>
+    <span class="tree-dev-type-name">${esc2(name)}</span>
+    <span class="tree-dev-type-tag is-system">System</span>
+    <span class="tree-dev-type-meta">not created</span>`;
+  head.addEventListener('click', () => createSystemStruct(name));
+  return head;
+}
+
+function createSystemStruct(name: string): void {
+  // Unit Station has a fixed signal list; MacroPort/SystemControl signals depend on the template, so start empty.
+  const signals = name === 'Unit Station' && typeof PROJECT_UNIT_STRUCT_SIGNALS !== 'undefined'
+    ? PROJECT_UNIT_STRUCT_SIGNALS.map(s => ({ id: s.id, name: s.name || s.id, dataType: s.dataType || 'Bool', varType: s.varType || 'Var', comment: s.comment || '' }))
+    : [];
+  const result = treeGetApi().confirmDeviceType(treeGetContext(), { modalDeviceId: null, name, categoryId: 'cat-other', signals });
+  if (!result.ok || !result.value) { notifyError(result.message || 'Unable to create struct data.'); return; }
+  saveProject(); renderTree();
+  if (typeof openStructTab === 'function') openStructTab(result.value.id);
+  toast('Struct Data: ' + name);
+}
+
+function makeFlowStructRow(): HTMLElement {
+  const schema = GrafcetStudioFlowStruct.getSharedFlowStruct(project);
+  const head = document.createElement('div');
+  head.className = 'tree-dev-type-head' + (schema.enabled === false ? ' is-missing' : '');
+  head.title = FLOW_STRUCT_HINT + (schema.enabled === false ? '\nDisabled.' : '');
+  head.innerHTML = `
+    <span class="tree-dev-toggle"></span>
+    <span class="tree-dev-dot"></span>
+    <span class="tree-dev-type-name">${esc2(schema.structTypeName || 'UDT_FlowData')}</span>
+    <span class="tree-dev-type-tag is-system">System</span>
+    <span class="tree-dev-type-meta">${schema.enabled === false ? 'off' : schema.members.length + ' mem'}</span>`;
+  head.addEventListener('click', () => {
+    GrafcetStudioFlowStruct.renderSharedFlowStructModal(project, () => {
+      syncFlowStructVariables();
+      saveProject(); renderTree();
+      if (typeof renderGlobalVarTable === 'function') renderGlobalVarTable();
+    });
+  });
+  return head;
+}
+
+function makeDevTypeRow(dev: DevDeviceType, systemHint?: string): HTMLElement {
   const isOpen = false;
   const cat = getDevCatById(dev.categoryId||'cat-other');
   const wrap = document.createElement('div');
@@ -88,15 +160,18 @@ function makeDevTypeRow(dev: DevDeviceType): HTMLElement {
 
   const head = document.createElement('div');
   head.className = 'tree-dev-type-head';
+  if (systemHint) head.title = systemHint;
   head.innerHTML = `
     <span class="tree-dev-toggle ${isOpen?'':'closed'}">${treeIcon('chevron')}</span>
     <span class="tree-dev-dot"></span>
     <span class="tree-dev-type-name">${esc2(dev.name)}</span>
-    <span class="tree-dev-type-tag" title="${esc2(cat.name)}">${esc2(cat.name)}</span>
+    ${systemHint
+      ? '<span class="tree-dev-type-tag is-system">System</span>'
+      : `<span class="tree-dev-type-tag" title="${esc2(cat.name)}">${esc2(cat.name)}</span>`}
     <span class="tree-dev-type-meta">${(dev.signals||[]).length} sig</span>
     <div class="tree-dev-type-acts">
       <button class="tree-dev-btn" onclick="openDeviceTypeModal('${dev.id}');event.stopPropagation()" title="Edit">✎</button>
-      <button class="tree-dev-btn del" onclick="removeDeviceType('${dev.id}',event)">✕</button>
+      ${systemHint ? '' : `<button class="tree-dev-btn del" onclick="removeDeviceType('${dev.id}',event)">✕</button>`}
     </div>`;
 
   const children = document.createElement('div');
@@ -279,7 +354,6 @@ function openDeviceTypeModal(devId: string | null): void {
   el.innerHTML=`
     <div class="modal dlg-modal dlg-w-800">
       <div class="dlg-head">
-        <span class="dlg-head-icon">Struct</span>
         <span class="dlg-head-title">${devId?'Edit':'New'} Struct Data</span>
       </div>
       <div class="dlg-row">
@@ -318,7 +392,12 @@ function openDeviceTypeModal(devId: string | null): void {
     </div>`;
   document.body.appendChild(el);
 
-  (document.getElementById('dev-modal-name') as HTMLInputElement).value = dev?.name||'';
+  const nameInput = document.getElementById('dev-modal-name') as HTMLInputElement;
+  nameInput.value = dev?.name||'';
+  if (dev && treeGetApi().isSystemStruct(dev.name)) {
+    nameInput.readOnly = true;
+    nameInput.title = 'System struct: codegen looks it up by this exact name.';
+  }
 
   const sigs = dev?.signals||[];
   if(sigs.length) sigs.forEach(s=>devModalAddRow(s));

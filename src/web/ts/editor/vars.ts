@@ -162,6 +162,10 @@ namespace GrafcetStudioVars {
     const devType = (context.project.devices || []).find(device => device.name === (variable.format || ''));
     const devSigs = devType ? (devType.signals || []) : [];
     if (variable.format === 'Cylinder') return devSigs.length ? devSigs : CYL_SIGNALS;
+    const shared = context.project.sharedFlowStruct;
+    if (!devType && shared && variable.format === (shared.structTypeName || 'UDT_FlowData')) {
+      return (shared.members || []).map(m => ({ id: m.name, name: m.name, dataType: m.type || 'BOOL', varType: 'Var', comment: m.comment || '' }));
+    }
     if (!devSigs.some(function(sig) { return !!findNestedDeviceType(context, sig); })) return devSigs;
     const visitedTypeIds: Record<string, boolean> = {};
     if (devType && devType.id) visitedTypeIds[devType.id] = true;

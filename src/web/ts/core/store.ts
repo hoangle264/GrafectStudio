@@ -251,6 +251,54 @@ namespace GrafcetStudioStoreHelpers {
       changed = ensureStructDataType(context, formatName, genericSignals, 'cat-other') || changed;
     });
 
+    return syncFlowStructVariables(context) || changed;
+  }
+
+  export const FLOW_STRUCT_VAR_SOURCE = 'flowStruct';
+
+  export function flowStructInstanceName(flowName: string): string {
+    return 'ST_' + String(flowName || 'Flow').replace(/[^a-zA-Z0-9_]/g, '_');
+  }
+
+  // Keeps one ST_<FlowName> variable per diagram while the shared flow struct is enabled.
+  // Only variables created here (source 'flowStruct') are retyped or removed; user-made ones are left alone.
+  export function syncFlowStructVariables(context: StoreContext): boolean {
+    const currentProject = context.getProject();
+    const shared = currentProject.sharedFlowStruct;
+    const enabled = !!shared && shared.enabled !== false;
+    const typeName = (shared && shared.structTypeName) || 'UDT_FlowData';
+    const vars = ensureProjectVariables(context);
+    const wanted = new Set(enabled ? (currentProject.diagrams || []).map(d => flowStructInstanceName(d && d.name)) : []);
+    let changed = false;
+
+    vars.user = vars.user.filter(function(v) {
+      const keep = !v || v.source !== FLOW_STRUCT_VAR_SOURCE || wanted.has(v.label);
+      if (!keep) changed = true;
+      return keep;
+    });
+    vars.user.forEach(function(v) {
+      if (v && v.source === FLOW_STRUCT_VAR_SOURCE && v.format !== typeName) {
+        v.format = typeName;
+        v.dataType = typeName;
+        changed = true;
+      }
+    });
+
+    const existing = new Set(vars.imported.concat(vars.user).map(v => v && v.label));
+    wanted.forEach(function(label) {
+      if (existing.has(label)) return;
+      vars.user.push(normalizeVariableRecord({
+        label,
+        format: typeName,
+        dataType: typeName,
+        kind: 'struct',
+        signalAddresses: {},
+        declarationMode: 'SymbolicBlock',
+        comment: 'Shared flow struct instance',
+        source: FLOW_STRUCT_VAR_SOURCE
+      }, 'user'));
+      changed = true;
+    });
     return changed;
   }
 
@@ -370,6 +418,7 @@ namespace GrafcetStudioStoreHelpers {
     upsertProjectVariable(context: StoreContext, bucket: string, variableDef: Partial<ProjectVariable>): ProjectVariable;
     normalizeVariableRecord(v: Partial<ProjectVariable> | null | undefined, bucket: string): ProjectVariable;
     syncStructData(context: StoreContext): boolean;
+    syncFlowStructVariables(context: StoreContext): boolean;
     syncVariableSignalAddressesFromDeviceTypes(context: StoreContext): boolean;
     normalizeIOMappingDirection(v: unknown): string;
     ensureProjectIOMapping(context: StoreContext): IOMapping;
@@ -384,6 +433,7 @@ namespace GrafcetStudioStoreHelpers {
     upsertProjectVariable,
     normalizeVariableRecord,
     syncStructData,
+    syncFlowStructVariables,
     syncVariableSignalAddressesFromDeviceTypes,
     normalizeIOMappingDirection,
     ensureProjectIOMapping,
@@ -453,6 +503,10 @@ function syncStructDataFromProjectData(): boolean {
 
 function syncStructData(): boolean {
   return syncStructDataFromProjectData();
+}
+
+function syncFlowStructVariables(): boolean {
+  return GrafcetStudioStoreHelpers.syncFlowStructVariables(getStoreContext());
 }
 
 function ensureProjectVariables(): StoreProjectVariables {
