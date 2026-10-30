@@ -127,7 +127,7 @@ public static class GeneratorContextBuilder
             var previousStep = index > 0 ? sequence[index - 1].Step : null;
             var isLastStep = index == sequence.Count - 1;
             var nextStep = isLastStep
-                ? BuildSyntheticNextStep(step, flow.Diagram)
+                ? BuildSyntheticNextStep(step)
                 : sequence[index + 1].Step;
             var macroBinding = callerBindings.FirstOrDefault(binding => string.Equals(binding.callerStepId, step.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -198,16 +198,13 @@ public static class GeneratorContextBuilder
     /// Creates a synthetic "next step" for the last step in a sequence.
     /// The synthetic step carries an auto-incremented ExecAddress so that
     /// templates can always use <c>{{NextStep.ExecAddress}}</c> without
-    /// checking for null on the final step.
+    /// checking for null on the final step. Works for PLC addresses and labels alike.
     /// </summary>
-    private static Step? BuildSyntheticNextStep(Step lastStep, DiagramInfo? diagram)
+    private static Step? BuildSyntheticNextStep(Step lastStep)
     {
-        if (string.IsNullOrWhiteSpace(lastStep.ExecAddress)) return null;
+        var nextAddress = ResolvedStep.IncrementExecAddress(lastStep.ExecAddress);
+        if (nextAddress is null) return null;
 
-        if (!StepAddressHelper.TryParseStepExecAddress(lastStep.ExecAddress, diagram, out var parsed))
-            return null;
-
-        var nextAddress = StepAddressHelper.IncrementParsedAddress(parsed);
         return new Step
         {
             Id = string.Empty,

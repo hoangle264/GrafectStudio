@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using GrafcetStudio.Domain.Enums;
 
 namespace GrafcetStudio.Domain.Models;
@@ -83,8 +84,7 @@ public class ResolvedStep
     /// Returns the ExecAddress of the next step when available.
     /// For the last step in a flow (NextStep is null), automatically generates
     /// the address by incrementing the current step's ExecAddress by 1.
-    /// Supports both plain numeric addresses (e.g. MR300 → MR301)
-    /// and bit-addressed formats (e.g. DM0.2 → DM0.3).
+    /// See <see cref="IncrementExecAddress"/> for the supported formats.
     /// Returns null if the current step has no ExecAddress.
     /// </summary>
     public string? NextExecAddress
@@ -93,40 +93,35 @@ public class ResolvedStep
     /// <summary>Lowercase alias for <see cref="NextExecAddress"/>. Used by Handlebars templates via <c>{{nextExecAddress}}</c>.</summary>
     public string? nextExecAddress => NextExecAddress;
 
-    private static string? IncrementExecAddress(string? address)
+    // "Tag".%X3 / Db.Member.%X3 (Siemens bit slice)
+    private static readonly Regex SiemensBitSlicePattern = new(@"^(.*\.%X)(\d+)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    // DM0.2, @DM10.3, ActiveWord.3 (word + bit)
+    private static readonly Regex WordBitPattern = new(@"^(.+\.)(\d+)$", RegexOptions.CultureInvariant);
+    // MR300, @MR300, Step_10, "Auto_S3" (trailing number, optional closing quote)
+    private static readonly Regex TrailingNumberPattern = new(@"^(.*?)(\d+)(""?)$", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Increments an exec address or label by one, keeping its text, case and digit width:
+    /// MR300 → MR301, DM0.2 → DM0.3, ActiveWord.3 → ActiveWord.4, "Tag".%X3 → "Tag".%X4,
+    /// Auto_Step09 → Auto_Step10. Returns null when there is no number to increment.
+    /// Bits are not rolled over into the next word.
+    /// </summary>
+    public static string? IncrementExecAddress(string? address)
     {
         if (string.IsNullOrWhiteSpace(address)) return null;
 
-        var trimmed = address.Trim().TrimStart('@');
-        var dotIndex = trimmed.IndexOf('.');
-        var head = dotIndex >= 0 ? trimmed[..dotIndex] : trimmed;
-        var bitText = dotIndex >= 0 ? trimmed[(dotIndex + 1)..] : string.Empty;
+        var value = address.Trim();
+        var match = SiemensBitSlicePattern.Match(value);
+        if (!match.Success) match = WordBitPattern.Match(value);
+        if (!match.Success) match = TrailingNumberPattern.Match(value);
+        if (!match.Success) return null;
 
-        var prefixLength = head.TakeWhile(char.IsLetter).Count();
-        if (prefixLength <= 0 || prefixLength >= head.Length) return null;
+        var numberText = match.Groups[2].Value;
+        if (!long.TryParse(numberText, out var number)) return null;
 
-        var prefix = head[..prefixLength].ToUpperInvariant();
-        var numberText = head[prefixLength..];
-        if (!int.TryParse(numberText, out var number)) return null;
-
-        var width = numberText.Length > 1 ? numberText.Length : 0;
-
-        // Bit-addressed format: prefix + number + "." + bit  (e.g. DM0.2 → DM0.3)
-        if (int.TryParse(bitText, out var bit))
-        {
-            var formatted = width > 0
-                ? $"{prefix}{number.ToString().PadLeft(width, '0')}.{bit + 1}"
-                : $"{prefix}{number}.{bit + 1}";
-            return formatted;
-        }
-
-        // Plain numeric format: prefix + number  (e.g. MR300 → MR301)
-        {
-            var nextNumber = number + 1;
-            return width > 0
-                ? $"{prefix}{nextNumber.ToString().PadLeft(width, '0')}"
-                : $"{prefix}{nextNumber}";
-        }
+        var next = (number + 1).ToString().PadLeft(numberText.Length, '0');
+        var suffix = match.Groups.Count > 3 ? match.Groups[3].Value : string.Empty;
+        return match.Groups[1].Value + next + suffix;
     }
 
     public string? InTransitionId => InTransition?.Id;
