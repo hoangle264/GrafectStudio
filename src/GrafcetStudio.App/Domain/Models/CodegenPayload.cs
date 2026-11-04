@@ -97,9 +97,25 @@ public class CodegenPayload
         foreach (var variable in Variables)
         {
             deviceTypesByName.TryGetValue(variable.Format, out var deviceType);
-            var signalNames = deviceType?.Signals
-                .Where(signal => !variable.SignalAddresses.ContainsKey(signal.Id) && !variable.SignalAddresses.ContainsKey(signal.Name))
-                .Select(signal => string.IsNullOrWhiteSpace(signal.Name) ? signal.Id : signal.Name);
+            IEnumerable<string>? signalNames = null;
+            if (deviceType is not null)
+            {
+                // A struct-typed member has no address of its own; its leaves ("Sensor.Fwd") carry them.
+                foreach (var container in StructNesting.ContainerPaths(deviceType, DeviceTypes))
+                {
+                    if (variable.SignalAddresses.TryGetValue(container, out var value) && string.IsNullOrWhiteSpace(value))
+                    {
+                        variable.SignalAddresses.Remove(container);
+                    }
+                }
+
+                signalNames = StructNesting.FlattenLeaves(deviceType, DeviceTypes)
+                    .Where(leaf => leaf.Depth > 1
+                        ? !variable.SignalAddresses.ContainsKey(leaf.Path)
+                        : !variable.SignalAddresses.ContainsKey(leaf.Signal.Id) && !variable.SignalAddresses.ContainsKey(leaf.Signal.Name))
+                    .Select(leaf => leaf.Path)
+                    .ToList();
+            }
             FillSignalLabels(variable.Label, variable.SignalAddresses, signalNames);
 
             if (variable.SignalAddresses.Count == 0 && string.IsNullOrWhiteSpace(variable.Address))

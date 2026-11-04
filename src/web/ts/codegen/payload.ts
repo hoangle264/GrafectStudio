@@ -274,8 +274,9 @@ namespace GrafcetStudioCodegenPayload {
     if (!deviceType || !Array.isArray(deviceType.signals)) return Object.assign({}, rawAddresses);
 
     const signalAddresses: Record<string, string> = {};
-    deviceType.signals.forEach(signal => {
-      const normalized = normalizeCSharpSignal(context, deviceType.name, signal);
+    // Nested members are sent per leaf, keyed by path ("Sensor.Fwd"); the struct-typed member itself is not.
+    GrafcetStudioStructNesting.flattenSignals(context.project.devices || [], deviceType).forEach(signal => {
+      const normalized = signal.depth > 1 ? signal : normalizeCSharpSignal(context, deviceType.name, signal);
       const outputKey = normalized.name || normalized.id;
       if (!outputKey) return;
       const address = rawAddresses[normalized.name] || rawAddresses[signal && signal.name] || '';

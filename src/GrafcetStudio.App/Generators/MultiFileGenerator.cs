@@ -82,6 +82,13 @@ public sealed class MultiFileGenerator : ICodeGenerator
                 Content = _mapIoGenerator.Generate(payload, Array.Empty<GrafcetStudio.CodeGen.Runtime.Models.AggregatedOutputBinding>())
             };
         }
+
+        // Variable-first KV projects: the structs and globals the .mnm refers to by name.
+        yield return new CodegenFile
+        {
+            Path = Keyence.KeyenceDeclarationGenerator.FilePath,
+            Content = Keyence.KeyenceDeclarationGenerator.Generate(payload)
+        };
     }
 
     private static IEnumerable<CodegenPayload> BuildUnitPayloads(CodegenPayload payload)

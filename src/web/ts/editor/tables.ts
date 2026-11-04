@@ -191,7 +191,7 @@
     const variables = ((state as unknown as { vars?: ProjectVariable[] }).vars || []);
     const rows = variables.map(function(variable, index) {
       const deviceType = (context.project.devices || []).find(device => device.name === (variable.format || '')) || null;
-      const signalRows = deviceType ? (deviceType.signals || []).map(function(signal) {
+      const signalRows = deviceType ? GrafcetStudioStructNesting.flattenSignals(context.project.devices || [], deviceType).map(function(signal) {
         return {
           kind: 'signal' as const,
           label: (variable.label || '?') + '.' + signal.name,

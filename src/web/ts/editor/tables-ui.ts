@@ -302,7 +302,7 @@ function etExportCSV(): void {
     const devType=(project.devices||[]).find(d=>d.name===(v.format||''));
     if(devType){
       varRows.push([vRowNum, v.label||'', v.format||'', '', 'DEVICE', v.comment||'']);
-      (devType.signals||[]).forEach(sig=>{
+      GrafcetStudioStructNesting.flattenSignals(project.devices||[], devType).forEach(sig=>{
         const addr=(v.signalAddresses||{})[sig.id]||'';
         varRows.push(['-', (v.label||'?')+'.'+sig.name, sig.dataType||'Bool', addr, sig.varType||'', sig.comment||'']);
       });

@@ -86,6 +86,7 @@ src/web/js/codegen/template-editor.js
 src/web/js/core/interop.js
 src/web/js/core/store-persistence.js
 src/web/js/core/store.js
+src/web/js/core/struct-nesting.js
 src/web/js/editor/excel-import-ui.js
 src/web/js/editor/excel-import.js
 src/web/js/editor/io-mapping-ui.js

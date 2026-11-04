@@ -81,7 +81,6 @@ namespace GrafcetStudioStoreHelpers {
   }
 
   export const GF_ADDRESS_DEFAULT_BOOL_SPAN = 200;
-  export const MAX_NESTING_DEPTH = 3;
 
   function normalizeBoolAddressMode(mode: unknown): string {
     const value = String(mode || '').trim().toLowerCase();
@@ -354,7 +353,8 @@ namespace GrafcetStudioStoreHelpers {
           changed = true;
         }
         const signalAddresses = v.signalAddresses;
-        (device.signals || []).forEach(function(sig) {
+        // Leaves only: a struct-typed member gets keys per nested leaf ("Sensor.Fwd"), not one for itself.
+        GrafcetStudioStructNesting.flattenSignals(currentProject.devices || [], device).forEach(function(sig) {
           const key = sig && (sig.name || sig.id);
           if (!key) return;
           if (!Object.prototype.hasOwnProperty.call(signalAddresses, key)) {

@@ -1,0 +1,179 @@
+using GrafcetStudio.Domain.Models;
+using GrafcetStudio.Domain.Resolution;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace GrafcetStudio.App.Generators.Keyence;
+
+/// <summary>
+/// Builds the structure types and global variables that the generated .mnm refers to by name, for
+/// variable-first KV STUDIO projects (KV-X / KV-8000).
+/// The text uses IEC 61131-3 declaration syntax (TYPE ... STRUCT / VAR_GLOBAL). It has not been
+/// checked against a KV STUDIO import file; keep every format detail in this class so it can be
+/// switched to the real import layout in one place.
+/// </summary>
+public static class KeyenceDeclarationGenerator
+{
+    public const string FilePath = "Declarations/KV_Declarations.txt";
+
+    private static readonly Dictionary<string, string> PrimitiveTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Bool"] = "BOOL",
+        ["Boolean"] = "BOOL",
+        ["Int"] = "INT",
+        ["DInt"] = "DINT",
+        ["UInt"] = "UINT",
+        ["UDInt"] = "UDINT",
+        ["Real"] = "REAL",
+        ["LReal"] = "LREAL",
+        ["Word"] = "WORD",
+        ["DWord"] = "DWORD",
+        ["Byte"] = "BYTE",
+        ["String"] = "STRING",
+        ["Time"] = "TIME"
+    };
+
+    /// <summary>Returns the declaration text, or an empty string when nothing is declared by name.</summary>
+    public static string Generate(CodegenPayload payload)
+    {
+        var deviceTypes = payload.DeviceTypes ?? new List<DeviceType>();
+        var shared = payload.SharedFlowStruct is { Enabled: true } schema && !string.IsNullOrWhiteSpace(schema.StructTypeName)
+            ? schema
+            : null;
+
+        var warnings = new List<string>();
+        var orderedTypes = new List<DeviceType>();
+        var seenTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var usesShared = false;
+        var globals = new List<string>();
+
+        foreach (var variable in payload.Variables ?? new List<DeviceVariable>())
+        {
+            if (string.IsNullOrWhiteSpace(variable.Label)) continue;
+            if (PlcAddressFormats.Keyence.IsAddress(variable.Label))
+            {
+                warnings.Add($"Variable \"{variable.Label}\" looks like a KV device and will be read as one; rename it.");
+                continue;
+            }
+            if (!IsIdentifier(variable.Label))
+            {
+                warnings.Add($"Variable \"{variable.Label}\" is not a valid identifier; the .mnm uses it as written.");
+            }
+
+            var structType = FindType(deviceTypes, variable.Format);
+            string typeName;
+            if (structType is not null)
+            {
+                AddTypeWithDependencies(structType, deviceTypes, orderedTypes, seenTypes, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                typeName = TypeIdentifier(structType.Name);
+            }
+            else if (shared is not null && string.Equals(variable.Format, shared.StructTypeName, StringComparison.OrdinalIgnoreCase))
+            {
+                usesShared = true;
+                typeName = TypeIdentifier(shared.StructTypeName);
+            }
+            else
+            {
+                typeName = MapPrimitive(variable.Format, $"variable \"{variable.Label}\"", warnings);
+            }
+
+            var device = structType is null && PlcAddressFormats.Keyence.IsAddress(variable.Address) ? variable.Address!.Trim() : null;
+            var line = $"    {variable.Label} : {typeName};";
+            if (device is not null) line += $" (* device {device} *)";
+            globals.Add(line);
+        }
+
+        if (globals.Count == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        if (usesShared && shared is not null)
+        {
+            AppendType(sb, TypeIdentifier(shared.StructTypeName),
+                shared.Members.Select(member => (member.Name, MapPrimitive(member.Type, $"{shared.StructTypeName}.{member.Name}", warnings), member.Comment)));
+        }
+
+        foreach (var type in orderedTypes)
+        {
+            AppendType(sb, TypeIdentifier(type.Name), type.Signals.Select(signal =>
+            {
+                var child = StructNesting.FindSignalType(deviceTypes, signal);
+                var memberType = child is not null
+                    ? TypeIdentifier(child.Name)
+                    : MapPrimitive(signal.DataType, $"{type.Name}.{signal.Name}", warnings);
+                return (string.IsNullOrWhiteSpace(signal.Name) ? signal.Id : signal.Name, memberType, (string?)signal.Comment);
+            }));
+        }
+
+        sb.AppendLine("VAR_GLOBAL");
+        foreach (var line in globals) sb.AppendLine(line);
+        sb.AppendLine("END_VAR");
+
+        // Header last, so warnings raised while writing the types are included.
+        var header = new StringBuilder();
+        header.AppendLine("(* KV STUDIO declarations generated by GrafcetStudio.");
+        header.AppendLine("   Structure types first (members before the structs that hold them), then global variables.");
+        header.AppendLine("   IEC 61131-3 syntax; register them in KV STUDIO before building the .mnm files. *)");
+        foreach (var warning in warnings.Distinct())
+        {
+            header.AppendLine($"(* WARNING: {warning} *)");
+        }
+        header.AppendLine();
+        return header.ToString() + sb;
+    }
+
+    private static void AddTypeWithDependencies(DeviceType type, IList<DeviceType> deviceTypes, List<DeviceType> ordered, HashSet<string> seen, HashSet<string> stack)
+    {
+        if (seen.Contains(type.Id) || !stack.Add(type.Id)) return;
+        foreach (var signal in type.Signals)
+        {
+            var child = StructNesting.FindSignalType(deviceTypes, signal);
+            if (child is not null) AddTypeWithDependencies(child, deviceTypes, ordered, seen, stack);
+        }
+        stack.Remove(type.Id);
+        if (seen.Add(type.Id)) ordered.Add(type);
+    }
+
+    private static void AppendType(StringBuilder sb, string typeName, IEnumerable<(string Name, string Type, string? Comment)> members)
+    {
+        sb.AppendLine($"TYPE {typeName} :");
+        sb.AppendLine("STRUCT");
+        foreach (var (name, type, comment) in members)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            var line = $"    {name} : {type};";
+            if (!string.IsNullOrWhiteSpace(comment)) line += $" (* {comment!.Replace("*)", "* )")} *)";
+            sb.AppendLine(line);
+        }
+        sb.AppendLine("END_STRUCT");
+        sb.AppendLine("END_TYPE");
+        sb.AppendLine();
+    }
+
+    private static DeviceType? FindType(IList<DeviceType> deviceTypes, string? name)
+        => string.IsNullOrWhiteSpace(name)
+            ? null
+            : deviceTypes.FirstOrDefault(type => string.Equals(type.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static string MapPrimitive(string? dataType, string owner, List<string> warnings)
+    {
+        var value = (dataType ?? string.Empty).Trim();
+        if (value.Length == 0) return "BOOL";
+        if (PrimitiveTypes.TryGetValue(value, out var mapped)) return mapped;
+        warnings.Add($"Unknown data type \"{value}\" on {owner}; written as is.");
+        return value;
+    }
+
+    /// <summary>Struct names may contain spaces ("Unit Station"); KV type names may not.</summary>
+    private static string TypeIdentifier(string name)
+    {
+        var chars = (name ?? string.Empty).Trim().Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_').ToArray();
+        var result = new string(chars).Trim('_');
+        if (result.Length == 0) return "Struct";
+        return char.IsDigit(result[0]) ? "_" + result : result;
+    }
+
+    private static bool IsIdentifier(string value)
+        => value.Length > 0 && (char.IsLetter(value[0]) || value[0] == '_') && value.All(ch => char.IsLetterOrDigit(ch) || ch == '_');
+}

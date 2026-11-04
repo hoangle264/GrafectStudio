@@ -20,6 +20,7 @@ namespace GrafcetStudioTree {
     varType: string;
     address?: string;
     comment?: string;
+    nestedTypeId?: string;
   }
 
   export interface ConfirmDeviceTypeInput {
@@ -147,19 +148,44 @@ namespace GrafcetStudioTree {
     return groups;
   }
 
-  function rewriteSignalAddressKeys(project: Project, formatName: string, idMap: Record<string, string>): void {
+  // Renamed signals of one struct: move address keys in every variable that holds that struct,
+  // directly ("Fwd") or nested ("Sensor.Fwd", and "Sensor.*" when a struct-typed member is renamed).
+  function rewriteSignalAddressKeys(project: Project, editedTypeId: string, oldTypeName: string, idMap: Record<string, string>): void {
+    const renames = Object.keys(idMap);
+    if (!renames.length) return;
+    const devices = ensureDevices(project);
     getVariableGroups(project).forEach(function(list) {
       (list || []).forEach(function(variable) {
-        if (!variable || variable.format !== formatName || !variable.signalAddresses) return;
+        if (!variable || !variable.signalAddresses) return;
+        const format = variable.format || variable.dataType || '';
+        const root = devices.find(device => !!device && (device.name === format || (device.id === editedTypeId && format === oldTypeName)));
+        if (!root) return;
         const signalAddresses = variable.signalAddresses;
-        Object.keys(idMap).forEach(function(oldId) {
-          const newId = idMap[oldId];
-          if (!Object.prototype.hasOwnProperty.call(signalAddresses, oldId)) return;
-          if (!Object.prototype.hasOwnProperty.call(signalAddresses, newId)) {
-            signalAddresses[newId] = signalAddresses[oldId];
-          }
-          delete signalAddresses[oldId];
+        const moves: Array<[string, string]> = [];
+        GrafcetStudioStructNesting.instancePrefixes(devices, root, editedTypeId).forEach(function(prefix) {
+          Object.keys(signalAddresses).forEach(function(key) {
+            renames.forEach(function(oldId) {
+              const from = prefix + oldId;
+              if (key !== from && key.indexOf(from + '.') !== 0) return;
+              moves.push([key, prefix + idMap[oldId] + key.slice(from.length)]);
+            });
+          });
         });
+        const values = moves.map(([from]) => signalAddresses[from]);
+        moves.forEach(([from]) => { delete signalAddresses[from]; });
+        moves.forEach(([, to], i) => {
+          if (!Object.prototype.hasOwnProperty.call(signalAddresses, to) || !signalAddresses[to]) signalAddresses[to] = values[i];
+        });
+      });
+    });
+  }
+
+  // Older data references nested structs by name only; pin them by id so a rename keeps the link.
+  function pinNestedTypeIds(devices: DeviceType[]): void {
+    devices.forEach(function(device) {
+      (device && device.signals || []).forEach(function(sig) {
+        const child = GrafcetStudioStructNesting.findSignalType(devices, sig);
+        if (child) sig.nestedTypeId = child.id;
       });
     });
   }
@@ -179,11 +205,17 @@ namespace GrafcetStudioTree {
     if (oldDevice && isSystemStruct(oldDevice.name) && oldDevice.name !== name) {
       return { ok: false, message: `"${oldDevice.name}" is a system struct and cannot be renamed.`, renamedSignalIds: {} };
     }
+    if (input.modalDeviceId && !oldDevice) return { ok: false, message: 'Struct data not found.', renamedSignalIds: {} };
+    if (devices.some(item => item.name === name && (!oldDevice || item.id !== oldDevice.id))) {
+      return { ok: false, message: `A struct named "${name}" already exists.`, renamedSignalIds: {} };
+    }
+    pinNestedTypeIds(devices);
     const oldDeviceName = oldDevice && oldDevice.name ? oldDevice.name : name;
     const idMap: Record<string, string> = {};
     const usedSignalIds = new Set<string>();
     const duplicateIds = new Set<string>();
     const signals: DeviceSignal[] = [];
+    let missingType = '';
 
     (input.signals || []).forEach(function(signal) {
       const signalName = String(signal && signal.name || '').trim();
@@ -197,6 +229,13 @@ namespace GrafcetStudioTree {
       usedSignalIds.add(nextId);
       const oldId = String(signal.id || '').trim();
       if (oldId && oldId !== nextId) idMap[oldId] = nextId;
+      const nestedTypeId = String(signal.nestedTypeId || '').trim();
+      if (nestedTypeId) {
+        const child = devices.find(item => item.id === nestedTypeId);
+        if (!child) { missingType = nextId; return; }
+        signals.push({ id: nextId, name: nextId, dataType: child.name, nestedTypeId: child.id, varType: signal.varType || 'Var', address: '', comment: signal.comment || '' });
+        return;
+      }
       signals.push({
         id: nextId,
         name: nextId,
@@ -213,23 +252,33 @@ namespace GrafcetStudioTree {
     if (duplicateIds.size) {
       return { ok: false, message: 'Duplicate signal name/id is not allowed: ' + Array.from(duplicateIds).join(', '), renamedSignalIds: idMap };
     }
+    if (missingType) {
+      return { ok: false, message: `Signal "${missingType}" uses a struct that no longer exists.`, renamedSignalIds: idMap };
+    }
+
+    const deviceId = oldDevice ? oldDevice.id : 'dev-' + context.now();
+    const candidate: DeviceType = { id: deviceId, name, signals };
+    const nesting = GrafcetStudioStructNesting.checkType(devices.filter(item => item.id !== deviceId).concat([candidate]), candidate);
+    if (!nesting.ok) return { ok: false, message: nesting.message, renamedSignalIds: idMap };
 
     let device: DeviceType;
-    if (input.modalDeviceId) {
-      if (!oldDevice) return { ok: false, message: 'Struct data not found.', renamedSignalIds: idMap };
+    if (oldDevice) {
       oldDevice.name = name;
       oldDevice.categoryId = input.categoryId || 'cat-other';
       oldDevice.signals = signals;
       device = oldDevice;
     } else {
-      device = { id: 'dev-' + context.now(), name, categoryId: input.categoryId || 'cat-other', open: true, signals };
+      device = { id: deviceId, name, categoryId: input.categoryId || 'cat-other', open: true, signals };
       devices.push(device);
     }
 
-    if (Object.keys(idMap).length) {
-      rewriteSignalAddressKeys(context.project, oldDeviceName, idMap);
-      if (oldDeviceName !== name) rewriteSignalAddressKeys(context.project, name, idMap);
+    if (oldDeviceName !== name) {
+      // Keep the display name of members that hold this struct in step with the rename.
+      devices.forEach(function(item) {
+        (item.signals || []).forEach(function(sig) { if (sig.nestedTypeId === device.id) sig.dataType = name; });
+      });
     }
+    rewriteSignalAddressKeys(context.project, device.id, oldDeviceName, idMap);
     if (context.syncVariableSignalAddressesFromDeviceTypes) context.syncVariableSignalAddressesFromDeviceTypes();
     return { ok: true, value: device, renamedSignalIds: idMap };
   }
@@ -239,6 +288,10 @@ namespace GrafcetStudioTree {
     const device = devices.find(item => item.id === devId);
     if (!device) return { ok: false, message: 'Struct data not found.' };
     if (isSystemStruct(device.name)) return { ok: false, message: `"${device.name}" is a system struct and cannot be deleted.` };
+    const users = GrafcetStudioStructNesting.usagesOf(devices, devId);
+    if (users.length) {
+      return { ok: false, message: `"${device.name}" is used inside ${users.map(item => '"' + item.name + '"').join(', ')}. Remove it there first.` };
+    }
     context.project.devices = devices.filter(item => item.id !== devId);
     return { ok: true, value: device };
   }

@@ -407,6 +407,38 @@ function openDeviceTypeModal(devId: string | null): void {
   setTimeout(()=>document.getElementById('dev-modal-name')?.focus(),80);
 }
 
+// Data type options: primitives, then structs this struct may hold. Structs that would break a
+// nesting rule stay visible but disabled, with the reason as tooltip.
+function devModalTypeOptions(sig?: DevDeviceSignal): string {
+  const nesting = GrafcetStudioStructNesting;
+  const devices = project.devices || [];
+  const current = sig ? nesting.findSignalType(devices, sig) : undefined;
+  const selected = current ? 'struct:' + current.id : (sig?.dataType || 'Bool');
+  const primitives = nesting.PRIMITIVE_TYPES
+    .map(t => `<option value="${t}" ${selected===t?'selected':''}>${t}</option>`).join('');
+  const parent = _devModalDevId ? devices.find(d => d.id === _devModalDevId) || null : null;
+  if (parent && nesting.isSystemStructName(parent.name)) return primitives;
+  const parentName = ((document.getElementById('dev-modal-name') as HTMLInputElement | null)?.value || '').trim();
+  const structs = devices
+    .filter(d => d && d.id !== _devModalDevId && !nesting.isSystemStructName(d.name))
+    .map(d => {
+      const value = 'struct:' + d.id;
+      const check = nesting.canContain(devices, parent, parentName, d);
+      const blocked = !check.ok && value !== selected;
+      return `<option value="${value}" ${value===selected?'selected':''} ${blocked?'disabled':''} title="${esc2(check.ok ? '' : check.message || '')}">${esc2(d.name)}</option>`;
+    }).join('');
+  return primitives + (structs ? `<optgroup label="Struct (max ${nesting.MAX_DEPTH} levels)">${structs}</optgroup>` : '');
+}
+
+function devModalSyncRowType(tr: HTMLTableRowElement): void {
+  const isStruct = String((tr.querySelector('[data-f="dataType"]') as HTMLSelectElement).value).indexOf('struct:') === 0;
+  const addr = tr.querySelector('[data-f="address"]') as HTMLInputElement | null;
+  if (!addr) return;
+  addr.disabled = isStruct;
+  addr.placeholder = isStruct ? 'set per member in Variables' : '%IX0.0 / %QX0.0';
+  if (isStruct) addr.value = '';
+}
+
 function devModalAddRow(sig?: DevDeviceSignal): void {
   const tbody=document.getElementById('dev-modal-tbody');
   if(!tbody) return;
@@ -417,7 +449,7 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
     <td><input class="dev-sig-input" placeholder="LSL" value="${esc2(sig?.name||'')}" data-f="name"></td>
     <td>
       <select class="dev-sig-select" data-f="dataType">
-        ${['Bool','Int','DInt','UInt','UDInt','Real','LReal','Word','DWord','Byte','String','Time'].map(t=>`<option value="${t}" ${(sig?.dataType||'Bool')===t?'selected':''}>${t}</option>`).join('')}
+        ${devModalTypeOptions(sig)}
       </select>
     </td>
     <td>
@@ -431,20 +463,27 @@ function devModalAddRow(sig?: DevDeviceSignal): void {
     <td><input class="dev-sig-input is-comment" placeholder="e.g. Lower limit sensor" value="${esc2(sig?.comment||'')}" data-f="comment"></td>
     <td><button class="dev-del-row" onclick="this.closest('tr').remove()">✕</button></td>`;
   tbody.appendChild(tr);
+  (tr.querySelector('[data-f="dataType"]') as HTMLSelectElement).addEventListener('change', () => devModalSyncRowType(tr));
+  devModalSyncRowType(tr);
 }
 
 function confirmDeviceType(): void {
   const name=((document.getElementById('dev-modal-name') as HTMLInputElement).value||'').trim();
   if(!name){notifyError('Please enter a struct data name.');return;}
   const catId=(document.getElementById('dev-modal-cat') as HTMLSelectElement).value;
-  const signals=Array.from(document.getElementById('dev-modal-tbody')!.querySelectorAll('tr')).map(tr=>({
-    id: String(tr.dataset.sigId || '').trim(),
-    name: (tr.querySelector('[data-f="name"]') as HTMLInputElement).value.trim(),
-    dataType: (tr.querySelector('[data-f="dataType"]') as HTMLSelectElement).value,
-    varType: (tr.querySelector('[data-f="varType"]') as HTMLSelectElement).value,
-    address: (tr.querySelector('[data-f="address"]') as HTMLInputElement | null)?.value.trim() || '',
-    comment: (tr.querySelector('[data-f="comment"]') as HTMLInputElement).value.trim()
-  }));
+  const signals=Array.from(document.getElementById('dev-modal-tbody')!.querySelectorAll('tr')).map(tr=>{
+    const typeValue = (tr.querySelector('[data-f="dataType"]') as HTMLSelectElement).value;
+    const nestedTypeId = typeValue.indexOf('struct:') === 0 ? typeValue.slice('struct:'.length) : '';
+    return {
+      id: String(tr.dataset.sigId || '').trim(),
+      name: (tr.querySelector('[data-f="name"]') as HTMLInputElement).value.trim(),
+      dataType: nestedTypeId ? '' : typeValue,
+      nestedTypeId,
+      varType: (tr.querySelector('[data-f="varType"]') as HTMLSelectElement).value,
+      address: nestedTypeId ? '' : (tr.querySelector('[data-f="address"]') as HTMLInputElement | null)?.value.trim() || '',
+      comment: (tr.querySelector('[data-f="comment"]') as HTMLInputElement).value.trim()
+    };
+  });
   const result = treeGetApi().confirmDeviceType(treeGetContext(), {
     modalDeviceId: _devModalDevId,
     name,
