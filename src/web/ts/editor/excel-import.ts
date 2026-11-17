@@ -59,8 +59,22 @@ namespace GrafcetStudioExcelImport {
     return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
+  /** Normalizes each dotted segment separately so "Sensor.Fwd" never matches a flat "SensorFwd". */
   function normalizeStructHeader(value: unknown): string {
-    return String(value || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return String(value || '').split('.')
+      .map(function(segment) { return segment.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(); })
+      .join('.');
+  }
+
+  const LABEL_HEADERS = ['label', 'name', 'tag', 'variable', 'var'];
+
+  /** Leaf keys of a struct, in declaration order; nested leaves are dotted paths ("Sensor.Fwd"). */
+  export function structLeafPaths(structTypeName: string, deviceTypes: DeviceType[]): string[] {
+    const devices = deviceTypes || [];
+    const structType = devices.find(function(device) { return !!device && device.name === structTypeName; });
+    return GrafcetStudioStructNesting.flattenSignals(devices, structType)
+      .map(function(signal) { return (signal.name || signal.id || '').trim(); })
+      .filter(Boolean);
   }
 
   function looksLikeAddress(value: unknown): boolean {
@@ -154,20 +168,63 @@ namespace GrafcetStudioExcelImport {
     const structType = (deviceTypes || []).find(function(device) { return device.name === structTypeName; });
     if (!structType) return { vars: [], errors: ['Struct Data "' + structTypeName + '" not found.'] };
 
-    const signals = structType.signals || [];
-    if (!signals.length) return { vars: [], errors: ['Struct Data "' + structTypeName + '" has no signals.'] };
+    // Leaves only: a struct-typed member is expanded to its dotted leaf paths, matching signalAddresses keys.
+    const devices = deviceTypes || [];
+    const leafKeys = structLeafPaths(structTypeName, devices);
+    if (!leafKeys.length) return { vars: [], errors: ['Struct Data "' + structTypeName + '" has no signals.'] };
+
+    const leafByNorm: Record<string, string> = {};
+    leafKeys.forEach(function(key) {
+      const norm = normalizeStructHeader(key);
+      if (norm && leafByNorm[norm] == null) leafByNorm[norm] = key;
+    });
+    const containerByNorm: Record<string, string> = {};
+    GrafcetStudioStructNesting.containerPaths(devices, structType).forEach(function(path) {
+      containerByNorm[normalizeStructHeader(path)] = path;
+    });
 
     const vars: ProjectVariable[] = [];
     const errors: string[] = [];
 
+    // A header row names its label column, or names at least one leaf / struct member.
     const firstRow = rows[0] || [];
-    const hasHeader = firstRow.length > 1 && !KV_ADDRESS_RE.test(firstRow[1]);
-    const headerMap: Record<string, number> = {};
-    if (hasHeader) {
-      firstRow.forEach(function(header, index) {
-        const key = normalizeStructHeader(header);
-        if (key && headerMap[key] == null) headerMap[key] = index;
+    const hasHeader = LABEL_HEADERS.indexOf(normalizeHeader(firstRow[0])) >= 0
+      || firstRow.slice(1).some(function(cell) {
+        const norm = normalizeStructHeader(cell);
+        return !!norm && (leafByNorm[norm] != null || containerByNorm[norm] != null);
       });
+
+    // Column index -> leaf key. With a header the file may list any subset of leaves, in any order.
+    const columnLeaf: Record<number, string> = {};
+    if (hasHeader) {
+      const seen: Record<string, number> = {};
+      firstRow.forEach(function(header, index) {
+        if (index === 0) return;
+        const raw = String(header || '').trim();
+        if (!raw) return;
+        const norm = normalizeStructHeader(raw);
+        const leaf = leafByNorm[norm];
+        if (leaf == null) {
+          if (containerByNorm[norm] != null) {
+            errors.push('Column "' + raw + '" is a struct member of "' + structTypeName + '"; use its leaves (e.g. "' + containerByNorm[norm] + '.<signal>").');
+          } else {
+            errors.push('Column "' + raw + '" is not a signal of "' + structTypeName + '".');
+          }
+          return;
+        }
+        if (seen[leaf] != null) {
+          errors.push('Column "' + raw + '" repeats signal "' + leaf + '".');
+          return;
+        }
+        seen[leaf] = index;
+        columnLeaf[index] = leaf;
+      });
+      if (errors.length) {
+        errors.push('Valid columns: ' + leafKeys.join(', '));
+        return { vars: [], errors };
+      }
+    } else {
+      leafKeys.forEach(function(key, leafIndex) { columnLeaf[leafIndex + 1] = key; });
     }
 
     rows.forEach(function(columns, rowIndex) {
@@ -175,15 +232,25 @@ namespace GrafcetStudioExcelImport {
       if (!columns[0] || !columns[0].trim()) return;
 
       const id = columns[0].trim();
+      // The file is the source of truth: leaves without a column or with an empty cell end up blank.
       const signalMap: Record<string, string> = {};
+      leafKeys.forEach(function(key) { signalMap[key] = ''; });
       let hasError = false;
 
-      signals.forEach(function(signal: DeviceSignal, signalIndex) {
-        const key = (signal.name || signal.id || ('sig-' + signalIndex)).trim();
-        const columnIndex = hasHeader ? headerMap[normalizeStructHeader(key)] : (signalIndex + 1);
-        const address = (columnIndex != null ? columns[columnIndex] : '') || '';
+      columns.forEach(function(cell, columnIndex) {
+        if (columnIndex === 0) return;
+        const address = String(cell || '').trim();
+        if (!address) return;
+        const key = columnLeaf[columnIndex];
+        if (key == null) {
+          errors.push('Row ' + (rowIndex + 1) + ' [' + id + ']: column ' + (columnIndex + 1) + (hasHeader
+            ? ' has a value but no header.'
+            : ' is beyond the ' + leafKeys.length + ' signals of "' + structTypeName + '"; add a header row to pick signals by name.'));
+          hasError = true;
+          return;
+        }
         signalMap[key] = address;
-        if (address && !validateAddress(address)) {
+        if (!validateAddress(address)) {
           errors.push('Row ' + (rowIndex + 1) + ' [' + id + '.' + key + ']: invalid address "' + address + '"');
           hasError = true;
         }
@@ -322,6 +389,7 @@ namespace GrafcetStudioExcelImport {
     parseCSV(text: string): string[][];
     parseUnitCSV(rows: string[][]): UnitCSVParseResult;
     parseStructCSV(rows: string[][], structTypeName: string, deviceTypes: DeviceType[]): StructCSVParseResult;
+    structLeafPaths(structTypeName: string, deviceTypes: DeviceType[]): string[];
     parseSiemensBlockCSV(rows: string[][], deviceTypes: DeviceType[]): SiemensBlockCSVParseResult;
     parsePhysicalIOCSV(rows: string[][], normalizeDirection?: (value: string) => string): PhysicalIOCSVParseResult;
     validateAddress(address: string): boolean;
@@ -331,6 +399,7 @@ namespace GrafcetStudioExcelImport {
     parseCSV,
     parseUnitCSV,
     parseStructCSV,
+    structLeafPaths,
     parseSiemensBlockCSV,
     parsePhysicalIOCSV,
     validateAddress

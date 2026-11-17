@@ -138,11 +138,12 @@ function showExcelImportModal(defaultType?: string): void {
 
         <div id="ei-struct-wrap" class="ei-field${initialType === 'struct' ? '' : ' is-hidden'}">
           <div class="ei-label">STRUCT DATA TYPE</div>
-          <select id="ei-struct-type" class="ei-select">
+          <select id="ei-struct-type" class="ei-select" onchange="eiOnImportTypeChange()">
             ${structOptions}
           </select>
           <div class="ei-note">
-            Col 0 = Label · Col 1..N map, in order, to the signals of the selected Struct Data
+            Col 0 = Label · Header row names the signals to fill (nested: Member.Signal); any subset, any order.
+            Signals without a column or with an empty cell are imported blank, replacing existing addresses.
           </div>
         </div>
 
@@ -157,9 +158,7 @@ function showExcelImportModal(defaultType?: string): void {
           <pre id="ei-preview-text" class="ei-preview-text"></pre>
         </div>
 
-        <div id="ei-schema-hint" class="ei-schema-hint">
-          ${eiGetSchemaHintHtml(initialType)}
-        </div>
+        <div id="ei-schema-hint" class="ei-schema-hint"></div>
       </div>
 
       <div class="dlg-foot">
@@ -173,14 +172,17 @@ function showExcelImportModal(defaultType?: string): void {
   eiOnImportTypeChange();
 }
 
-function eiGetSchemaHintHtml(type: string): string {
+function eiGetSchemaHintHtml(type: string, structType?: string): string {
   if (type === 'unit') {
     return '<b class="ei-accent">Unit Station CSV</b>: UnitName · flagOrigin · flagAuto · flagManual · originBaseAddr · autoBaseAddr · flagError · btnStart · hmiStop · btnReset · eStop · outHomed';
   }
   if (type === 'physical-io') {
     return '<b class="ei-accent">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in or output/out';
   }
-  return '<b class="ei-accent">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
+  const leaves = structType ? eiGetParserApi().structLeafPaths(structType, project.devices || []) : [];
+  if (!leaves.length) return '<b class="ei-accent">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
+  return '<b class="ei-accent">Struct Data CSV</b> (' + esc(structType) + '): Label · ' + leaves.map(esc).join(' · ')
+    + '<br>Without a header row, columns follow this order.';
 }
 
 function eiGetImportTypeLabel(type: string, structType?: string): string {
@@ -195,15 +197,15 @@ function eiOnImportTypeChange(): void {
   const type  = radio ? radio.value : 'struct';
   const structWrap = document.getElementById('ei-struct-wrap');
   const schemaHint = document.getElementById('ei-schema-hint');
+  const st         = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
 
   if (structWrap) structWrap.classList.toggle('is-hidden', type !== 'struct');
   if (schemaHint) {
-    schemaHint.innerHTML = eiGetSchemaHintHtml(type);
+    schemaHint.innerHTML = eiGetSchemaHintHtml(type, st ? st.value : '');
   }
 
   if (_eiPendingText) {
     const rows = eiParseCSV(_eiPendingText);
-    const st   = document.getElementById('ei-struct-type') as HTMLSelectElement | null;
     const stat = document.getElementById('ei-stat');
     if (stat) stat.textContent = 'Mode: ' + eiGetImportTypeLabel(type, st ? st.value : '') + '  (' + rows.length + ' rows)';
   }
