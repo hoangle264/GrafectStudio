@@ -10,12 +10,7 @@ namespace GrafcetStudioExcelImport {
   type PlcBlock = GrafcetStudioProject.PlcBlock;
   type PhysicalIOCSVParseResult = GrafcetStudioProject.PhysicalIOCSVParseResult;
 
-  const KV_ADDRESS_RE = /^@?(MR|LR|DM|CR|AR|WR|HR)\d+$/i;
-
-  export function validateAddress(address: string): boolean {
-    if (!address || !address.trim()) return true;
-    return KV_ADDRESS_RE.test(address.trim());
-  }
+  // Address cells are taken as written: any PLC notation is accepted, the PLC tool reports bad ones on import.
 
   export function parseCSV(text: string): string[][] {
     const lines = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -77,10 +72,6 @@ namespace GrafcetStudioExcelImport {
       .filter(Boolean);
   }
 
-  function looksLikeAddress(value: unknown): boolean {
-    return KV_ADDRESS_RE.test(String(value || '').trim());
-  }
-
   export function parseUnitCSV(rows: string[][]): UnitCSVParseResult {
     const configs: UnitConfig[] = [];
     const errors: string[] = [];
@@ -128,37 +119,25 @@ namespace GrafcetStudioExcelImport {
         outHomed: getByHeader(columns, ['homedone', 'outhomed'])
       };
 
-      let hasError = false;
-      Object.keys(io).forEach(function(key) {
-        if (key === 'originBaseAddr' || key === 'autoBaseAddr') return;
-        const value = io[key as keyof typeof io];
-        if (value && !validateAddress(value)) {
-          errors.push('Row ' + (rowIndex + 1) + ' [' + unitName + '.' + key + ']: invalid address "' + value + '"');
-          hasError = true;
+      configs.push({
+        label: unitName,
+        unitIndex: unitIndex,
+        originBaseAddr: io.originBaseAddr || '@MR100',
+        autoBaseAddr: io.autoBaseAddr || '@MR300',
+        flags: {
+          flagOrigin: io.flagOrigin,
+          flagAuto: io.flagAuto,
+          flagManual: io.flagManual,
+          flagError: io.flagError
+        },
+        io: {
+          btnStart: io.btnStart,
+          hmiStop: io.hmiStop,
+          btnReset: io.btnReset,
+          eStop: io.eStop,
+          outHomed: io.outHomed
         }
       });
-
-      if (!hasError) {
-        configs.push({
-          label: unitName,
-          unitIndex: unitIndex,
-          originBaseAddr: io.originBaseAddr || '@MR100',
-          autoBaseAddr: io.autoBaseAddr || '@MR300',
-          flags: {
-            flagOrigin: io.flagOrigin,
-            flagAuto: io.flagAuto,
-            flagManual: io.flagManual,
-            flagError: io.flagError
-          },
-          io: {
-            btnStart: io.btnStart,
-            hmiStop: io.hmiStop,
-            btnReset: io.btnReset,
-            eStop: io.eStop,
-            outHomed: io.outHomed
-          }
-        });
-      }
     });
 
     return { configs, errors };
@@ -250,10 +229,6 @@ namespace GrafcetStudioExcelImport {
           return;
         }
         signalMap[key] = address;
-        if (!validateAddress(address)) {
-          errors.push('Row ' + (rowIndex + 1) + ' [' + id + '.' + key + ']: invalid address "' + address + '"');
-          hasError = true;
-        }
       });
 
       if (!hasError) {
@@ -271,6 +246,36 @@ namespace GrafcetStudioExcelImport {
 
     return { vars, errors };
   }
+  /** Rows of a Struct Data CSV in the layout parseStructCSV reads: Label, then one column per leaf path. */
+  export function buildStructCSVRows(variables: ProjectVariable[], structTypeName: string, deviceTypes: DeviceType[]): string[][] {
+    const leafKeys = structLeafPaths(structTypeName, deviceTypes);
+    const rows: string[][] = [['Label'].concat(leafKeys)];
+    (variables || []).forEach(function(variable) {
+      if (!variable || (variable.format || variable.dataType) !== structTypeName) return;
+      const addresses = variable.signalAddresses || {};
+      rows.push([variable.label || ''].concat(leafKeys.map(function(key) { return addresses[key] || ''; })));
+    });
+    return rows;
+  }
+
+  // Header names parseUnitCSV accepts, paired with where the value lives in a UnitConfig.
+  const UNIT_CSV_COLUMNS: Array<[string, string]> = [
+    ['originBaseAddr', 'originBaseAddr'], ['autoBaseAddr', 'autoBaseAddr'],
+    ['flagOrigin', 'flags.flagOrigin'], ['flagAuto', 'flags.flagAuto'], ['flagManual', 'flags.flagManual'], ['flagError', 'flags.flagError'],
+    ['btnStart', 'io.btnStart'], ['hmiStop', 'io.hmiStop'], ['btnReset', 'io.btnReset'], ['eStop', 'io.eStop'], ['outHomed', 'io.outHomed']
+  ];
+
+  /** Rows of a Unit Station CSV in the layout parseUnitCSV reads. */
+  export function buildUnitCSVRows(configs: UnitConfig[], getAddress: (config: UnitConfig, path: string) => string): string[][] {
+    const rows: string[][] = [['UnitName', 'UnitIndex'].concat(UNIT_CSV_COLUMNS.map(function(column) { return column[0]; }))];
+    (configs || []).forEach(function(config) {
+      if (!config) return;
+      rows.push([config.label || '', config.unitIndex != null ? String(config.unitIndex) : '']
+        .concat(UNIT_CSV_COLUMNS.map(function(column) { return String(getAddress(config, column[1]) || ''); })));
+    });
+    return rows;
+  }
+
   function getHeaderValue(columns: string[], headerIndexMap: Record<string, number>, names: string[]): string {
     for (let index = 0; index < names.length; index++) {
       const headerIndex = headerIndexMap[names[index]];
@@ -390,9 +395,10 @@ namespace GrafcetStudioExcelImport {
     parseUnitCSV(rows: string[][]): UnitCSVParseResult;
     parseStructCSV(rows: string[][], structTypeName: string, deviceTypes: DeviceType[]): StructCSVParseResult;
     structLeafPaths(structTypeName: string, deviceTypes: DeviceType[]): string[];
+    buildStructCSVRows(variables: ProjectVariable[], structTypeName: string, deviceTypes: DeviceType[]): string[][];
+    buildUnitCSVRows(configs: UnitConfig[], getAddress: (config: UnitConfig, path: string) => string): string[][];
     parseSiemensBlockCSV(rows: string[][], deviceTypes: DeviceType[]): SiemensBlockCSVParseResult;
     parsePhysicalIOCSV(rows: string[][], normalizeDirection?: (value: string) => string): PhysicalIOCSVParseResult;
-    validateAddress(address: string): boolean;
   }
 
   export const api: ExcelImportApi = {
@@ -400,9 +406,10 @@ namespace GrafcetStudioExcelImport {
     parseUnitCSV,
     parseStructCSV,
     structLeafPaths,
+    buildStructCSVRows,
+    buildUnitCSVRows,
     parseSiemensBlockCSV,
-    parsePhysicalIOCSV,
-    validateAddress
+    parsePhysicalIOCSV
   };
 }
 

@@ -564,6 +564,68 @@ function gvtDeleteVar(source: string, key: string | number): void {
 }
 
 
+function gvtSafeFileName(name: string): string {
+  return String(name || '').trim().replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'Project';
+}
+
+// Downloads one CSV per Struct Data type, plus one for unit stations, each in the layout Excel Import reads back.
+function gvtExportVariablesCSV(): void {
+  const parser = eiGetParserApi();
+  const devices = project.devices || [];
+  const byType = new Map<string, VuiProjectVariable[]>();
+  const units: VuiUnitConfig[] = [];
+  let skipped = 0;
+  gvtGetEntries().forEach(function(entry) {
+    if (entry.source === 'unit') { units.push(entry.data as VuiUnitConfig); return; }
+    const variable = entry.data as VuiProjectVariable;
+    const typeName = variable.format || variable.dataType || '';
+    // Primitives and types outside Struct Data (e.g. the shared flow struct) have no import layout.
+    if (!devices.some(function(device) { return device && device.name === typeName; }) || !parser.structLeafPaths(typeName, devices).length) {
+      skipped++;
+      return;
+    }
+    if (!byType.has(typeName)) byType.set(typeName, []);
+    byType.get(typeName)!.push(variable);
+  });
+
+  const base = gvtSafeFileName(project.name);
+  const files: Array<[string, string[][]]> = [];
+  byType.forEach(function(variables, typeName) {
+    files.push([base + '_Struct_' + gvtSafeFileName(typeName) + '.csv', parser.buildStructCSVRows(variables, typeName, devices)]);
+  });
+  if (units.length) files.push([base + '_UnitStation.csv', parser.buildUnitCSVRows(units, gvtGetUnitAddr)]);
+  if (!files.length) { toast('No struct or unit station variables to export'); return; }
+
+  files.forEach(function(file, index) { setTimeout(function() { downloadCSV(file[1], file[0]); }, index * 200); });
+  toast('Exporting ' + files.length + ' CSV file' + (files.length !== 1 ? 's' : '')
+    + (skipped ? ' · ' + skipped + ' variable' + (skipped !== 1 ? 's' : '') + ' without an import layout skipped' : ''));
+}
+
+// Deletes every variable and unit station. ST_<Flow> variables are kept: they belong to the shared flow struct.
+async function gvtClearAllVariables(): Promise<void> {
+  const flowSource = GrafcetStudioStoreHelpers.FLOW_STRUCT_VAR_SOURCE;
+  const vars = ensureProjectVariables();
+  const varCount = vars.imported.length
+    + vars.user.filter(function(v) { return !v || v.source !== flowSource; }).length
+    + (project.excelVars || []).length;
+  const unitCount = Object.keys(project.unitConfig || {}).length;
+  if (!varCount && !unitCount) { toast('No variable data to clear'); return; }
+  const message = 'Delete all ' + varCount + ' variable' + (varCount !== 1 ? 's' : '')
+    + ' and ' + unitCount + ' unit station' + (unitCount !== 1 ? 's' : '') + '? ST_<Flow> variables are kept.';
+  if (!(await confirmDialog('Clear variables', message, 'Delete all', true))) return;
+  runUndoableProjectChange('Variable data cleared', function() {
+    const live = ensureProjectVariables();
+    live.imported = [];
+    live.user = live.user.filter(function(v) { return !!v && v.source === flowSource; });
+    project.excelVars = [];
+    project.unitConfig = {};
+    gvtSyncPlcBlockMemberIds();
+    saveProject();
+    renderGlobalVarTable();
+    if (typeof updateVarDatalist === 'function') updateVarDatalist();
+  });
+}
+
 // ─────────────────────────────────────────────
 //  BOOT
 // ─────────────────────────────────────────────
