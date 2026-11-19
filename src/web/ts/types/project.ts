@@ -206,6 +206,8 @@ namespace GrafcetStudioProject {
     source?: VariableSource;
     _source?: VariableSource;
     _sigExpanded?: boolean;
+    /** Nested struct member paths ("Sensor", "Sensor.Fwd") the user collapsed in the variable table. */
+    _nestCollapsed?: Record<string, boolean>;
   }
 
   export interface ProjectVariables {

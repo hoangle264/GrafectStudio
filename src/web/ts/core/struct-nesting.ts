@@ -40,7 +40,8 @@ namespace GrafcetStudioStructNesting {
     }
     const typeName = String(sig.dataType || '').trim();
     if (!typeName || isPrimitiveType(typeName)) return undefined;
-    return list.find(device => !!device && device.name === typeName);
+    return list.find(device => !!device && device.name === typeName)
+      || list.find(device => !!device && String(device.name || '').toLowerCase() === typeName.toLowerCase());
   }
 
   /** Types that hold a signal of the given type directly. */

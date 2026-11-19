@@ -558,7 +558,7 @@ body.unified-vars .vartable-panel{display:none;}
 .dp-save-row{padding:10px 12px;}
 /* DiagramType chips */
 .dp-type-chips{display:flex;gap:6px;margin-top:2px;}
-.dp-type-chip{flex:1;height:var(--ctl-h);padding:0 8px;border-radius:var(--radius);border:1px solid var(--border);background:transparent;font-size:var(--fs-xs);font-family:var(--font-ui);font-weight:600;cursor:pointer;transition:.15s;text-align:center;color:var(--text2);}
+.dp-type-chip{flex:1;min-height:var(--ctl-h);height:auto;padding:5px 8px;line-height:1.25;border-radius:var(--radius);border:1px solid var(--border);background:transparent;font-size:var(--fs-xs);font-family:var(--font-ui);font-weight:600;cursor:pointer;transition:.15s;text-align:center;color:var(--text2);}
 .dp-type-chip.active-main{border-color:var(--amber);color:var(--amber);background:var(--amber3);}
 .dp-type-chip.active-sub{border-color:var(--blue);color:var(--blue);background:var(--blue3);}
 .dp-type-chip:hover{border-color:var(--border2);}
@@ -1147,3 +1147,7 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .tree-orphan-head{padding:4px 8px;font-size:var(--fs-xs);color:var(--text3);letter-spacing:1px;border-top:1px solid var(--border);}
 .tree-empty-note{padding:3px 8px;font-size:var(--fs-xs);color:var(--text3);font-style:italic;}
 .tree-empty-note.indent{padding-left:34px;}
+
+.gvt-nest-row{cursor:pointer;}
+.gvt-nest-row:hover{background:var(--bg3,rgba(255,255,255,.04));}
+.gvt-nest-caret{font-size:var(--fs-xs);color:var(--text2);width:10px;flex-shrink:0;}

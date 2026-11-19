@@ -145,6 +145,8 @@
                 <div class="gvt-toolbar"> 
                     <input id="gvt-search" type="text" placeholder="🔍 Filter..." class="gvt-search-input" oninput="renderGlobalVarTable()"> 
                     <span id="gvt-count" class="muted-mini">0 struct data</span> 
+                    <button class="panel-head-btn" onclick="gvtSetAllExpanded(true)" title="Expand all struct variables">▼ Expand all</button>
+                    <button class="panel-head-btn" onclick="gvtSetAllExpanded(false)" title="Collapse all struct variables">▶ Collapse all</button>
                 </div>
                 <div class="panel-scroll">
                     <table class="vt-table table-full">

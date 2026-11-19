@@ -459,7 +459,22 @@ function renderGlobalVarTable(): void {
 
     //  Signal sub-rows (editable) 
     if(isExpanded && sigList.length>0){
+      const collapsed = v._nestCollapsed || {};
+      const emittedGroups: Record<string, boolean> = {};
       sigList.forEach(function(sig){
+        const parts = String(sig.name || sig.id || '').split('.');
+        // Emit a foldable row for each nested member path the first time it appears; skip leaves under a collapsed one.
+        let hidden = false;
+        for (let depth = 0; depth < parts.length - 1 && !hidden; depth++) {
+          const path = parts.slice(0, depth + 1).join('.');
+          if (!emittedGroups[path]) {
+            emittedGroups[path] = true;
+            tbody.appendChild(gvtMakeNestGroupRow(entry, v, path, depth, !!collapsed[path], sigList));
+          }
+          if (collapsed[path]) hidden = true;
+        }
+        if (hidden) return;
+        const depth = parts.length - 1;
         const subTr=document.createElement('tr');
         subTr.className='vt-dev-signal-row';
         const vc=({Input:'vt-input',Output:'vt-output',Var:'vt-var'} as Record<string,string>)[sig.varType||'']||'vt-var';
@@ -473,9 +488,9 @@ function renderGlobalVarTable(): void {
 
         // col 2: Label.SignalName
         const tdSLabel=document.createElement('td');
-        tdSLabel.innerHTML=`<div class="vt-sig-label">
+        tdSLabel.innerHTML=`<div class="vt-sig-label" style="padding-left:${6 + depth * 14}px">
           <span class="vt-sig-indent"></span>
-          <span class="vt-sig-name">${esc2(v.label||'?')}.${esc2(sig.name)}</span>
+          <span class="vt-sig-name" title="${esc2(v.label||'?')}.${esc2(sig.name)}">${depth ? esc2(parts[depth]) : esc2(v.label||'?') + '.' + esc2(sig.name)}</span>
         </div>`;
         subTr.appendChild(tdSLabel);
 
@@ -508,6 +523,59 @@ function renderGlobalVarTable(): void {
       });
     }
   });
+}
+
+// Writes a UI-only flag back onto the stored variable/unit record behind a table entry.
+function gvtStoredRecord(entry: GrafcetStudioVars.VarEntry): VuiProjectVariable | null {
+  if ((entry.source === 'imported' || entry.source === 'user') && project.variables && entry.bucket && project.variables[entry.bucket]) {
+    return (project.variables[entry.bucket] as VuiProjectVariable[])[entry.key as number] || null;
+  }
+  if (entry.source === 'excel' && project.excelVars) return project.excelVars[entry.key as number] || null;
+  if (entry.source === 'unit' && project.unitConfig) return (project.unitConfig[entry.key as string] as unknown as VuiProjectVariable) || null;
+  return null;
+}
+
+function gvtMakeNestGroupRow(entry: GrafcetStudioVars.VarEntry, v: VuiProjectVariable, path: string, depth: number, isCollapsed: boolean, sigList: GrafcetStudioProject.DeviceSignal[]): HTMLTableRowElement {
+  const leafCount = sigList.filter(function(sig) { return String(sig.name || sig.id || '').indexOf(path + '.') === 0; }).length;
+  const name = path.split('.').pop() || path;
+  const tr = document.createElement('tr');
+  tr.className = 'vt-dev-signal-row gvt-nest-row';
+  tr.innerHTML = `<td><div class="vt-sig-num"></div></td>
+    <td><div class="vt-sig-label" style="padding-left:${6 + depth * 14}px" title="${esc2(v.label||'?')}.${esc2(path)}">
+      <span class="gvt-nest-caret">${isCollapsed ? '▶' : '▼'}</span>
+      <span class="vt-sig-name">${depth ? '' : esc2(v.label||'?') + '.'}${esc2(name)}</span>
+    </div></td>
+    <td><span class="sdcol-type sig-word">STRUCT</span></td>
+    <td class="gvt-tog"><span class="gvt-tog-count">${leafCount} member${leafCount !== 1 ? 's' : ''}</span></td>`;
+  tr.addEventListener('click', function() {
+    const rec = gvtStoredRecord(entry);
+    if (!rec) return;
+    const map = rec._nestCollapsed || (rec._nestCollapsed = {});
+    if (isCollapsed) delete map[path]; else map[path] = true;
+    saveProject(); renderGlobalVarTable();
+  });
+  return tr;
+}
+
+// Expands or collapses every struct row, including nested members.
+function gvtSetAllExpanded(expanded: boolean): void {
+  gvtGetEntries().forEach(function(entry) {
+    const rec = gvtStoredRecord(entry);
+    if (!rec) return;
+    rec._sigExpanded = expanded;
+    if (expanded) delete rec._nestCollapsed;
+    else {
+      const sigList = entry.source === 'unit' ? gvtGetUnitSigList() : gvtGetSigList(entry.data as VuiProjectVariable);
+      const map: Record<string, boolean> = {};
+      sigList.forEach(function(sig) {
+        const parts = String(sig.name || sig.id || '').split('.');
+        for (let i = 1; i < parts.length; i++) map[parts.slice(0, i).join('.')] = true;
+      });
+      if (Object.keys(map).length) rec._nestCollapsed = map; else delete rec._nestCollapsed;
+    }
+  });
+  saveProject();
+  renderGlobalVarTable();
 }
 
 function gvtResolveEntry(source: string, key: string | number): GrafcetStudioVars.ResolveEntryResult {
