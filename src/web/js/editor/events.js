@@ -610,6 +610,12 @@ const onKey = (e) => {
     e.preventDefault();
     selectAll();
   }
+  if (key === 'c' && mod && !e.shiftKey && typeof clipboardCopy === 'function') {
+    if (clipboardCopy()) e.preventDefault();
+  }
+  if (key === 'v' && mod && !e.shiftKey && typeof clipboardPaste === 'function') {
+    if (clipboardPaste()) e.preventDefault();
+  }
   if (key === 'z' && mod) {
     e.preventDefault();
     if (e.shiftKey) historyRedo(); else historyUndo();

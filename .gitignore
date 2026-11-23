@@ -96,6 +96,7 @@ src/web/js/editor/tables.js
 src/web/js/editor/tree-devices-ui.js
 src/web/js/editor/tree-diagrams-ui.js
 src/web/js/editor/tree-ui.js
+src/web/js/editor/clipboard.js
 src/web/js/editor/tree.js
 src/web/js/editor/vars-ui.js
 src/web/js/editor/vars.js
