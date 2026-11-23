@@ -18,6 +18,7 @@ function addTransition(x,y){
   afterChange(); return id;
 }
 function addParallel(x,y,type){
+  if(isNumericFlow()){ toast('Numeric step mode has one step register per flow: AND branches are not allowed. Split them into separate flows.',{kind:'warn'}); return null; }
   const id='B'+(nextId++);
   state.parallels.push({id,x:snap(x-100),y:snap(y),type,width:200,ports:3});
   afterChange(); return id;
@@ -148,6 +149,10 @@ function updateProps() {
       document.getElementById('px-x').value=s.x;
       document.getElementById('px-y').value=s.y;
       document.getElementById('px-num').value=s.number;
+      const numeric=isNumericFlow();
+      document.getElementById('px-val-group').style.display=numeric?'block':'none';
+      document.getElementById('px-addr-group').style.display=numeric?'none':'block';
+      document.getElementById('px-val').value=numeric?getStepValue(s):'';
       document.getElementById('px-lbl').value=s.label||'';
       document.getElementById('px-init').checked=s.initial||false;
       renderStepAddressEditor(s);

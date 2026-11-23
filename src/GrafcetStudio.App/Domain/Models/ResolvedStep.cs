@@ -28,6 +28,15 @@ public class ResolvedStep
 
     public string StepId => Step.Id;
 
+    /// <summary>Numeric step mode: CASE value of this step. Templates: <c>{{StepValue}}</c>.</summary>
+    public int StepValue => Step.StepValue;
+
+    /// <summary>
+    /// Numeric step mode: value to load into the step register when this step's transition fires —
+    /// the out-transition's target step, else the next step in sequence. Templates: <c>{{NextStepValue}}</c>.
+    /// </summary>
+    public int NextStepValue { get; init; }
+
     public int StepNumber => Step.Number;
 
     public string StepLabel => Step.Label;

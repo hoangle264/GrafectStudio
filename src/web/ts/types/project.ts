@@ -8,7 +8,7 @@ namespace GrafcetStudioProject {
 
   export type DiagramType = 'Macro' | 'MacroStep' | 'Grafcet' | 'Driver' | string;
   export type StepKind = 'normal' | 'macro';
-  export type AddressMode = 'bool' | 'word' | string;
+  export type AddressMode = 'bool' | 'word' | 'numeric' | string;
   export type BoolAddressMode = 'linear' | 'block' | string;
   export type SignalVarType = 'Input' | 'Output' | 'Var' | 'Instance' | string;
   export type IODirection = 'Input' | 'Output' | '' | string;
@@ -117,6 +117,7 @@ namespace GrafcetStudioProject {
   export interface Step {
     id: string;
     number?: number;
+    stepValue?: number;        // numeric address mode: CASE value (default number * 10)
     label?: string;
     initial?: boolean;
     kind?: StepKind;

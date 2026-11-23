@@ -242,11 +242,15 @@
                             <div class="prop-label">STEP NUMBER</div>
                             <input class="prop-input" id="px-num" type="number" min="0" oninput="setProp('number',+this.value)">
                         </div>
+                        <div class="prop-group" id="px-val-group" style="display:none">
+                            <div class="prop-label">STEP VALUE (CASE)</div>
+                            <input class="prop-input" id="px-val" type="number" min="1" oninput="setProp('stepValue',+this.value)">
+                        </div>
                         <div class="prop-group">
                             <div class="prop-label">LABEL</div>
                             <input class="prop-input" id="px-lbl" type="text" placeholder="Step name..." oninput="setProp('label',this.value)">
                         </div>
-                        <div class="prop-group">
+                        <div class="prop-group" id="px-addr-group">
                             <div class="prop-label">STEP ADDRESS (ACTIVE / DONE)</div>
                             <label class="prop-check">
                                 <input type="checkbox" id="px-addr-manual" onchange="setStepAddressManual(this.checked)"> Manual address</label>
@@ -396,6 +400,7 @@
                         <div class="dp-mode-chips dp-address-chips" id="dp-address-mode-chips">
                             <button class="dp-chip dp-chip-auto" data-address-mode="bool" onclick="dpSetAddressMode('bool')">Bool</button>
                             <button class="dp-chip dp-chip-origin" data-address-mode="word" onclick="dpSetAddressMode('word')">Word</button>
+                            <button class="dp-chip dp-chip-manual" data-address-mode="numeric" onclick="dpSetAddressMode('numeric')" title="One step register per flow: CASE _step OF 10, 20, ... (no AND branches, no Done bit)">Numeric</button>
                         </div>
 
                         <label class="prop-check">
@@ -414,8 +419,10 @@
                         <div id="dp-word-address-fields">
                             <div class="dp-label">Active word / tag</div>
                             <input class="dp-input" id="dp-active-word" type="text" placeholder="DM0 or StepWord" oninput="dpLiveUpdate()">
+                            <div id="dp-complete-word-wrap">
                             <div class="dp-label">Complete word / tag</div>
                             <input class="dp-input" id="dp-complete-word" type="text" placeholder="DM100 or DoneWord" oninput="dpLiveUpdate()">
+                            </div>
                         </div>
                     </div>
 

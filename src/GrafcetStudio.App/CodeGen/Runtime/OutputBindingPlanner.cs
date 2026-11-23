@@ -138,6 +138,8 @@ public static class OutputBindingPlanner
 
     private static void AddDistinct(IList<string> values, string value)
     {
+        // Numeric-mode steps have no done bit; never list an empty reference.
+        if (string.IsNullOrWhiteSpace(value)) return;
         if (!values.Contains(value, StringComparer.OrdinalIgnoreCase))
         {
             values.Add(value);

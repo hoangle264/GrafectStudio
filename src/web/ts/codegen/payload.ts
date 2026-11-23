@@ -160,6 +160,8 @@ namespace GrafcetStudioCodegenPayload {
     }
 
     const mode = String((flow && flow.addressMode) || 'bool').toLowerCase();
+    // Numeric mode: the step is a value of the flow's step register, not a bit; there is no Done state.
+    if (mode === 'numeric') return { execAddress: '', doneAddress: '' };
     if (mode === 'word') {
       if (stepNumber > 32) throw new Error('Word address mode supports at most 32 steps per flow');
       const bitIndex = stepNumber - 1;
@@ -197,6 +199,32 @@ namespace GrafcetStudioCodegenPayload {
     };
   }
 
+  /** CASE value of a step in numeric mode: stepValue when set, else number * 10. */
+  export function resolveStepValue(step: Step): number {
+    const explicit = Number(step && step.stepValue);
+    if (Number.isInteger(explicit) && explicit > 0) return explicit;
+    return Math.max(1, Number(step && step.number) || 1) * 10;
+  }
+
+  /** Step register of a numeric flow: the Active word tag when given, else the Active word address. */
+  export function resolveStepVar(flow: DiagramMeta): string {
+    return String((flow && ((flow as any).activeWordTag || flow.activeWord)) || 'DM0').trim();
+  }
+
+  function validateNumericFlow(diagram: DiagramMeta, state: { steps?: Step[]; parallels?: unknown[] } | null | undefined): void {
+    const name = diagram.name || diagram.id;
+    if (state && Array.isArray(state.parallels) && state.parallels.length) {
+      throw new Error('Flow "' + name + '" uses numeric step mode, which cannot hold AND (parallel) branches. Remove them or split them into separate flows.');
+    }
+    const seen = new Map<number, string>();
+    ((state && state.steps) || []).forEach(function(step) {
+      const value = resolveStepValue(step);
+      const label = 'step ' + (step.number || step.id);
+      if (seen.has(value)) throw new Error('Flow "' + name + '" has step value ' + value + ' on both ' + seen.get(value) + ' and ' + label + '.');
+      seen.set(value, label);
+    });
+  }
+
   function getFlowAddressRange(flow: DiagramMeta, steps: Step[]): FlowRange | null {
     if (!flow || flow.addressMode !== 'bool') return null;
     const maxStepNumber = (steps || []).reduce((max, step) => Math.max(max, Number(step.number) || 0), 0);
@@ -222,6 +250,14 @@ namespace GrafcetStudioCodegenPayload {
       const data = context.loadDiagramData(diagram.id);
       const steps = ((data && data.state && data.state.steps) || []);
       validateStepNumbers(steps, diagram.name || diagram.id);
+
+      if (diagram.addressMode === 'numeric') {
+        validateNumericFlow(diagram, data && data.state);
+        const key = resolveStepVar(diagram).toUpperCase();
+        if (usedWords.has(key)) throw new Error('Step register ' + key + ' is used by both "' + usedWords.get(key) + '" and "' + (diagram.name || diagram.id) + '".');
+        usedWords.set(key, diagram.name || diagram.id);
+        return;
+      }
 
       if (diagram.addressMode === 'word') {
         if (steps.some(step => Number(step.number) > 32)) {
@@ -352,6 +388,7 @@ namespace GrafcetStudioCodegenPayload {
       return {
         id: step.id || '',
         number: Number(step.number || 0),
+        stepValue: diagram.addressMode === 'numeric' ? resolveStepValue(step) : 0,
         label: step.label || '',
         initial: !!step.initial,
         kind: step.kind || 'normal',
@@ -627,6 +664,7 @@ namespace GrafcetStudioCodegenPayload {
     buildCSharpProjectPayload(context: PayloadContext, platform: string): CodegenPayload;
     validateUnitAddressConfig(context: PayloadContext, unitDiagrams: DiagramMeta[]): void;
     resolveStepAddress(step: Step, flow: DiagramMeta, platform?: string): ResolvedStepAddress;
+    resolveStepValue(step: Step): number;
   }
 
   export const api: CodegenPayloadApi = {
@@ -635,7 +673,8 @@ namespace GrafcetStudioCodegenPayload {
     buildCSharpUnitPayload,
     buildCSharpProjectPayload,
     validateUnitAddressConfig,
-    resolveStepAddress
+    resolveStepAddress,
+    resolveStepValue
   };
 }
 

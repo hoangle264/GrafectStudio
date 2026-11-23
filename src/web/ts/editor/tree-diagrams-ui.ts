@@ -276,7 +276,8 @@ function dpSetType(type: string): void {
 }
 
 function dpSetAddressMode(mode: string): void {
-  const normalized = String(mode || 'bool').toLowerCase() === 'word' ? 'word' : 'bool';
+  const lower = String(mode || 'bool').toLowerCase();
+  const normalized = lower === 'word' || lower === 'numeric' ? lower : 'bool';
   document.querySelectorAll<HTMLElement>('#dp-address-mode-chips .dp-chip').forEach(c=>{
     c.classList.toggle('active', c.dataset.addressMode===normalized);
   });
@@ -299,11 +300,15 @@ function dpGetCurrentBoolAddressMode(): string {
   return active ? active.dataset.boolMode || 'linear' : 'linear';
 }
 function dpUpdateAddressFields(): void {
-  const isWord = dpGetCurrentAddressMode() === 'word';
+  const mode = dpGetCurrentAddressMode();
+  const isWord = mode === 'word' || mode === 'numeric';
   const boolFields = document.getElementById('dp-bool-address-fields');
   const wordFields = document.getElementById('dp-word-address-fields');
+  const completeWrap = document.getElementById('dp-complete-word-wrap');
   if (boolFields) boolFields.style.display = isWord ? 'none' : 'block';
   if (wordFields) wordFields.style.display = isWord ? 'block' : 'none';
+  // Numeric mode keeps one step register (Active word) and has no Done state.
+  if (completeWrap) completeWrap.style.display = mode === 'numeric' ? 'none' : 'block';
 }
 function dpReadAddressConfig(): TdAddressConfig {
   const mode = dpGetCurrentAddressMode();
@@ -328,6 +333,10 @@ function dpValidateAddressConfig(config: TdAddressConfig): boolean {
       toast('Warning: Base address must look like MR100 or LR0');
       return false;
     }
+  }
+  if (config.addressMode === 'numeric' && !String(config.activeWordTag || config.activeWord || '').trim()) {
+    toast('Warning: Enter the step register in Active word, for example DM0 or StepNo');
+    return false;
   }
   if (config.addressMode === 'word') {
     const hasActive = !!String(config.activeWordTag || config.activeWord || '').trim();
@@ -458,6 +467,7 @@ function saveDiagPropsPanel(): void {
   d.activeWordTag = address.activeWordTag;
   d.completeWordTag = address.completeWordTag;
   saveProject(); renderTree(); renderTabs();
+  if (activeDiagramId === d.id) { render(); updateProps(); }   // numeric mode changes step labels on the canvas
   document.getElementById('dp-title')!.textContent = d.name;
   dpUpdateCodePreview(d);
   toast('Properties saved');

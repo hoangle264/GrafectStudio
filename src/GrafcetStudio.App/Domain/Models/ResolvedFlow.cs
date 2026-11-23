@@ -29,6 +29,12 @@ public class ResolvedFlow
 
     public string sequenceEnd { get; init; } = string.Empty;
 
+    /// <summary>True when the flow uses numeric step mode (CASE stepVar OF 10, 20, ...; no Done bits).</summary>
+    public bool isNumericStep { get; init; }
+
+    /// <summary>Numeric step mode: the flow's step register (Active word tag, else Active word address).</summary>
+    public string stepVar { get; init; } = string.Empty;
+
     public IList<ResolvedStep> steps { get; init; } = new List<ResolvedStep>();
 
     public IList<ResolvedStep> resolvedSteps => steps;

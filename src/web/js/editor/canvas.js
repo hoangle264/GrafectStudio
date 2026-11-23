@@ -129,6 +129,17 @@ function getStepAddresses(s) {
   } catch(e) { return null; }
 }
 
+// Numeric step mode: steps are CASE values of one step register (10, 20, ...).
+function isNumericFlow() {
+  const diagram=(project.diagrams||[]).find(d=>d.id===activeDiagramId);
+  return !!diagram && String(diagram.addressMode||'').toLowerCase()==='numeric';
+}
+function getStepValue(s) {
+  const api=window.GrafcetStudio && window.GrafcetStudio.codegenPayload;
+  if(api && api.resolveStepValue) return api.resolveStepValue(s);
+  return Number.isInteger(s.stepValue) && s.stepValue>0 ? s.stepValue : Math.max(1, s.number||1)*10;
+}
+
 function buildStepEl(s) {
   const g=svgE('g'); g.setAttribute('class','gf-step'); g.id='el-'+s.id;
   g.dataset.id=s.id; g.dataset.type='step';
@@ -156,7 +167,7 @@ function buildStepEl(s) {
   const num=svgE('text'); num.setAttribute('class','s-num');
   num.setAttribute('x',s.x+numW/2); num.setAttribute('y',s.y+SH/2+4);
   num.setAttribute('text-anchor','middle');
-  num.textContent=String(s.number).padStart(2,'0');
+  num.textContent=isNumericFlow() ? String(getStepValue(s)) : String(s.number).padStart(2,'0');
   g.appendChild(num);
 
   if(isMacroStep){

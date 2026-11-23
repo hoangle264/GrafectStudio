@@ -153,6 +153,10 @@ namespace GrafcetStudioStoreHelpers {
         changed = true;
       }
     }
+    if (diag.addressMode === 'numeric' && !diag.activeWord && !diag.activeWordTag) {
+      diag.activeWord = 'DM0';
+      changed = true;
+    }
     if (diag.addressMode === 'word') {
       if (!diag.activeWord) {
         diag.activeWord = 'DM0';

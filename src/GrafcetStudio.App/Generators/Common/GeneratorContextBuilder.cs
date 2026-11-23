@@ -121,6 +121,11 @@ public static class GeneratorContextBuilder
         var sequence = sequenceResolver.Resolve(state);
         var callerBindings = macroBindings.Where(binding => string.Equals(binding.callerFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
         var calleeBindings = macroBindings.Where(binding => string.Equals(binding.calleeFlowId, flow.Id, StringComparison.OrdinalIgnoreCase)).ToList();
+        var isNumericStep = string.Equals(flow.Diagram?.AddressMode, "numeric", StringComparison.OrdinalIgnoreCase);
+        var stepsById = (flow.Steps ?? new List<Step>())
+            .Where(item => !string.IsNullOrEmpty(item.Id))
+            .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var resolvedSteps = sequence.Select((entry, index) =>
         {
             var step = EnrichStepActions(entry.Step, variables, library);
@@ -140,6 +145,7 @@ public static class GeneratorContextBuilder
                 MacroBinding = macroBinding,
                 PreviousStep = previousStep,
                 NextStep = nextStep,
+                NextStepValue = isNumericStep ? ResolveNextStepValue(entry.OutTransition, nextStep, stepsById) : 0,
                 InTransition = entry.InTransition,
                 OutTransition = entry.OutTransition,
                 BranchType = entry.BranchType
@@ -165,6 +171,10 @@ public static class GeneratorContextBuilder
             stepMinAddress = flowStepRange.MinAddress,
             stepMaxAddress = flowStepRange.MaxAddress,
             sequenceEnd = flowStepRange.SequenceEnd,
+            isNumericStep = isNumericStep,
+            stepVar = isNumericStep
+                ? (!string.IsNullOrWhiteSpace(flow.Diagram?.ActiveWordTag) ? flow.Diagram!.ActiveWordTag!.Trim() : (flow.Diagram?.ActiveWord ?? "DM0").Trim())
+                : string.Empty,
             steps = resolvedSteps,
             rawSteps = flow.Steps,
             transitions = flow.Transitions,
@@ -200,15 +210,29 @@ public static class GeneratorContextBuilder
     /// templates can always use <c>{{NextStep.ExecAddress}}</c> without
     /// checking for null on the final step. Works for PLC addresses and labels alike.
     /// </summary>
+    /// <summary>Numeric mode: the out-transition's first target step wins over sequence order.</summary>
+    private static int ResolveNextStepValue(Transition? outTransition, Step? nextStep, IDictionary<string, Step> stepsById)
+    {
+        var targetId = outTransition?.ToStepIds?.FirstOrDefault();
+        if (targetId != null && stepsById.TryGetValue(targetId, out var target) && target.StepValue > 0) return target.StepValue;
+        return nextStep?.StepValue ?? 0;
+    }
+
     private static Step? BuildSyntheticNextStep(Step lastStep)
     {
         var nextAddress = ResolvedStep.IncrementExecAddress(lastStep.ExecAddress);
-        if (nextAddress is null) return null;
+        if (nextAddress is null)
+        {
+            // Numeric step mode has no exec address; the synthetic step still carries the next CASE value.
+            if (lastStep.StepValue <= 0) return null;
+            return new Step { Id = string.Empty, Number = lastStep.Number + 1, Label = string.Empty, StepValue = lastStep.StepValue + 10 };
+        }
 
         return new Step
         {
             Id = string.Empty,
             Number = lastStep.Number + 1,
+            StepValue = lastStep.StepValue > 0 ? lastStep.StepValue + 10 : 0,
             Label = string.Empty,
             ExecAddress = nextAddress,
             DoneAddress = string.Empty,
@@ -224,13 +248,15 @@ public static class GeneratorContextBuilder
 
     private static Step EnrichStepActions(Step step, IList<DeviceVariable> variables, DeviceLibraryRoot library)
     {
-        if (string.IsNullOrWhiteSpace(step.ExecAddress) || step.Actions.Count == 0) return step;
+        // Numeric-mode steps have no exec address but still need device commands resolved.
+        if ((string.IsNullOrWhiteSpace(step.ExecAddress) && step.StepValue <= 0) || step.Actions.Count == 0) return step;
 
-        var enrichedActions = step.Actions.Select(action => EnrichStepAction(action, step.ExecAddress, variables, library)).ToList();
+        var enrichedActions = step.Actions.Select(action => EnrichStepAction(action, step.ExecAddress ?? string.Empty, variables, library)).ToList();
         return new Step
         {
             Id = step.Id,
             Number = step.Number,
+            StepValue = step.StepValue,
             Label = step.Label,
             Kind = step.Kind,
             MacroFlowId = step.MacroFlowId,

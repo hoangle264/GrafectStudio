@@ -30,6 +30,10 @@ public class Step
     [JsonPropertyName("doneAddress")]
     public string? DoneAddress { get; init; }
 
+    /// <summary>Numeric step mode: CASE value of the flow's step register (10, 20, ...); 0 in bool/word mode.</summary>
+    [JsonPropertyName("stepValue")]
+    public int StepValue { get; init; }
+
     [JsonPropertyName("actions")]
     public IList<StepAction> Actions { get; init; } = new List<StepAction>();
 }
