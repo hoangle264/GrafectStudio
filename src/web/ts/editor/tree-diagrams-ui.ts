@@ -308,7 +308,11 @@ function dpUpdateAddressFields(): void {
   if (boolFields) boolFields.style.display = isWord ? 'none' : 'block';
   if (wordFields) wordFields.style.display = isWord ? 'block' : 'none';
   // Numeric mode keeps one step register (Active word) and has no Done state.
-  if (completeWrap) completeWrap.style.display = mode === 'numeric' ? 'none' : 'block';
+  if (completeWrap) completeWrap.style.display = mode === 'numeric' ? 'none' : '';
+  const hint = document.getElementById('dp-numeric-hint');
+  if (hint) hint.style.display = mode === 'numeric' ? '' : 'none';
+  const activeLabel = document.getElementById('dp-active-word-label');
+  if (activeLabel) activeLabel.textContent = mode === 'numeric' ? 'Step register' : 'Active word';
 }
 function dpReadAddressConfig(): TdAddressConfig {
   const mode = dpGetCurrentAddressMode();

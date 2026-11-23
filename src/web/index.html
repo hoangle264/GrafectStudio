@@ -333,91 +333,51 @@
                         <button class="pin-btn" onclick="closeDiagPropsPanel()" title="Close">&#10005;</button>
                     </div>
 
-                    <!-- IDENTITY -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">IDENTITY</div>
-                        <div class="dp-label">Diagram name</div>
-                        <input class="dp-input" id="dp-name" type="text" oninput="dpLiveUpdate()">
-                        <div class="dp-label">Description</div>
-                        <input class="dp-input" id="dp-desc" type="text" placeholder="Short description..." oninput="dpLiveUpdate()">
-                    </div>
-
-                    <!-- HIERARCHY -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">HIERARCHY</div>
-                        <div class="dp-label">Machine</div>
-                        <input class="dp-input" id="dp-machine" type="text" oninput="dpLiveUpdate()">
-                        <div class="dp-label">Unit</div>
-                        <select class="dp-select" id="dp-unit" onchange="dpFillFolderSelect(this.value,'');dpLiveUpdate()">
-                            <option value="">&mdash; unassigned &mdash;</option>
-                        </select>
-                        <div class="dp-label">Folder</div>
-                        <select class="dp-select" id="dp-folder" onchange="dpLiveUpdate()">
-                            <option value="">&mdash; unit root &mdash;</option>
-                        </select>
-                    </div>
-
-                    <!-- MODE -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">MODE</div>
-                        <div class="dp-mode-chips" id="dp-mode-chips">
-                            <button class="dp-chip dp-chip-auto" data-mode="Auto" onclick="dpSetMode('Auto')">Auto</button>
-                            <button class="dp-chip dp-chip-origin" data-mode="Origin" onclick="dpSetMode('Origin')">Origin</button>
+                    <div class="pg">
+                    <div class="pg-cat" data-pg-cat="flow-identity">
+                        <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Identity</div>
+                        <div class="pg-body">
+                                <div class="pg-row"><label class="pg-name">Name</label><div class="pg-val"><input class="pg-input" id="dp-name" type="text" oninput="dpLiveUpdate()"></div></div>
+                                <div class="pg-row"><label class="pg-name">Description</label><div class="pg-val"><input class="pg-input" id="dp-desc" type="text" placeholder="Short description..." oninput="dpLiveUpdate()"></div></div>
                         </div>
                     </div>
-
-                    <!-- DIAGRAM TYPE -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">DIAGRAM TYPE</div>
-                        <div class="dp-type-chips">
-                            <button class="dp-type-chip" id="dp-type-main" onclick="dpSetType('Macro')">
-                                <div class="dp-chip-title">Macro</div>
-                                <div class="dp-chip-desc">Runnable flow</div>
-                            </button>
-                            <button class="dp-type-chip" id="dp-type-sub" onclick="dpSetType('MacroStep')">
-                                <div class="dp-chip-title">MacroStep</div>
-                                <div class="dp-chip-desc">Called by Macro</div>
-                            </button>
+                    <div class="pg-cat" data-pg-cat="flow-hierarchy">
+                        <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Hierarchy</div>
+                        <div class="pg-body">
+                                <div class="pg-row"><label class="pg-name">Machine</label><div class="pg-val"><input class="pg-input" id="dp-machine" type="text" oninput="dpLiveUpdate()"></div></div>
+                                <div class="pg-row"><label class="pg-name">Unit</label><div class="pg-val"><select class="pg-input" id="dp-unit" onchange="dpFillFolderSelect(this.value,'');dpLiveUpdate()"><option value="">&mdash; unassigned &mdash;</option></select></div></div>
+                                <div class="pg-row"><label class="pg-name">Folder</label><div class="pg-val"><select class="pg-input" id="dp-folder" onchange="dpLiveUpdate()"><option value="">&mdash; unit root &mdash;</option></select></div></div>
                         </div>
                     </div>
-
-                    <!-- ADDRESS CONFIG -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">ADDRESS CONFIG</div>
-                        <div class="dp-label">Address mode</div>
-                        <div class="dp-mode-chips dp-address-chips" id="dp-address-mode-chips">
-                            <button class="dp-chip dp-chip-auto" data-address-mode="bool" onclick="dpSetAddressMode('bool')">Bool</button>
-                            <button class="dp-chip dp-chip-origin" data-address-mode="word" onclick="dpSetAddressMode('word')">Word</button>
-                            <button class="dp-chip dp-chip-manual" data-address-mode="numeric" onclick="dpSetAddressMode('numeric')" title="One step register per flow: CASE _step OF 10, 20, ... (no AND branches, no Done bit)">Numeric</button>
-                        </div>
-
-                        <label class="prop-check">
-                            <input type="checkbox" id="dp-show-step-addr" checked onchange="dpToggleStepAddress(this.checked)"> Show step addresses on canvas</label>
-
-                        <div id="dp-bool-address-fields">
-                            <div class="dp-label">Bool packing</div>
-                            <div class="dp-mode-chips dp-address-chips" id="dp-bool-mode-chips">
-                                <button class="dp-chip dp-chip-auto" data-bool-mode="linear" onclick="dpSetBoolAddressMode('linear')">Linear</button>
-                                <button class="dp-chip dp-chip-origin" data-bool-mode="block" onclick="dpSetBoolAddressMode('block')">Block</button>
-                            </div>
-                            <div class="dp-label">Base address</div>
-                            <input class="dp-input" id="dp-base-mr" type="text" placeholder="MR100" oninput="dpLiveUpdate()">
-                        </div>
-
-                        <div id="dp-word-address-fields">
-                            <div class="dp-label">Active word / tag</div>
-                            <input class="dp-input" id="dp-active-word" type="text" placeholder="DM0 or StepWord" oninput="dpLiveUpdate()">
-                            <div id="dp-complete-word-wrap">
-                            <div class="dp-label">Complete word / tag</div>
-                            <input class="dp-input" id="dp-complete-word" type="text" placeholder="DM100 or DoneWord" oninput="dpLiveUpdate()">
-                            </div>
+                    <div class="pg-cat" data-pg-cat="flow-behavior">
+                        <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Behavior</div>
+                        <div class="pg-body">
+                                <div class="pg-row"><label class="pg-name">Mode</label><div class="pg-val"><div class="pg-chips"><span class="dp-mode-chips" id="dp-mode-chips"><button class="dp-chip dp-chip-auto" data-mode="Auto" onclick="dpSetMode('Auto')">Auto</button><button class="dp-chip dp-chip-origin" data-mode="Origin" onclick="dpSetMode('Origin')">Origin</button></span></div></div></div>
+                                <div class="pg-row"><label class="pg-name">Type</label><div class="pg-val"><div class="pg-chips"><span class="dp-type-chips"><button class="dp-type-chip" id="dp-type-main" onclick="dpSetType('Macro')" title="Runnable flow"><span class="dp-chip-title">Macro</span></button><button class="dp-type-chip" id="dp-type-sub" onclick="dpSetType('MacroStep')" title="Called by a Macro"><span class="dp-chip-title">MacroStep</span></button></span></div></div></div>
                         </div>
                     </div>
-
-                    <!-- CODE PREVIEW -->
-                    <div class="dp-section">
-                        <div class="dp-section-title">CODE PREVIEW</div>
-                        <div class="dp-codeprev" id="dp-codeprev"></div>
+                    <div class="pg-cat" data-pg-cat="flow-address">
+                        <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Step addressing</div>
+                        <div class="pg-body">
+                                <div class="pg-row"><label class="pg-name" title="Bool / Word: one bit per step. Numeric: one integer register, steps 10, 20, ...">Step mode</label><div class="pg-val"><div class="pg-chips"><span class="dp-mode-chips dp-address-chips" id="dp-address-mode-chips"><button class="dp-chip dp-chip-auto" data-address-mode="bool" onclick="dpSetAddressMode('bool')" title="Two bits per step (active + done) from a base address">Bool</button><button class="dp-chip dp-chip-origin" data-address-mode="word" onclick="dpSetAddressMode('word')" title="One bit per step in an active word and a done word">Word</button><button class="dp-chip dp-chip-manual" data-address-mode="numeric" onclick="dpSetAddressMode('numeric')" title="One step register per flow: CASE register OF 10, 20, ... (no AND branches, no Done bit)">Numeric</button></span></div></div></div>
+                                <div class="pg-hint" id="dp-numeric-hint">Numeric: the flow keeps its step in one register (CASE value 10, 20, ...). Set each step's value in the step properties. No AND branches, no Done bit.</div>
+                                <div id="dp-bool-address-fields">
+                                <div class="pg-row"><label class="pg-name">Bool packing</label><div class="pg-val"><div class="pg-chips"><span class="dp-mode-chips dp-address-chips" id="dp-bool-mode-chips"><button class="dp-chip dp-chip-auto" data-bool-mode="linear" onclick="dpSetBoolAddressMode('linear')">Linear</button><button class="dp-chip dp-chip-origin" data-bool-mode="block" onclick="dpSetBoolAddressMode('block')">Block</button></span></div></div></div>
+                                <div class="pg-row"><label class="pg-name">Base address</label><div class="pg-val"><input class="pg-input mono" id="dp-base-mr" type="text" placeholder="MR100" oninput="dpLiveUpdate()"></div></div>
+                                </div>
+                                <div id="dp-word-address-fields">
+                                <div class="pg-row"><label class="pg-name"><span id="dp-active-word-label">Active word</span></label><div class="pg-val"><input class="pg-input mono" id="dp-active-word" type="text" placeholder="DM0 or StepWord" oninput="dpLiveUpdate()"></div></div>
+                                <div class="pg-row" id="dp-complete-word-wrap"><label class="pg-name">Complete word</label><div class="pg-val"><input class="pg-input mono" id="dp-complete-word" type="text" placeholder="DM100 or DoneWord" oninput="dpLiveUpdate()"></div></div>
+                                </div>
+                                <div class="pg-row"><label class="pg-name">Show on canvas</label><div class="pg-val"><input type="checkbox" class="pg-check" id="dp-show-step-addr" checked onchange="dpToggleStepAddress(this.checked)"></div></div>
+                        </div>
+                    </div>
+                    <div class="pg-cat" data-pg-cat="flow-preview">
+                        <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Code preview</div>
+                        <div class="pg-body">
+                                <div class="dp-codeprev" id="dp-codeprev"></div>
+                        </div>
+                    </div>
                     </div>
 
                     <!-- Save button -->

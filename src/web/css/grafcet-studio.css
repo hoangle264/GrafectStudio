@@ -1178,3 +1178,9 @@ select.pg-input{background:var(--bg);}
 .pg .act-editor{padding:6px 8px;}
 .pg-footer{padding:10px var(--gutter);}
 .pg-summary{padding:8px 10px;color:var(--text2);font-size:var(--fs-xs);border-bottom:1px solid var(--border);}
+.pg-chips{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0;}
+.pg-chips .dp-mode-chips,.pg-chips .dp-type-chips{display:flex;flex-wrap:wrap;gap:4px;margin:0;}
+.pg-chips .dp-chip,.pg-chips .dp-type-chip{padding:1px 8px;min-height:20px;font-size:var(--fs-xs);}
+.pg-chips .dp-type-chip{width:auto;flex:0 0 auto;}
+.pg-hint{padding:4px 8px 4px 18px;font-size:var(--fs-xs);color:var(--text3);border-top:1px solid rgba(127,127,127,.12);}
+.dp-panel .pg .dp-codeprev{margin:6px 8px;}
