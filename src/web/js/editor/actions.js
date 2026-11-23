@@ -52,11 +52,14 @@ function updateVarDatalist() {
       o.label=(v.label?v.label+' | ':'')+v.comment+suffix;
       dl.appendChild(o);
     }
-    // For device type instances: add per-signal addresses too
+    // For device type instances: add per-signal addresses too (nested struct leaves included)
     if(v.signalAddresses){
-      const devType=(project.devices||[]).find(d=>d.name===(v.format||''));
+      const devices=project.devices||[];
+      const devType=devices.find(d=>d.name===(v.format||''));
       if(devType){
-        (devType.signals||[]).forEach(sig=>{
+        const nest=window.GrafcetStudioStructNesting;
+        const leaves=nest&&nest.flattenSignals ? nest.flattenSignals(devices, devType) : (devType.signals||[]);
+        leaves.forEach(sig=>{
           const addr=v.signalAddresses[sig.id];
           const sigLabel=(v.label||'?')+'.'+sig.name;
           if(sigLabel && !seen.has('lbl:'+sigLabel)){
@@ -81,15 +84,26 @@ function updateVarDatalist() {
   // Current diagram first (highest priority)
   getVars().forEach(v => addVar(v, ''));
 
-  // All other diagrams
+  // All other diagrams (loaded once per active diagram / diagram list, then cached)
+  getOtherDiagramVars().forEach(e => addVar(e.v, e.unitName));
+}
+
+let _otherVarsCache = null;
+function getOtherDiagramVars() {
+  const key = activeDiagramId + '|' + (project.diagrams||[]).map(d => d.id + ':' + (d.unit||d.name||'')).join(',');
+  if(_otherVarsCache && _otherVarsCache.key === key) return _otherVarsCache.list;
+  const list = [];
   (project.diagrams||[]).forEach(diag => {
-    if(diag.id === activeDiagramId) return; // already added above
+    if(diag.id === activeDiagramId) return; // current diagram is read live
     const raw = loadDiagramData(diag.id);
     if(!raw?.state?.vars) return;
     const unitName = diag.unit || diag.name || '';
-    raw.state.vars.forEach(v => addVar(v, unitName));
+    raw.state.vars.forEach(v => list.push({ v, unitName }));
   });
+  _otherVarsCache = { key, list };
+  return list;
 }
+function invalidateVarDatalistCache() { _otherVarsCache = null; }
 
 function makeActRow(act, idx, stepId) {
   const row = document.createElement('div');
