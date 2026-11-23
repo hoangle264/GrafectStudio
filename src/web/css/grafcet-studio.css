@@ -1153,3 +1153,28 @@ textarea.prop-input{resize:vertical;min-height:70px;height:auto;padding:6px 8px;
 .gvt-nest-row{cursor:pointer;}
 .gvt-nest-row:hover{background:var(--bg3,rgba(255,255,255,.04));}
 .gvt-nest-caret{font-size:var(--fs-xs);color:var(--text2);width:10px;flex-shrink:0;}
+
+/* ── Property grid (Visual Studio style): collapsible categories, name | value rows ── */
+.pg{font-size:var(--fs-sm);}
+.pg-cat{border-bottom:1px solid var(--border);}
+.pg-cat-head{display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:pointer;user-select:none;
+  font-size:var(--fs-xs);font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text-label);background:var(--s2);}
+.pg-cat-head:hover{color:var(--text);}
+.pg-chev{display:inline-block;width:10px;transition:transform .12s;color:var(--text3);}
+.pg-cat.collapsed .pg-chev{transform:rotate(-90deg);}
+.pg-cat.collapsed .pg-body{display:none;}
+.pg-row{display:grid;grid-template-columns:minmax(70px,38%) 1fr;align-items:center;min-height:24px;border-top:1px solid rgba(127,127,127,.12);}
+.pg-name{padding:0 8px 0 18px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:1px solid rgba(127,127,127,.12);align-self:stretch;display:flex;align-items:center;}
+.pg-val{padding:1px 4px;min-width:0;display:flex;align-items:center;}
+.pg-input{width:100%;min-width:0;height:22px;padding:0 6px;background:transparent;border:1px solid transparent;color:var(--text);
+  font-family:var(--font-ui);font-size:var(--fs-sm);border-radius:var(--radius-sm);outline:none;}
+.pg-input.mono{font-family:var(--font-mono);}
+.pg-input:hover{border-color:var(--border);}
+.pg-input:focus{border-color:var(--blue);background:var(--bg);}
+.pg-input[readonly]{color:var(--text3);}
+select.pg-input{background:var(--bg);}
+.pg-input::placeholder{color:var(--text3);font-style:italic;}
+.pg-check{accent-color:var(--blue);margin:0 4px;}
+.pg .act-editor{padding:6px 8px;}
+.pg-footer{padding:10px var(--gutter);}
+.pg-summary{padding:8px 10px;color:var(--text2);font-size:var(--fs-xs);border-bottom:1px solid var(--border);}

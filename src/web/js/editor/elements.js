@@ -140,18 +140,18 @@ function updateProps() {
   // Align bar
   updateAlignBtns();
   if(ids.length===0){
-    show('no-sel'); hide('step-props'); hide('trans-props'); hide('par-props'); return;
+    show('no-sel'); hide('step-props'); hide('trans-props'); hide('par-props'); hide('multi-props'); return;
   }
   if(ids.length===1){
     const id=ids[0];
     const s=state.steps.find(x=>x.id===id);
-    if(s){ hide('no-sel');show('step-props');hide('trans-props');hide('par-props');
+    if(s){ hide('no-sel');show('step-props');hide('trans-props');hide('par-props');hide('multi-props');
       document.getElementById('px-x').value=s.x;
       document.getElementById('px-y').value=s.y;
       document.getElementById('px-num').value=s.number;
       const numeric=isNumericFlow();
-      document.getElementById('px-val-group').style.display=numeric?'block':'none';
-      document.getElementById('px-addr-group').style.display=numeric?'none':'block';
+      document.getElementById('px-val-group').style.display=numeric?'':'none';
+      document.getElementById('px-addr-group').style.display=numeric?'none':'';
       document.getElementById('px-val').value=numeric?getStepValue(s):'';
       document.getElementById('px-lbl').value=s.label||'';
       document.getElementById('px-init').checked=s.initial||false;
@@ -161,7 +161,7 @@ function updateProps() {
       return;
     }
     const t=state.transitions.find(x=>x.id===id);
-    if(t){ hide('no-sel');hide('step-props');show('trans-props');hide('par-props');
+    if(t){ hide('no-sel');hide('step-props');show('trans-props');hide('par-props');hide('multi-props');
       document.getElementById('tx-x').value=t.x;
       document.getElementById('tx-y').value=t.y;
       document.getElementById('tx-cond').value=t.condition||'';
@@ -169,7 +169,7 @@ function updateProps() {
       return;
     }
     const p=state.parallels.find(x=>x.id===id);
-    if(p){ hide('no-sel');hide('step-props');hide('trans-props');show('par-props');
+    if(p){ hide('no-sel');hide('step-props');hide('trans-props');show('par-props');hide('multi-props');
       document.getElementById('bx-x').value=p.x;
       document.getElementById('bx-y').value=p.y;
       document.getElementById('bx-w').value=p.width;
@@ -178,8 +178,9 @@ function updateProps() {
       return;
     }
   }
-  // Multiple selected
+  // Multiple selected: common properties grid (prop-grid.ts)
   hide('no-sel');hide('step-props');hide('trans-props');hide('par-props');
+  if(typeof renderMultiProps==='function'){ show('multi-props'); renderMultiProps(ids); } else hide('multi-props');
 }
 function updateAlignBtns() {
   const multi = selIds.size >= 2;
@@ -233,7 +234,7 @@ function renderMacroStepEditor(step) {
     return;
   }
 
-  group.style.display = 'block';
+  group.style.display = '';
   const flows = getEligibleMacroStepFlows(step);
   select.innerHTML = '<option value="">- none -</option>' + flows.map(diagram =>
     `<option value="${esc2(diagram.id)}" ${diagram.id === step.macroFlowId ? 'selected' : ''}>${esc2(diagram.name || diagram.id)}</option>`

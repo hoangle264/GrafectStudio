@@ -228,41 +228,32 @@
                     </div>
 
                     <!-- Step Props -->
-                    <div id="step-props" class="is-hidden">
-                        <div class="prop-group">
-                            <div class="prop-label">COORDINATES (X / Y)</div>
-                            <div class="coord-row">
-                                <span class="coord-label">X</span>
-                                <input class="coord-input" id="px-x" type="number" oninput="setPropCoord('x',this.value)">
-                                <span class="coord-label">Y</span>
-                                <input class="coord-input" id="px-y" type="number" oninput="setPropCoord('y',this.value)">
+                    <div id="step-props" class="pg is-hidden">
+                        <div class="pg-cat" data-pg-cat="step-identity">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Step</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">Number</label><div class="pg-val"><input class="pg-input mono" id="px-num" type="number" min="0" oninput="setProp('number',+this.value)"></div></div>
+                            <div class="pg-row" id="px-val-group" style="display:none"><label class="pg-name">Step value</label><div class="pg-val"><input class="pg-input mono" id="px-val" type="number" min="1" title="CASE value in numeric step mode" oninput="setProp('stepValue',+this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Label</label><div class="pg-val"><input class="pg-input" id="px-lbl" type="text" placeholder="Step name..." oninput="setProp('label',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Initial</label><div class="pg-val"><input type="checkbox" class="pg-check" id="px-init" onchange="setProp('initial',this.checked)"></div></div>
                             </div>
                         </div>
-                        <div class="prop-group">
-                            <div class="prop-label">STEP NUMBER</div>
-                            <input class="prop-input" id="px-num" type="number" min="0" oninput="setProp('number',+this.value)">
+                        <div class="pg-cat" data-pg-cat="step-address">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Address</div>
+                            <div class="pg-body">
+                            <div id="px-addr-group">
+                            <div class="pg-row"><label class="pg-name">Manual</label><div class="pg-val"><input type="checkbox" class="pg-check" id="px-addr-manual" onchange="setStepAddressManual(this.checked)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Active</label><div class="pg-val"><input class="pg-input mono" id="px-addr-exec" type="text" placeholder="Active address" oninput="setStepAddress('execAddress',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Done</label><div class="pg-val"><input class="pg-input mono" id="px-addr-done" type="text" placeholder="Done address" oninput="setStepAddress('doneAddress',this.value)"></div></div>
+                            </div>
+                            <div class="pg-row" id="px-macro-flow-group" style="display:none"><label class="pg-name">Macro flow</label><div class="pg-val"><select class="pg-input" id="px-macro-flow" onchange="setMacroFlowId(this.value)"></select></div></div>
+                            </div>
                         </div>
-                        <div class="prop-group" id="px-val-group" style="display:none">
-                            <div class="prop-label">STEP VALUE (CASE)</div>
-                            <input class="prop-input" id="px-val" type="number" min="1" oninput="setProp('stepValue',+this.value)">
-                        </div>
-                        <div class="prop-group">
-                            <div class="prop-label">LABEL</div>
-                            <input class="prop-input" id="px-lbl" type="text" placeholder="Step name..." oninput="setProp('label',this.value)">
-                        </div>
-                        <div class="prop-group" id="px-addr-group">
-                            <div class="prop-label">STEP ADDRESS (ACTIVE / DONE)</div>
-                            <label class="prop-check">
-                                <input type="checkbox" id="px-addr-manual" onchange="setStepAddressManual(this.checked)"> Manual address</label>
-                            <input class="prop-input" id="px-addr-exec" type="text" placeholder="Active address" oninput="setStepAddress('execAddress',this.value)">
-                            <input class="prop-input" id="px-addr-done" type="text" placeholder="Done address" oninput="setStepAddress('doneAddress',this.value)">
-                        </div>
-                        <div class="prop-group" id="px-macro-flow-group" style="display:none">
-                            <div class="prop-label">MACRO FLOW</div>
-                            <select class="prop-input" id="px-macro-flow" onchange="setMacroFlowId(this.value)"></select>
-                        </div>
+                        <div class="pg-cat" data-pg-cat="step-actions">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Actions</div>
+                            <div class="pg-body">
                         <div class="act-editor" id="act-editor">
-                            <div class="act-editor-label">ACTIONS &mdash; IEC 61131-3</div>
+                            <div class="act-editor-label">IEC 61131-3</div>
                             <datalist id="var-datalist"></datalist>
                             <div class="act-list" id="act-list"></div>
                             <button class="act-add-btn" onclick="actAddRow()">+ Add Action</button>
@@ -275,65 +266,62 @@
                                 <span class="act-ql-chip"><b>D</b> Delayed</span>
                             </div>
                         </div>
-                        <div class="prop-group">
-                            <label class="prop-check">
-                                <input type="checkbox" id="px-init" onchange="setProp('initial',this.checked)"> Initial Step</label>
+                            </div>
                         </div>
-                        <div class="prop-group">
-                            <button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button>
+                        <div class="pg-cat" data-pg-cat="px-layout">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Layout</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">X</label><div class="pg-val"><input class="pg-input mono" id="px-x" type="number" oninput="setPropCoord('x',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Y</label><div class="pg-val"><input class="pg-input mono" id="px-y" type="number" oninput="setPropCoord('y',this.value)"></div></div>
+                            </div>
                         </div>
+                        <div class="pg-footer"><button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button></div>
                     </div>
 
                     <!-- Transition Props -->
-                    <div id="trans-props" class="is-hidden">
-                        <div class="prop-group">
-                            <div class="prop-label">COORDINATES (X / Y)</div>
-                            <div class="coord-row">
-                                <span class="coord-label">X</span>
-                                <input class="coord-input" id="tx-x" type="number" oninput="setPropCoord('x',this.value)">
-                                <span class="coord-label">Y</span>
-                                <input class="coord-input" id="tx-y" type="number" oninput="setPropCoord('y',this.value)">
+                    <div id="trans-props" class="pg is-hidden">
+                        <div class="pg-cat" data-pg-cat="trans-logic">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Transition</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">Condition</label><div class="pg-val"><input class="pg-input mono g" id="tx-cond" type="text" placeholder="a &middot; b + c" oninput="setProp('condition',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Label</label><div class="pg-val"><input class="pg-input" id="tx-lbl" type="text" placeholder="Label..." oninput="setProp('label',this.value)"></div></div>
                             </div>
                         </div>
-                        <div class="prop-group">
-                            <div class="prop-label">RECEPTIVITY / CONDITION</div>
-                            <input class="prop-input g" id="tx-cond" type="text" placeholder="a &middot; b + c" oninput="setProp('condition',this.value)">
+                        <div class="pg-cat" data-pg-cat="tx-layout">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Layout</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">X</label><div class="pg-val"><input class="pg-input mono" id="tx-x" type="number" oninput="setPropCoord('x',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Y</label><div class="pg-val"><input class="pg-input mono" id="tx-y" type="number" oninput="setPropCoord('y',this.value)"></div></div>
+                            </div>
                         </div>
-                        <div class="prop-group">
-                            <div class="prop-label">LABEL</div>
-                            <input class="prop-input" id="tx-lbl" type="text" placeholder="Label..." oninput="setProp('label',this.value)">
-                        </div>
-                        <div class="prop-group">
-                            <button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button>
-                        </div>
+                        <div class="pg-footer"><button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button></div>
                     </div>
 
                     <!-- Parallel Bar Props -->
-                    <div id="par-props" class="is-hidden">
-                        <div class="prop-group">
-                            <div class="prop-label">COORDINATES (X / Y)</div>
-                            <div class="coord-row">
-                                <span class="coord-label">X</span>
-                                <input class="coord-input" id="bx-x" type="number" oninput="setPropCoord('x',this.value)">
-                                <span class="coord-label">Y</span>
-                                <input class="coord-input" id="bx-y" type="number" oninput="setPropCoord('y',this.value)">
+                    <div id="par-props" class="pg is-hidden">
+                        <div class="pg-cat" data-pg-cat="par-branch">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>AND branch</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">Type</label><div class="pg-val"><span class="parallel-type-value" id="bx-type"></span></div></div>
+                            <div class="pg-row"><label class="pg-name">Width</label><div class="pg-val"><input class="pg-input mono" id="bx-w" type="number" min="80" step="20" oninput="setProp('width',Math.max(80,+this.value))"></div></div>
+                            <div class="pg-row"><label class="pg-name">Ports</label><div class="pg-val"><input class="pg-input mono" id="bx-ports" type="number" min="2" max="8" oninput="setProp('ports',Math.min(8,Math.max(2,+this.value)))"></div></div>
                             </div>
                         </div>
-                        <div class="prop-group">
-                            <div class="prop-label">WIDTH</div>
-                            <input class="prop-input" id="bx-w" type="number" min="80" step="20" oninput="setProp('width',Math.max(80,+this.value))">
+                        <div class="pg-cat" data-pg-cat="bx-layout">
+                            <div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Layout</div>
+                            <div class="pg-body">
+                            <div class="pg-row"><label class="pg-name">X</label><div class="pg-val"><input class="pg-input mono" id="bx-x" type="number" oninput="setPropCoord('x',this.value)"></div></div>
+                            <div class="pg-row"><label class="pg-name">Y</label><div class="pg-val"><input class="pg-input mono" id="bx-y" type="number" oninput="setPropCoord('y',this.value)"></div></div>
+                            </div>
                         </div>
-                        <div class="prop-group">
-                            <div class="prop-label">BRANCH PORTS</div>
-                            <input class="prop-input" id="bx-ports" type="number" min="2" max="8" oninput="setProp('ports',Math.min(8,Math.max(2,+this.value)))">
-                        </div>
-                        <div class="prop-group">
-                            <div class="prop-label">TYPE</div>
-                            <div class="parallel-type-value" id="bx-type"></div>
-                        </div>
-                        <div class="prop-group">
-                            <button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button>
-                        </div>
+                        <div class="pg-footer"><button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button></div>
+                    </div>
+
+                    <!-- Multi-selection Props -->
+                    <div id="multi-props" class="pg is-hidden">
+                        <div class="pg-summary" id="mx-summary"></div>
+                        <div id="mx-body"></div>
+                        <div class="pg-footer"><button class="btn r btn-full" onclick="delSelected()">&#8856; DELETE</button></div>
                     </div>
                 </div>
 
@@ -584,6 +572,7 @@
     <script src="js/editor/elements.js"></script>
     <script src="js/editor/events.js"></script>
     <script src="js/editor/clipboard.js"></script>
+    <script src="js/editor/prop-grid.js"></script>
     <script src="js/editor/tree.js"></script>
     <script src="js/editor/tree-ui.js"></script>
     <script src="js/codegen/flow-struct-editor.js"></script>
