@@ -55,6 +55,14 @@ function makeDiagItem(d: TdDiagramMeta): HTMLElement {
   item.addEventListener('click', e=>{ if(!(e.target as HTMLElement).closest('.tree-item-btn')) openTab(d.id); });
   item.addEventListener('dblclick', ()=>openDiagPropsPanel(d.id));
   item.addEventListener('contextmenu', e=>{ e.preventDefault(); showTreeCtx(e, d.id, 'diagram'); });
+  // Drag onto a unit or folder row to move the diagram there (tree organization only).
+  item.draggable = true;
+  item.addEventListener('dragstart', e=>{
+    e.dataTransfer?.setData(TD_DRAG_MIME, d.id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    item.classList.add('dragging');
+  });
+  item.addEventListener('dragend', ()=>item.classList.remove('dragging'));
   return item;
 }
 
@@ -121,6 +129,45 @@ async function removeUnit(id: string, e?: Event): Promise<void> {
     return true;
   });
 }
+// -- Drag & drop of diagrams onto unit / folder rows --
+const TD_DRAG_MIME = 'application/x-grafcet-diagram';
+
+/** Makes a unit row (folderId empty = unit root) or a folder row accept dropped diagrams. */
+function tdMakeDropTarget(head: HTMLElement, unitId: string, folderId: string): void {
+  const accepts = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).indexOf(TD_DRAG_MIME) >= 0;
+  head.addEventListener('dragover', e=>{
+    if (!accepts(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    head.classList.add('drop-target');
+  });
+  head.addEventListener('dragleave', ()=>head.classList.remove('drop-target'));
+  head.addEventListener('drop', e=>{
+    head.classList.remove('drop-target');
+    if (!accepts(e)) return;
+    e.preventDefault();
+    const id = e.dataTransfer!.getData(TD_DRAG_MIME);
+    moveDiagramTo(id, unitId, folderId);
+  });
+}
+
+function moveDiagramTo(diagramId: string, unitId: string, folderId: string): void {
+  const d = project.diagrams.find(x=>x.id===diagramId);
+  const u = tdFindUnit(unitId);
+  if (!d || !u) return;
+  if ((d.unitId||'') === unitId && (d.folderId||'') === (folderId||'')) return;
+  const folderName = folderId ? (u.folders||[]).find(x=>x.id===folderId)?.name : '';
+  runUndoableProjectChange('Moved "'+d.name+'" to '+u.name+(folderName ? ' / '+folderName : ''), () => {
+    d.unitId = unitId;
+    d.unit = u.name;
+    if (folderId) d.folderId = folderId; else delete d.folderId;
+    if (folderId) { const f = (u.folders||[]).find(x=>x.id===folderId); if (f) f.open = true; }
+    u.open = true;
+    saveProject(); renderTree();
+    if (diagPropsId === diagramId) openDiagPropsPanel(diagramId);
+  });
+}
+
 // -- Folders (one level inside a unit; tree organization only, code generation ignores them) --
 function tdFindUnit(id: string): GrafcetStudioProject.Unit | undefined {
   return (project.units||[]).find(x=>x.id===id);

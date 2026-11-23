@@ -17,6 +17,7 @@ declare function closeTab(id: string, e: Event): void;
 declare function updateAlignBtns(): void;
 declare function makeDevicesSection(): HTMLElement;
 declare function makeDiagItem(d: TreeUiDiagramMeta): HTMLElement;
+declare function tdMakeDropTarget(head: HTMLElement, unitId: string, folderId: string): void;
 
 function treeGetApi(): GrafcetStudioTree.TreeApi {
   const api = window.GrafcetStudio && window.GrafcetStudio.tree as GrafcetStudioTree.TreeApi | undefined;
@@ -223,6 +224,7 @@ function makeFolderItem(u: GrafcetStudioProject.Unit, f: GrafcetStudioProject.Un
       <button class="tree-unit-btn del" onclick="removeFolder('${u.id}','${f.id}',event)" title="Delete folder (diagrams move to the unit)">✕</button>
     </div>`;
   head.addEventListener('click', ()=>toggleFolderOpen(u.id, f.id));
+  tdMakeDropTarget(head, u.id, f.id);
   const children = document.createElement('div');
   children.className = 'tree-unit-children tree-folder-children' + (isOpen?'':' hidden');
   if(!diags.length){
@@ -256,6 +258,7 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
       <button class="tree-unit-btn del" onclick="removeUnit('${u.id}',event)" title="Delete">✕</button>
     </div>`;
   head.addEventListener('click', ()=>toggleUnitOpen(u.id));
+  tdMakeDropTarget(head, u.id, '');
 
   const children = document.createElement('div');
   children.className = 'tree-unit-children' + (isOpen?'':' hidden');
