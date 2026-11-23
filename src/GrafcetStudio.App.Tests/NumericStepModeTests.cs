@@ -97,4 +97,17 @@ public class NumericStepModeTests
         Assert.Contains("35: ; Finish\nIF MR104 THEN StepNo := 10; END_IF;", output);
         Assert.Contains("END_CASE;", output);
     }
+
+    [Fact]
+    public void DeviceCommand_SplitsNumericStepCondition()
+    {
+        var command = new GrafcetStudio.CodeGen.Runtime.Models.DeviceCommandFlowOutput { SourceExecuteBit = "StepNo=20" };
+        Assert.True(command.IsNumericStep);
+        Assert.Equal("StepNo", command.StepVar);
+        Assert.Equal(20, command.StepValue);
+
+        var bitCommand = new GrafcetStudio.CodeGen.Runtime.Models.DeviceCommandFlowOutput { SourceExecuteBit = "MR1000", SourceDoneBit = "MR1001" };
+        Assert.False(bitCommand.IsNumericStep);
+        Assert.Equal(string.Empty, bitCommand.StepVar);
+    }
 }

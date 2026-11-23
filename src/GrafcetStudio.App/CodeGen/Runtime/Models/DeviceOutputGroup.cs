@@ -67,6 +67,29 @@ public class DeviceCommandFlowOutput
 
     public string SourceDoneBit { get; init; } = string.Empty;
 
+    /// <summary>
+    /// True when the source step belongs to a numeric-step flow. Its SourceExecuteBit is then
+    /// "&lt;stepVar&gt;=&lt;value&gt;" and there is no done bit; templates use StepVar / StepValue to emit a compare.
+    /// </summary>
+    public bool IsNumericStep => TrySplitNumericRef(SourceExecuteBit, out _, out _);
+
+    /// <summary>Numeric step mode: the flow's step register (e.g. DM0 or StepNo).</summary>
+    public string StepVar => TrySplitNumericRef(SourceExecuteBit, out var name, out _) ? name : string.Empty;
+
+    /// <summary>Numeric step mode: the CASE value of the source step (e.g. 10).</summary>
+    public int StepValue => TrySplitNumericRef(SourceExecuteBit, out _, out var value) ? value : 0;
+
+    private static bool TrySplitNumericRef(string reference, out string name, out int value)
+    {
+        name = string.Empty;
+        value = 0;
+        var index = (reference ?? string.Empty).LastIndexOf('=');
+        if (index <= 0 || index == reference!.Length - 1) return false;
+        if (!int.TryParse(reference[(index + 1)..].Trim(), out value)) return false;
+        name = reference[..index].Trim();
+        return name.Length > 0;
+    }
+
     public int Index { get; init; }
 
     public int Number { get; init; }
