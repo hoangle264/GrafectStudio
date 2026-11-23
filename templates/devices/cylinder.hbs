@@ -2,10 +2,18 @@
 {{#each Commands~}}
 ;{{CommandId}}
 {{#each FlowCommands~}}
+{{#if IsNumericStep}}
+{{#if IsFirst}}
+LD=  {{StepVar}} #{{StepValue}}
+{{else}}
+OR=  {{StepVar}} #{{StepValue}}
+{{/if}}
+{{else}}
 {{#if IsFirst}}
 LD   {{SourceDoneBit}}
 {{else}}
 AND   {{SourceDoneBit}}
+{{/if}}
 {{/if}}
 {{/each}}
 {{#if (eq CommandId "CoilA")~}}
