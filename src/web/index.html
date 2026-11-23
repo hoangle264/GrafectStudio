@@ -356,8 +356,12 @@
                         <div class="dp-label">Machine</div>
                         <input class="dp-input" id="dp-machine" type="text" oninput="dpLiveUpdate()">
                         <div class="dp-label">Unit</div>
-                        <select class="dp-select" id="dp-unit" onchange="dpLiveUpdate()">
+                        <select class="dp-select" id="dp-unit" onchange="dpFillFolderSelect(this.value,'');dpLiveUpdate()">
                             <option value="">&mdash; unassigned &mdash;</option>
+                        </select>
+                        <div class="dp-label">Folder</div>
+                        <select class="dp-select" id="dp-folder" onchange="dpLiveUpdate()">
+                            <option value="">&mdash; unit root &mdash;</option>
                         </select>
                     </div>
 
@@ -494,6 +498,7 @@
         <div class="tree-ctx-i" id="tctx-open" onclick="tctxOpen()">📂 Open Diagram</div>
         <div class="tree-ctx-i" id="tctx-rename" onclick="tctxRename()">✎ Rename</div>
         <div class="tree-ctx-i" id="tctx-dup" onclick="tctxDup()">⊞ Duplicate</div>
+        <div id="tctx-move"></div>
         <div class="tree-ctx-sep"></div>
         <div class="tree-ctx-i r" id="tctx-del" onclick="tctxDel()">⊘ Delete</div>
     </div> <!-- Export Tables Modal -->

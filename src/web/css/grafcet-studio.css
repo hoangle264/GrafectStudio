@@ -243,6 +243,8 @@ body.panel-resizing{cursor:col-resize;user-select:none;}
 
 .tree-unit-children{padding-left:0;border-bottom:none;}
 .tree-unit-children.hidden{display:none;}
+.tree-folder-head{padding-left:46px;}
+.tree-folder-children .tree-item{padding-left:66px;}
 
 /* Mode groups inside unit */
 .tree-mode-group{border-bottom:1px solid rgba(255,255,255,.03);}

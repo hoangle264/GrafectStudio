@@ -207,6 +207,36 @@ function renderTree(): void {
   updateAlignBtns();
 }
 
+function makeFolderItem(u: GrafcetStudioProject.Unit, f: GrafcetStudioProject.UnitFolder, diags: TreeUiDiagramMeta[]): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'tree-folder';
+  const isOpen = f.open !== false;
+  const head = document.createElement('div');
+  head.className = 'tree-unit-head tree-folder-head';
+  head.innerHTML = `
+    <span class="tree-unit-toggle ${isOpen?'open':'closed'}">${treeIcon('chevron')}</span>
+    ${treeIcon('folder','unit')}
+    <span class="tree-unit-name">${esc2(f.name)}</span>
+    <div class="tree-unit-actions">
+      <button class="tree-unit-btn" onclick="addDiagramInFolder('${u.id}','${f.id}');event.stopPropagation()" title="Add diagram">+</button>
+      <button class="tree-unit-btn" onclick="renameFolder('${u.id}','${f.id}');event.stopPropagation()" title="Rename">✎</button>
+      <button class="tree-unit-btn del" onclick="removeFolder('${u.id}','${f.id}',event)" title="Delete folder (diagrams move to the unit)">✕</button>
+    </div>`;
+  head.addEventListener('click', ()=>toggleFolderOpen(u.id, f.id));
+  const children = document.createElement('div');
+  children.className = 'tree-unit-children tree-folder-children' + (isOpen?'':' hidden');
+  if(!diags.length){
+    const empty = document.createElement('div');
+    empty.className='tree-empty-note indent';
+    empty.textContent='empty';
+    children.appendChild(empty);
+  } else {
+    diags.forEach(d=>children.appendChild(makeDiagItem(d)));
+  }
+  wrap.appendChild(head); wrap.appendChild(children);
+  return wrap;
+}
+
 function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'tree-unit'; wrap.dataset.unitId = u.id;
@@ -221,6 +251,7 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
     <span class="tree-unit-name">${esc2(u.name)}</span>
     <div class="tree-unit-actions">
       <button class="tree-unit-btn" onclick="addDiagramInUnit('${u.id}','Auto');event.stopPropagation()" title="Add diagram">+</button>
+      <button class="tree-unit-btn" onclick="addFolder('${u.id}');event.stopPropagation()" title="Add folder">${treeIcon('folder','unit')}</button>
       <button class="tree-unit-btn" onclick="renameUnit('${u.id}');event.stopPropagation()" title="Rename">✎</button>
       <button class="tree-unit-btn del" onclick="removeUnit('${u.id}',event)" title="Delete">✕</button>
     </div>`;
@@ -230,13 +261,18 @@ function makeUnitItem(u: GrafcetStudioProject.Unit): HTMLElement {
   children.className = 'tree-unit-children' + (isOpen?'':' hidden');
 
   // New tree keeps programs directly under the unit; mode stays in Properties.
-  if(!diagsInUnit.length){
+  // Folders (one level) first, then diagrams at the unit root. A folderId that no longer exists counts as root.
+  const folders = u.folders || [];
+  const folderIds = new Set(folders.map(f=>f.id));
+  folders.forEach(f=>children.appendChild(makeFolderItem(u, f, diagsInUnit.filter(d=>d.folderId===f.id))));
+  const rootDiags = diagsInUnit.filter(d=>!d.folderId || !folderIds.has(d.folderId));
+  if(!rootDiags.length && !folders.length){
     const empty = document.createElement('div');
     empty.className='tree-empty-note indent';
     empty.textContent='no programs';
     children.appendChild(empty);
   } else {
-    diagsInUnit.forEach(d=>children.appendChild(makeDiagItem(d)));
+    rootDiags.forEach(d=>children.appendChild(makeDiagItem(d)));
   }
 
   wrap.appendChild(head); wrap.appendChild(children);

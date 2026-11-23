@@ -59,10 +59,17 @@ namespace GrafcetStudioProject {
     [key: string]: unknown;
   }
 
+  export interface UnitFolder {
+    id: string;
+    name: string;
+    open?: boolean;
+  }
+
   export interface Unit {
     id: string;
     name: string;
     open?: boolean;
+    folders?: UnitFolder[];   // one level; organizes the tree only, never read by code generation
     [key: string]: unknown;
   }
 
@@ -75,6 +82,7 @@ namespace GrafcetStudioProject {
     orchestratorConfig?: OrchestratorConfig;
     unitId?: string;
     unit?: string;
+    folderId?: string;        // UnitFolder.id inside unitId; tree grouping only
     diagramType?: DiagramType;
     machine?: string;
     description?: string;

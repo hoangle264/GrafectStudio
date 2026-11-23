@@ -84,6 +84,22 @@ function confirmUnit(): void {
     if (!result.ok) { notifyError(result.message || 'Unable to add unit.'); return; }
     saveProject(); renderTree();
     toast('Unit added: '+val);
+  } else if(unitModalMode?.startsWith('addFolder:')){
+    const u = tdFindUnit(unitModalMode.split(':')[1]);
+    if(!u) return;
+    if((u.folders||[]).some(f=>f.name.toLowerCase()===val.toLowerCase())){ notifyError('Folder "'+val+'" already exists in this unit.'); return; }
+    u.folders = (u.folders||[]).concat([{ id:'fld-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), name:val, open:true }]);
+    u.open = true;
+    saveProject(); renderTree();
+    toast('Folder added: '+val);
+  } else if(unitModalMode?.startsWith('renameFolder:')){
+    const parts = unitModalMode.split(':');
+    const u = tdFindUnit(parts[1]);
+    const f = u && (u.folders||[]).find(x=>x.id===parts[2]);
+    if(!u || !f) return;
+    if((u.folders||[]).some(x=>x.id!==f.id && x.name.toLowerCase()===val.toLowerCase())){ notifyError('Folder "'+val+'" already exists in this unit.'); return; }
+    f.name = val;
+    saveProject(); renderTree();
   } else if(unitModalMode?.startsWith('rename:')){
     const id=unitModalMode.split(':')[1];
     result = treeGetApi().renameUnit(treeGetContext(), id, val);
@@ -105,6 +121,73 @@ async function removeUnit(id: string, e?: Event): Promise<void> {
     return true;
   });
 }
+// -- Folders (one level inside a unit; tree organization only, code generation ignores them) --
+function tdFindUnit(id: string): GrafcetStudioProject.Unit | undefined {
+  return (project.units||[]).find(x=>x.id===id);
+}
+function addFolder(unitId: string): void {
+  if(!tdFindUnit(unitId)) return;
+  unitModalMode = 'addFolder:'+unitId;
+  document.getElementById('modal-unit-title')!.textContent = 'ADD FOLDER';
+  (document.getElementById('modal-unit-name') as HTMLInputElement).value = 'Folder'+(((tdFindUnit(unitId)!.folders||[]).length)+1);
+  showModal('modal-unit');
+  setTimeout(()=>(document.getElementById('modal-unit-name') as HTMLInputElement).select(),60);
+}
+function renameFolder(unitId: string, folderId: string): void {
+  const f = (tdFindUnit(unitId)?.folders||[]).find(x=>x.id===folderId);
+  if(!f) return;
+  unitModalMode = 'renameFolder:'+unitId+':'+folderId;
+  document.getElementById('modal-unit-title')!.textContent = 'RENAME FOLDER';
+  (document.getElementById('modal-unit-name') as HTMLInputElement).value = f.name;
+  showModal('modal-unit');
+}
+async function removeFolder(unitId: string, folderId: string, e?: Event): Promise<void> {
+  if(e) e.stopPropagation();
+  const u = tdFindUnit(unitId);
+  const f = (u?.folders||[]).find(x=>x.id===folderId);
+  if(!u || !f) return;
+  const inside = project.diagrams.filter(d=>d.unitId===unitId && d.folderId===folderId);
+  const detail = inside.length ? ` ${inside.length} diagram(s) move to unit "${u.name}".` : '';
+  if(!(await confirmDialog('Delete folder', `Delete folder "${f.name}"?${detail}`, 'Delete', true))) return;
+  runUndoableProjectChange(`Deleted folder "${f.name}"`, () => {
+    inside.forEach(d=>{ delete d.folderId; });
+    u.folders = (u.folders||[]).filter(x=>x.id!==folderId);
+    saveProject(); renderTree();
+  });
+}
+function toggleFolderOpen(unitId: string, folderId: string): void {
+  const f = (tdFindUnit(unitId)?.folders||[]).find(x=>x.id===folderId);
+  if(!f) return;
+  f.open = f.open === false;
+  saveProject(); renderTree();
+}
+function addDiagramInFolder(unitId: string, folderId: string): void {
+  const result = treeGetApi().addDiagramInUnit(treeGetContext(), unitId, 'Auto');
+  result.diagram.folderId = folderId;
+  saveDiagramData(result.diagram.id, result.emptyState, result.nextId, result.nextStepNum, result.viewX, result.viewY, result.viewScale);
+  saveProject(); renderTree(); openTab(result.diagram.id);
+}
+function moveDiagramToFolder(diagramId: string, folderId: string): void {
+  const d = project.diagrams.find(x=>x.id===diagramId);
+  if(!d) return;
+  if(folderId) d.folderId = folderId; else delete d.folderId;
+  saveProject(); renderTree();
+  if(diagPropsId===diagramId) dpFillFolderSelect(d.unitId||'', d.folderId||'');
+}
+function dpFillFolderSelect(unitId: string, folderId: string): void {
+  const sel = document.getElementById('dp-folder') as HTMLSelectElement | null;
+  if(!sel) return;
+  const folders = (tdFindUnit(unitId)?.folders)||[];
+  sel.innerHTML = '<option value="">- unit root -</option>';
+  folders.forEach(f=>{
+    const o = document.createElement('option');
+    o.value = f.id; o.textContent = f.name;
+    if(f.id===folderId) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.disabled = !folders.length;
+}
+
 function toggleUnitOpen(id: string): void {
   const result = treeGetApi().toggleUnitOpen(treeGetContext(), id);
   if(result.ok){ saveProject(); renderTree(); }
@@ -138,6 +221,7 @@ function openDiagPropsPanel(id: string): void {
     if(u.id===d.unitId) o.selected=true;
     sel.appendChild(o);
   });
+  dpFillFolderSelect(d.unitId||'', d.folderId||'');
 
   // Fill fields
   (document.getElementById('dp-name') as HTMLInputElement).value = d.name||'';
@@ -354,6 +438,11 @@ function saveDiagPropsPanel(): void {
   const unitSel = document.getElementById('dp-unit') as HTMLSelectElement;
   d.unitId = unitSel.value||undefined;
   d.unit = unitSel.value ? (project.units.find(u=>u.id===unitSel.value)?.name||'') : '';
+  // A folder belongs to one unit: keep it only if it exists in the (possibly new) unit.
+  const folderSel = document.getElementById('dp-folder') as HTMLSelectElement | null;
+  const folderId = folderSel ? folderSel.value : (d.folderId||'');
+  if(folderId && (tdFindUnit(d.unitId||'')?.folders||[]).some(f=>f.id===folderId)) d.folderId = folderId;
+  else delete d.folderId;
   d.mode = dpGetCurrentMode();
   d.controlState = dpGetCurrentControlState();
   d.category = dpIsOrchestrator() ? 'orchestrator' : 'normal';
@@ -404,6 +493,7 @@ function showTreeCtx(e: Event, id: string, type: string): void {
   const isDiag = type==='diagram';
   (document.getElementById('tctx-open') as HTMLElement).style.display = isDiag?'flex':'none';
   (document.getElementById('tctx-dup') as HTMLElement).style.display  = isDiag?'flex':'none';
+  tdFillMoveMenu(isDiag ? id : null);
   m.style.display='block';
   const vw=window.innerWidth, vh=window.innerHeight;
   const mouseEvent = e as MouseEvent;
@@ -412,6 +502,25 @@ function showTreeCtx(e: Event, id: string, type: string): void {
     const r=m.getBoundingClientRect();
     if(r.right>vw) m.style.left=(mouseEvent.clientX-r.width)+'px';
     if(r.bottom>vh) m.style.top=(mouseEvent.clientY-r.height)+'px';
+  });
+}
+// "Move to <folder>" entries for the diagram's own unit; hidden when the unit has no folders.
+function tdFillMoveMenu(diagramId: string | null): void {
+  const box = document.getElementById('tctx-move');
+  if(!box) return;
+  box.innerHTML = '';
+  const d = diagramId ? project.diagrams.find(x=>x.id===diagramId) : undefined;
+  const folders = (d && tdFindUnit(d.unitId||'')?.folders) || [];
+  if(!d || !folders.length) return;
+  const targets: Array<[string, string]> = [['', 'Unit root'] as [string, string]].concat(folders.map(f=>[f.id, f.name] as [string, string]));
+  const sep = document.createElement('div'); sep.className = 'tree-ctx-sep'; box.appendChild(sep);
+  targets.forEach(([fid, label])=>{
+    if((d.folderId||'') === fid) return;
+    const item = document.createElement('div');
+    item.className = 'tree-ctx-i';
+    item.textContent = '↳ Move to ' + label;
+    item.addEventListener('click', ()=>{ hideTreeCtx(); moveDiagramToFolder(d.id, fid); });
+    box.appendChild(item);
   });
 }
 function hideTreeCtx(): void {
@@ -428,7 +537,13 @@ function tctxDup(): void {
   const d=project.diagrams.find(x=>x.id===treeCtxTarget!.id); if(!d) return;
   const newId='diag-'+Date.now();
   const srcData=loadDiagramData(d.id);
-  project.diagrams.push({id:newId, name:d.name+' Copy'} as TdDiagramMeta);
+  // Keep unit, folder, mode, type and address settings; a fresh base MR avoids sharing step bits with the source.
+  const copy = JSON.parse(JSON.stringify(d)) as TdDiagramMeta;
+  copy.id = newId;
+  copy.name = d.name+' Copy';
+  if (copy.addressMode !== 'word') delete copy.baseMr;
+  project.diagrams.push(copy);
+  if (typeof ensureFlowAddressConfig === 'function') ensureFlowAddressConfig(copy, true);
   if(srcData) saveDiagramData(newId, JSON.parse(JSON.stringify(srcData.state)), srcData.nextId, srcData.nextStepNum, srcData.viewX, srcData.viewY, srcData.viewScale);
   saveProject(); renderTree();
   toast('Duplicated');
