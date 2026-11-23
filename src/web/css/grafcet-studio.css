@@ -1186,3 +1186,6 @@ select.pg-input{background:var(--bg);}
 .dp-panel .pg .dp-codeprev{margin:6px 8px;}
 .tree-item.dragging{opacity:.45;}
 .tree-unit-head.drop-target{background:rgba(0,122,204,.22);outline:1px dashed var(--blue);outline-offset:-1px;}
+.pg-inline{gap:4px;}
+.pg-inline .pg-input{flex:1;}
+.pg-inline .btn{flex:0 0 auto;height:22px;padding:0 8px;}

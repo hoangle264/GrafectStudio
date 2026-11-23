@@ -17,9 +17,11 @@ interface PgField {
   kinds: PgKind[];
   type: 'text' | 'number' | 'check';
   mono?: boolean;
+  numericOnly?: boolean;   // shown only in numeric step mode flows
 }
 
 declare function snap(v: number): number;
+declare function isNumericFlow(): boolean;
 
 const PG_COLLAPSED_KEY = 'gs.propGrid.collapsed';
 
@@ -28,7 +30,8 @@ const PG_MULTI_FIELDS: Array<{ title: string; fields: PgField[] }> = [
     { key: 'label', label: 'Label', kinds: ['step', 'transition'], type: 'text' }
   ] },
   { title: 'Step', fields: [
-    { key: 'initial', label: 'Initial', kinds: ['step'], type: 'check' }
+    { key: 'initial', label: 'Initial', kinds: ['step'], type: 'check' },
+    { key: 'stepValue', label: 'Step value', kinds: ['step'], type: 'number', mono: true, numericOnly: true }
   ] },
   { title: 'Transition', fields: [
     { key: 'condition', label: 'Condition', kinds: ['transition'], type: 'text', mono: true }
@@ -100,6 +103,7 @@ function renderMultiProps(ids: string[]): void {
   PG_MULTI_FIELDS.forEach(group => {
     const rows: HTMLElement[] = [];
     group.fields.forEach(field => {
+      if (field.numericOnly && !(typeof isNumericFlow === 'function' && isNumericFlow())) return;
       const targets = items.filter(item => field.kinds.indexOf(item.kind) >= 0);
       if (!targets.length) return;
       rows.push(pgMultiRow(field, targets.map(item => item.el)));
@@ -115,7 +119,80 @@ function renderMultiProps(ids: string[]): void {
     cat.appendChild(groupBody);
     body.appendChild(cat);
   });
+  if (counts.step >= 2) body.appendChild(pgRenumberTools(items.filter(item => item.kind === 'step').map(item => item.el)));
   pgRestoreCollapsed(body);
+}
+
+/** Renumber the selected steps in reading order (top to bottom, then left to right). */
+function pgRenumberTools(steps: PgElement[]): HTMLElement {
+  const cat = document.createElement('div');
+  cat.className = 'pg-cat';
+  cat.dataset.pgCat = 'multi-renumber';
+  cat.innerHTML = '<div class="pg-cat-head" onclick="pgToggle(this)"><span class="pg-chev">&#9662;</span>Renumber steps</div>';
+  const body = document.createElement('div');
+  body.className = 'pg-body';
+  const ordered = steps.slice().sort((a, b) => ((a.y || 0) - (b.y || 0)) || ((a.x || 0) - (b.x || 0)));
+  const firstNumber = Math.min(...steps.map(s => Number(s.number) || 1));
+  const numeric = typeof isNumericFlow === 'function' && isNumericFlow();
+  const firstValue = numeric ? Math.min(...steps.map(s => pgStepValue(s))) : 10;
+
+  const addRow = (label: string, start: number, stepBy: number | null, key: 'number' | 'stepValue') => {
+    const row = document.createElement('div');
+    row.className = 'pg-row';
+    row.innerHTML = '<label class="pg-name">' + esc2(label) + '</label>';
+    const val = document.createElement('div');
+    val.className = 'pg-val pg-inline';
+    const startInput = document.createElement('input');
+    startInput.type = 'number'; startInput.min = '1'; startInput.className = 'pg-input mono'; startInput.value = String(start);
+    startInput.title = 'Start';
+    val.appendChild(startInput);
+    let byInput: HTMLInputElement | null = null;
+    if (stepBy != null) {
+      byInput = document.createElement('input');
+      byInput.type = 'number'; byInput.min = '1'; byInput.className = 'pg-input mono'; byInput.value = String(stepBy);
+      byInput.title = 'Increment';
+      val.appendChild(byInput);
+    }
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm'; btn.textContent = 'Apply';
+    btn.addEventListener('click', () => pgRenumber(ordered, key, Number(startInput.value), byInput ? Number(byInput.value) : 1));
+    val.appendChild(btn);
+    row.appendChild(val);
+    body.appendChild(row);
+  };
+  addRow('Number from', firstNumber, null, 'number');
+  if (numeric) addRow('Value from / by', firstValue, 10, 'stepValue');
+  const hint = document.createElement('div');
+  hint.className = 'pg-hint';
+  hint.textContent = 'Order: top to bottom, then left to right.';
+  body.appendChild(hint);
+  cat.appendChild(body);
+  return cat;
+}
+
+function pgStepValue(step: PgElement): number {
+  const v = Number(step.stepValue);
+  return Number.isInteger(v) && v > 0 ? v : Math.max(1, Number(step.number) || 1) * 10;
+}
+
+function pgRenumber(ordered: PgElement[], key: 'number' | 'stepValue', start: number, by: number): void {
+  if (!Number.isInteger(start) || start < 1 || !Number.isInteger(by) || by < 1) { toast('Enter whole numbers of 1 or more', { kind: 'warn' }); return; }
+  const next = ordered.map((_, i) => start + i * by);
+  // The new numbers must not clash with steps outside the selection.
+  const chosen = new Set(ordered.map(s => s.id));
+  const others = pgState().steps.filter(s => !chosen.has(s.id));
+  const taken = new Set(others.map(s => key === 'number' ? Number(s.number) : pgStepValue(s)));
+  const clash = next.find(n => taken.has(n));
+  if (clash != null) { toast((key === 'number' ? 'Step number ' : 'Step value ') + clash + ' is already used by a step outside the selection', { kind: 'warn' }); return; }
+  ordered.forEach((s, i) => { s[key] = next[i]; });
+  if (key === 'number') {
+    const maxNumber = Math.max(...pgState().steps.map(s => Number(s.number) || 0));
+    if (nextStepNum <= maxNumber) nextStepNum = maxNumber + 1;
+  }
+  afterChange();
+  render();
+  renderMultiProps([...selIds]);
+  toast('Renumbered ' + ordered.length + ' steps');
 }
 
 function pgMultiRow(field: PgField, targets: PgElement[]): HTMLElement {
@@ -146,7 +223,9 @@ function pgMultiRow(field: PgField, targets: PgElement[]): HTMLElement {
         if (input.value.trim() === '') return;
         const n = Number(input.value);
         if (!Number.isFinite(n)) return;
-        pgApply(field, targets, typeof snap === 'function' ? snap(n) : n);
+        const isCoord = field.key === 'x' || field.key === 'y';
+        if (!isCoord && (!Number.isInteger(n) || n < 1)) return;
+        pgApply(field, targets, isCoord && typeof snap === 'function' ? snap(n) : n);
       } else {
         pgApply(field, targets, input.value);
       }
