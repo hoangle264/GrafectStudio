@@ -642,12 +642,19 @@ function gvtExportVariablesCSV(): void {
   const devices = project.devices || [];
   const byType = new Map<string, VuiProjectVariable[]>();
   const units: VuiUnitConfig[] = [];
+  const primitives: VuiProjectVariable[] = [];
+  const flowSource = GrafcetStudioStoreHelpers.FLOW_STRUCT_VAR_SOURCE;
   let skipped = 0;
   gvtGetEntries().forEach(function(entry) {
     if (entry.source === 'unit') { units.push(entry.data as VuiUnitConfig); return; }
     const variable = entry.data as VuiProjectVariable;
     const typeName = variable.format || variable.dataType || '';
-    // Primitives and types outside Struct Data (e.g. the shared flow struct) have no import layout.
+    if (variable.source !== flowSource && !variable.signalAddresses && variable.kind !== 'struct'
+        && !devices.some(function(device) { return device && device.name === typeName; })) {
+      primitives.push(variable);
+      return;
+    }
+    // Types outside Struct Data (e.g. the shared flow struct) have no import layout.
     if (!devices.some(function(device) { return device && device.name === typeName; }) || !parser.structLeafPaths(typeName, devices).length) {
       skipped++;
       return;
@@ -662,7 +669,8 @@ function gvtExportVariablesCSV(): void {
     files.push([base + '_Struct_' + gvtSafeFileName(typeName) + '.csv', parser.buildStructCSVRows(variables, typeName, devices)]);
   });
   if (units.length) files.push([base + '_UnitStation.csv', parser.buildUnitCSVRows(units, gvtGetUnitAddr)]);
-  if (!files.length) { toast('No struct or unit station variables to export'); return; }
+  if (primitives.length) files.push([base + '_Variables.csv', parser.buildPrimitiveCSVRows(primitives)]);
+  if (!files.length) { toast('No variables to export'); return; }
 
   files.forEach(function(file, index) { setTimeout(function() { downloadCSV(file[1], file[0]); }, index * 200); });
   toast('Exporting ' + files.length + ' CSV file' + (files.length !== 1 ? 's' : '')

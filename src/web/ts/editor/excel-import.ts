@@ -258,6 +258,75 @@ namespace GrafcetStudioExcelImport {
     return rows;
   }
 
+  const PRIMITIVE_COLUMNS: Array<[string, string[]]> = [
+    ['label', LABEL_HEADERS],
+    ['address', ['address', 'addr', 'device', 'plcaddress']],
+    ['type', ['type', 'datatype', 'format']],
+    ['comment', ['comment', 'description', 'desc', 'note']]
+  ];
+
+  /**
+   * Plain (non-struct) variables: Label, Address, Type, Comment. A header row may reorder or omit
+   * columns; without one the columns follow that order. Type defaults to BOOL. A label already used
+   * by a struct instance (reservedLabels) or a Struct Data type name in Type is rejected.
+   */
+  export function parsePrimitiveCSV(rows: string[][], deviceTypes: DeviceType[], reservedLabels: string[]): StructCSVParseResult {
+    const vars: ProjectVariable[] = [];
+    const errors: string[] = [];
+    const firstRow = rows[0] || [];
+    const colIndex: Record<string, number> = { label: 0, address: 1, type: 2, comment: 3 };
+    const hasHeader = firstRow.some(function(cell) {
+      const norm = normalizeHeader(cell);
+      return PRIMITIVE_COLUMNS.some(function(column) { return column[1].indexOf(norm) >= 0; });
+    });
+    if (hasHeader) {
+      PRIMITIVE_COLUMNS.forEach(function(column) {
+        colIndex[column[0]] = firstRow.findIndex(function(cell) { return column[1].indexOf(normalizeHeader(cell)) >= 0; });
+      });
+      if (colIndex.label < 0) return { vars: [], errors: ['Header row has no Label column.'] };
+    }
+    const structNames = new Set((deviceTypes || []).map(function(device) { return String(device && device.name || '').toLowerCase(); }));
+    const reserved = new Set((reservedLabels || []).map(function(label) { return String(label || '').toLowerCase(); }));
+    const seen = new Set<string>();
+    const cell = function(columns: string[], key: string): string {
+      const index = colIndex[key];
+      return index >= 0 ? String(columns[index] || '').trim() : '';
+    };
+
+    rows.forEach(function(columns, rowIndex) {
+      if (hasHeader && rowIndex === 0) return;
+      const label = cell(columns, 'label');
+      if (!label) return;
+      const where = 'Row ' + (rowIndex + 1) + ' [' + label + ']: ';
+      const key = label.toLowerCase();
+      const dataType = cell(columns, 'type') || 'BOOL';
+      if (reserved.has(key)) { errors.push(where + 'name is already used by a struct instance.'); return; }
+      if (seen.has(key)) { errors.push(where + 'label appears more than once in the file.'); return; }
+      if (structNames.has(dataType.toLowerCase())) { errors.push(where + 'type "' + dataType + '" is a Struct Data type; import it as Struct Data.'); return; }
+      seen.add(key);
+      vars.push({
+        label: label,
+        address: cell(columns, 'address'),
+        format: dataType,
+        dataType: dataType,
+        kind: 'primitive',
+        comment: cell(columns, 'comment'),
+        _source: 'excel'
+      });
+    });
+    return { vars, errors };
+  }
+
+  /** Rows of a plain-variable CSV in the layout parsePrimitiveCSV reads. */
+  export function buildPrimitiveCSVRows(variables: ProjectVariable[]): string[][] {
+    const rows: string[][] = [['Label', 'Address', 'Type', 'Comment']];
+    (variables || []).forEach(function(variable) {
+      if (!variable) return;
+      rows.push([variable.label || '', variable.address || '', variable.dataType || variable.format || 'BOOL', variable.comment || '']);
+    });
+    return rows;
+  }
+
   // Header names parseUnitCSV accepts, paired with where the value lives in a UnitConfig.
   const UNIT_CSV_COLUMNS: Array<[string, string]> = [
     ['originBaseAddr', 'originBaseAddr'], ['autoBaseAddr', 'autoBaseAddr'],
@@ -397,6 +466,8 @@ namespace GrafcetStudioExcelImport {
     structLeafPaths(structTypeName: string, deviceTypes: DeviceType[]): string[];
     buildStructCSVRows(variables: ProjectVariable[], structTypeName: string, deviceTypes: DeviceType[]): string[][];
     buildUnitCSVRows(configs: UnitConfig[], getAddress: (config: UnitConfig, path: string) => string): string[][];
+    parsePrimitiveCSV(rows: string[][], deviceTypes: DeviceType[], reservedLabels: string[]): StructCSVParseResult;
+    buildPrimitiveCSVRows(variables: ProjectVariable[]): string[][];
     parseSiemensBlockCSV(rows: string[][], deviceTypes: DeviceType[]): SiemensBlockCSVParseResult;
     parsePhysicalIOCSV(rows: string[][], normalizeDirection?: (value: string) => string): PhysicalIOCSVParseResult;
   }
@@ -408,6 +479,8 @@ namespace GrafcetStudioExcelImport {
     structLeafPaths,
     buildStructCSVRows,
     buildUnitCSVRows,
+    parsePrimitiveCSV,
+    buildPrimitiveCSVRows,
     parseSiemensBlockCSV,
     parsePhysicalIOCSV
   };

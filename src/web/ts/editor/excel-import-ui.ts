@@ -34,6 +34,22 @@ function eiParsePhysicalIOCSV(rows: string[][]): GrafcetStudioProject.PhysicalIO
   );
 }
 
+// Labels of every struct instance in the project; a plain variable may not reuse one.
+function eiStructInstanceLabels(): string[] {
+  const vars = project.variables || { imported: [], user: [] };
+  const structNames = new Set((project.devices || []).map(function (d) { return d && d.name; }));
+  return ([] as GrafcetStudioProject.ProjectVariable[])
+    .concat(vars.imported || [], vars.user || [], project.excelVars || [])
+    .filter(function (v) {
+      return !!v && !!v.label && (v.kind === 'struct' || !!v.signalAddresses || structNames.has(v.dataType || v.format || ''));
+    })
+    .map(function (v) { return v.label as string; });
+}
+
+function eiImportedVarCount(): number {
+  return ((project.variables && project.variables.imported) || []).length + (project.excelVars || []).length;
+}
+
 function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImportOptions): EiExcelImportResult {
   const rows = eiParseCSV(csvText);
   if (!rows.length) return { ok: false, message: 'CSV file is empty or unreadable.', added: 0 };
@@ -59,6 +75,17 @@ function eiImportFromCSVText(csvText: string, csvType: string, options?: EiImpor
     if (typeof syncStructDataFromProjectData === 'function') syncStructDataFromProjectData();
     if (typeof saveProject === 'function') saveProject();
     return { ok: true, message: 'Import thanh cong ' + parsed.configs.length + ' unit station.', added: parsed.configs.length };
+  }
+
+  if (csvType === 'primitive') {
+    const parsed = eiGetParserApi().parsePrimitiveCSV(rows, project.devices || [], eiStructInstanceLabels());
+    if (parsed.errors.length) return { ok: false, message: 'Validation errors:\n' + parsed.errors.join('\n'), added: 0 };
+    if (!parsed.vars.length) return { ok: false, message: 'No valid variable rows found.', added: 0 };
+    if (typeof ensureProjectVariables === 'function') ensureProjectVariables();
+    parsed.vars.forEach(function (v) { upsertProjectVariable('imported', v); });
+    if (typeof saveProject === 'function') saveProject();
+    if (typeof updateVarDatalist === 'function') updateVarDatalist();
+    return { ok: true, message: 'Import thanh cong ' + parsed.vars.length + ' bien.', added: parsed.vars.length };
   }
 
   const selectedStructType = (options && options.structType) || '';
@@ -95,8 +122,8 @@ function showExcelImportModal(defaultType?: string): void {
     : '<option value="">(No Struct Data yet)</option>';
 
   const unitCount = Object.keys(project.unitConfig || {}).length;
-  const varCount  = (project.excelVars || []).length;
-  const initialType = defaultType === 'physical-io' || defaultType === 'unit' || defaultType === 'struct' ? defaultType : 'struct';
+  const varCount  = eiImportedVarCount();
+  const initialType = defaultType === 'physical-io' || defaultType === 'unit' || defaultType === 'struct' || defaultType === 'primitive' ? defaultType : 'struct';
 
   const el = document.createElement('div');
   el.id = 'modal-excel-import';
@@ -129,6 +156,9 @@ function showExcelImportModal(defaultType?: string): void {
             </label>
             <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="struct" ${initialType === 'struct' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Struct Data
+            </label>
+            <label class="ei-radio">
+              <input type="radio" name="ei-import-type" value="primitive" ${initialType === 'primitive' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Variables
             </label>
             <label class="ei-radio">
               <input type="radio" name="ei-import-type" value="physical-io" ${initialType === 'physical-io' ? 'checked' : ''} onchange="eiOnImportTypeChange()"> Physical IO
@@ -179,6 +209,9 @@ function eiGetSchemaHintHtml(type: string, structType?: string): string {
   if (type === 'physical-io') {
     return '<b class="ei-accent">Physical IO CSV</b>: DeviceTag · PLCAddress · Direction · Description<br>Direction: input/in or output/out';
   }
+  if (type === 'primitive') {
+    return '<b class="ei-accent">Variables CSV</b>: Label · Address · Type · Comment<br>Type defaults to BOOL. Names already used by a struct instance are rejected.';
+  }
   const leaves = structType ? eiGetParserApi().structLeafPaths(structType, project.devices || []) : [];
   if (!leaves.length) return '<b class="ei-accent">Struct Data CSV</b>: Label | Signal1 | Signal2 | ...';
   return '<b class="ei-accent">Struct Data CSV</b> (' + esc(structType) + '): Label · ' + leaves.map(esc).join(' · ')
@@ -188,6 +221,7 @@ function eiGetSchemaHintHtml(type: string, structType?: string): string {
 function eiGetImportTypeLabel(type: string, structType?: string): string {
   if (type === 'unit') return 'Unit Station';
   if (type === 'physical-io') return 'Physical IO';
+  if (type === 'primitive') return 'Variables';
   return 'Struct Data' + (structType ? ' (' + structType + ')' : '');
 }
 
@@ -275,10 +309,12 @@ function eiDoImport(): void {
 async function eiClearExcelVars(): Promise<void> {
   if (!(await confirmDialog('Clear Excel data', 'Clear all imported Excel data?', 'Clear', true))) return;
   runUndoableProjectChange('Excel import data cleared', () => {
+    if (typeof ensureProjectVariables === 'function') ensureProjectVariables().imported = [];
     project.excelVars = [];
     project.unitConfig = {};
     if (typeof saveProject === 'function') saveProject();
     if (typeof renderVarTable === 'function') renderVarTable();
+    if (typeof updateVarDatalist === 'function') updateVarDatalist();
     closeModal('modal-excel-import');
     showExcelImportModal();
   });
